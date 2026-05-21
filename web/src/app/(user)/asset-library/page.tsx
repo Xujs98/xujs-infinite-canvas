@@ -5,8 +5,8 @@ import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { App, Button, Card, Drawer, Empty, Image, Input, Pagination, Spin, Tag, Typography } from "antd";
 import axios from "axios";
-import copy from "copy-to-clipboard";
 
+import { useCopyText } from "@/hooks/use-copy-text";
 import { cn } from "@/lib/utils";
 import { useAssetStore } from "@/stores/use-asset-store";
 import { fetchAssetLibrary, type AssetLibraryItem } from "@/services/api/assets";
@@ -16,6 +16,7 @@ const PAGE_SIZE = 12;
 
 export default function AssetLibraryPage() {
   const { message } = App.useApp();
+  const copyText = useCopyText();
   const [keyword, setKeyword] = useState("");
   const [selectedType, setSelectedType] = useState("");
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
@@ -75,11 +76,6 @@ export default function AssetLibraryPage() {
     } catch {
       message.error("加入失败");
     }
-  };
-
-  const copyText = async (value: string) => {
-    copy(value);
-    message.success("已复制");
   };
 
   if (!isReady) {
@@ -164,8 +160,8 @@ export default function AssetLibraryPage() {
             </div>
             {selectedAsset.description ? <Typography.Paragraph type="secondary">{selectedAsset.description}</Typography.Paragraph> : null}
             <div className="flex flex-wrap gap-2">
-              {selectedAsset.type === "text" ? <Button type="primary" icon={<Copy className="size-4" />} onClick={() => void copyText(selectedAsset.content)}>复制文本</Button> : null}
-              {selectedAsset.type === "image" ? <Button type="primary" icon={<Copy className="size-4" />} onClick={() => void copyText(selectedAsset.url)}>复制链接</Button> : null}
+              {selectedAsset.type === "text" ? <Button type="primary" icon={<Copy className="size-4" />} onClick={() => copyText(selectedAsset.content)}>复制文本</Button> : null}
+              {selectedAsset.type === "image" ? <Button type="primary" icon={<Copy className="size-4" />} onClick={() => copyText(selectedAsset.url)}>复制链接</Button> : null}
               <Button icon={<FolderPlus className="size-4" />} onClick={() => void saveToMyAssets(selectedAsset)}>加入我的素材</Button>
             </div>
           </div>

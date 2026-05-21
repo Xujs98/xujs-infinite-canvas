@@ -10,8 +10,13 @@ import { useEffect } from "react";
 
 import { UserStatusActions } from "@/components/user-status-actions";
 import { adminLayoutStyle } from "@/lib/app-theme";
-import { useThemeStore } from "@/stores/use-theme-store";
 import { useUserStore } from "@/stores/use-user-store";
+
+const adminMenus = [
+  { key: "/admin/prompts", icon: <FileTextOutlined />, label: "提示词管理" },
+  { key: "/admin/assets", icon: <PictureOutlined />, label: "素材库" },
+  { key: "/admin/settings", icon: <SettingOutlined />, label: "系统设置" },
+];
 
 export default function AdminLayout({ children }: { children: ReactNode }) {
   const { token: antToken } = theme.useToken();
@@ -21,11 +26,8 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
   const user = useUserStore((state) => state.user);
   const isReady = useUserStore((state) => state.isReady);
   const logout = useUserStore((state) => state.clearSession);
-  const colorTheme = useThemeStore((state) => state.theme);
-  const setTheme = useThemeStore((state) => state.setTheme);
   const activeKey = pathname.startsWith("/admin/settings") ? "/admin/settings" : pathname.startsWith("/admin/assets") ? "/admin/assets" : pathname.startsWith("/admin/prompts") ? "/admin/prompts" : "";
   const pageTitle = pathname.startsWith("/admin/settings") ? "系统设置" : pathname.startsWith("/admin/assets") ? "素材库管理" : "提示词管理";
-  const appVersion = process.env.NEXT_PUBLIC_APP_VERSION || "dev";
 
   useEffect(() => {
     if (!isReady) return;
@@ -57,11 +59,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
           mode="inline"
           selectedKeys={[activeKey]}
           style={adminLayoutStyle.menu}
-          items={[
-            { key: "/admin/prompts", icon: <FileTextOutlined />, label: <Link href="/admin/prompts" style={{ color: "inherit" }}>提示词管理</Link>, style: adminLayoutStyle.menuItem },
-            { key: "/admin/assets", icon: <PictureOutlined />, label: <Link href="/admin/assets" style={{ color: "inherit" }}>素材库</Link>, style: adminLayoutStyle.menuItem },
-            { key: "/admin/settings", icon: <SettingOutlined />, label: <Link href="/admin/settings" style={{ color: "inherit" }}>系统设置</Link>, style: adminLayoutStyle.menuItem },
-          ]}
+          items={adminMenus.map((item) => ({ ...item, label: <Link href={item.key} style={{ color: "inherit" }}>{item.label}</Link>, style: adminLayoutStyle.menuItem }))}
         />
         <Flex vertical gap={8} style={{ position: "absolute", bottom: 0, insetInline: 0, padding: 12, borderTop: `1px solid ${antToken.colorBorder}`, background: antToken.colorBgContainer }}>
           <Button block icon={<HomeOutlined />} href="/canvas" target="_blank" rel="noreferrer">前往画布</Button>
@@ -73,11 +71,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
           <Typography.Title level={5} style={{ margin: 0 }}>{pageTitle}</Typography.Title>
           <Flex align="center" gap={4}>
             <UserStatusActions
-              version={appVersion}
-              theme={colorTheme}
-              onThemeChange={setTheme}
               showConfig={false}
-              userName={user.username}
               menuItems={[{ key: "logout", icon: <LogOut className="size-4" />, label: "退出登录", onClick: logout }]}
             />
           </Flex>

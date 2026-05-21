@@ -126,11 +126,7 @@ export function AppTopNav({ activeToolSlug, config, onConfigChange, hideHeader =
             <div className="my-auto flex h-9 min-w-0 items-center justify-end gap-2 justify-self-end whitespace-nowrap">
               {isReady && user ? (
                 <UserStatusActions
-                  version={appVersion}
-                  theme={theme}
-                  onThemeChange={setTheme}
                   onOpenConfig={() => openConfigDialog(false)}
-                  userName={user.username}
                   menuItems={[
                     ...(user.role === "admin" ? [{ key: "admin", icon: <Shield className="size-4" />, label: <Link href="/admin">管理后台</Link> }] : []),
                     { key: "logout", icon: <LogOut className="size-4" />, label: "退出登录", onClick: logout },

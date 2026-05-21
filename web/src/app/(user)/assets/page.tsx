@@ -3,8 +3,8 @@
 import { Copy, Download, PencilLine, Search, Trash2, Upload } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { App, Button, Card, Drawer, Empty, Form, Image, Input, Modal, Pagination, Select, Space, Tag, Typography } from "antd";
-import copy from "copy-to-clipboard";
 
+import { useCopyText } from "@/hooks/use-copy-text";
 import { formatBytes, readFileAsDataUrl } from "@/lib/image-utils";
 import { uploadImage } from "@/services/image-storage";
 import { cn } from "@/lib/utils";
@@ -30,6 +30,7 @@ const kindOptions = [
 
 export default function AssetsPage() {
   const { message } = App.useApp();
+  const copyText = useCopyText();
   const [form] = Form.useForm<AssetFormValues>();
   const coverInputRef = useRef<HTMLInputElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
@@ -138,10 +139,9 @@ export default function AssetsPage() {
     if (!form.getFieldValue("title")) form.setFieldValue("title", file.name);
   };
 
-  const copyText = async (asset: Asset) => {
+  const copyAssetText = async (asset: Asset) => {
     if (asset.kind !== "text") return;
-    copy(asset.data.content);
-    message.success("文本已复制");
+    copyText(asset.data.content, "文本已复制");
   };
 
   const downloadImage = (asset: Asset) => {
@@ -199,7 +199,7 @@ export default function AssetsPage() {
                 asset={asset}
                 onOpen={() => setPreviewAsset(asset)}
                 onEdit={() => openEdit(asset)}
-                onCopy={copyText}
+                onCopy={copyAssetText}
                 onDownload={downloadImage}
                 onDelete={() => setDeletingAsset(asset)}
               />
@@ -286,7 +286,7 @@ export default function AssetsPage() {
         }} />
       </Modal>
 
-      <AssetDrawer asset={previewAsset} onClose={() => setPreviewAsset(null)} onCopy={copyText} onDownload={downloadImage} />
+      <AssetDrawer asset={previewAsset} onClose={() => setPreviewAsset(null)} onCopy={copyAssetText} onDownload={downloadImage} />
 
       <Modal title="删除素材" open={Boolean(deletingAsset)} onCancel={() => setDeletingAsset(null)} onOk={confirmDelete} okText="删除" okButtonProps={{ danger: true }} cancelText="取消">
         确定删除「{deletingAsset?.title}」吗？删除后会从我的素材中移除。

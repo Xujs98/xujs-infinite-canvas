@@ -9,12 +9,10 @@ import { GitHubLink } from "@/components/github-link";
 import { AnimatedThemeToggler } from "@/components/ui/animated-theme-toggler";
 import { VersionReleaseModal } from "@/components/version-release-modal";
 import { cn } from "@/lib/utils";
-import type { ThemeName } from "@/stores/use-theme-store";
+import { useThemeStore } from "@/stores/use-theme-store";
+import { useUserStore } from "@/stores/use-user-store";
 
 type UserStatusActionsProps = {
-  version: string;
-  theme: ThemeName;
-  onThemeChange: (theme: ThemeName) => void;
   onOpenConfig?: () => void;
   showConfig?: boolean;
   userName?: string;
@@ -34,9 +32,6 @@ type UserStatusActionsProps = {
 };
 
 export function UserStatusActions({
-  version,
-  theme,
-  onThemeChange,
   onOpenConfig,
   showConfig = true,
   userName,
@@ -54,7 +49,12 @@ export function UserStatusActions({
   userLabel,
   iconStyle,
 }: UserStatusActionsProps) {
-  const avatarText = initial || (userName?.trim()[0] || "U").toUpperCase();
+  const theme = useThemeStore((state) => state.theme);
+  const setTheme = useThemeStore((state) => state.setTheme);
+  const storedUserName = useUserStore((state) => state.user?.username);
+  const appVersion = process.env.NEXT_PUBLIC_APP_VERSION || "dev";
+  const resolvedUserName = userName || storedUserName;
+  const avatarText = initial || (resolvedUserName?.trim()[0] || "U").toUpperCase();
   const naturalIconClass = "inline-flex size-8 shrink-0 items-center justify-center text-stone-600 transition hover:text-stone-950 dark:text-stone-300 dark:hover:text-white [&_svg]:size-4";
 
   return (
@@ -73,13 +73,13 @@ export function UserStatusActions({
       ) : null}
       <AnimatedThemeToggler
         theme={theme}
-        onThemeChange={onThemeChange}
+        onThemeChange={setTheme}
         className={naturalIconClass}
         style={iconStyle}
         aria-label={theme === "dark" ? "切换到浅色主题" : "切换到深色主题"}
         title={theme === "dark" ? "切换到浅色主题" : "切换到深色主题"}
       />
-      <VersionReleaseModal currentVersion={version} style={versionStyle} />
+      <VersionReleaseModal currentVersion={appVersion} style={versionStyle} />
       <GitHubLink className={cn("bg-transparent hover:bg-transparent dark:hover:bg-transparent", gitHubClassName)} style={gitHubStyle} />
       <div ref={accountRef}>
         <Dropdown

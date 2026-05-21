@@ -53,17 +53,13 @@ export function useAdminAssets() {
     if (query.isError) {
       const errorMessage = query.error instanceof Error ? query.error.message : "读取素材失败";
       message.error(errorMessage);
-      if (errorMessage.includes("未登录") || errorMessage.includes("权限不足") || errorMessage.includes("登录状态无效")) {
-        clearSession();
-      }
+      if (errorMessage.includes("未登录") || errorMessage.includes("权限不足") || errorMessage.includes("登录状态无效")) clearSession();
     }
   }, [clearSession, message, query.error, query.isError]);
 
   const updateFilters = (next: Partial<{ keyword: string; type: string; tag: string[]; page: number; pageSize: number }>) => {
     const queryState = { keyword, type, tag, page, pageSize, ...next };
-    if (next.keyword !== undefined || next.type !== undefined || next.tag !== undefined || next.pageSize !== undefined) {
-      queryState.page = 1;
-    }
+    if (next.keyword !== undefined || next.type !== undefined || next.tag !== undefined || next.pageSize !== undefined) queryState.page = 1;
     setKeyword(queryState.keyword);
     setType(queryState.type);
     setTag(queryState.tag);
@@ -71,20 +67,7 @@ export function useAdminAssets() {
     setPageSize(queryState.pageSize);
   };
 
-  const refreshAssets = async () => {
-    await query.refetch();
-  };
-
-  const saveAsset = async (asset: Partial<AdminAsset>) => {
-    await saveMutation.mutateAsync(asset);
-  };
-
-  const deleteAsset = async (id: string) => {
-    await deleteMutation.mutateAsync(id);
-  };
-
   const data = query.data;
-  const isLoading = query.isFetching || saveMutation.isPending || deleteMutation.isPending;
 
   return {
     assets: data?.items || [],
@@ -95,15 +78,15 @@ export function useAdminAssets() {
     page,
     pageSize,
     total: data?.total || 0,
-    isLoading,
+    isLoading: query.isFetching || saveMutation.isPending || deleteMutation.isPending,
     searchAssets: (value = keyword) => updateFilters({ keyword: value }),
     changeKind: (value: string) => updateFilters({ type: value, tag: [] }),
     changeTag: (value: string[]) => updateFilters({ tag: value }),
     changePage: (value: number) => updateFilters({ page: value }),
     changePageSize: (value: number) => updateFilters({ pageSize: value }),
     resetFilters: () => updateFilters({ keyword: "", type: "", tag: [], page: 1, pageSize: defaultPageSize }),
-    refreshAssets,
-    saveAsset,
-    deleteAsset,
+    refreshAssets: () => query.refetch(),
+    saveAsset: (asset: Partial<AdminAsset>) => saveMutation.mutateAsync(asset),
+    deleteAsset: (id: string) => deleteMutation.mutateAsync(id),
   };
 }

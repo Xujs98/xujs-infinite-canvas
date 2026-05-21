@@ -2,12 +2,12 @@
 
 import { CopyOutlined, DeleteOutlined, EditOutlined, EyeOutlined, PlusOutlined, ReloadOutlined, SearchOutlined } from "@ant-design/icons";
 import { ProTable, type ProColumns } from "@ant-design/pro-components";
-import { App, Button, Card, Col, Flex, Form, Image, Input, Modal, Row, Select, Space, Tag, Tooltip, Typography } from "antd";
+import { Button, Card, Col, Flex, Form, Image, Input, Modal, Row, Select, Space, Tag, Tooltip, Typography } from "antd";
 import { useEffect, useState } from "react";
-import copy from "copy-to-clipboard";
 
+import { useCopyText } from "@/hooks/use-copy-text";
 import type { AdminAsset } from "@/services/api/admin";
-import { useAdminAssets } from "../hooks/use-admin-assets";
+import { useAdminAssets } from "./use-admin-assets";
 
 type AssetFormValues = Partial<AdminAsset> & { tagText?: string };
 
@@ -21,7 +21,7 @@ const editTypeOptions = typeOptions.slice(1);
 
 export default function AdminAssetsPage() {
   const { assets, tags, keyword, kind, tag, page, pageSize, total, isLoading, searchAssets, changeKind, changeTag, changePage, changePageSize, resetFilters, refreshAssets, saveAsset: saveAdminAsset, deleteAsset } = useAdminAssets();
-  const { message } = App.useApp();
+  const copyText = useCopyText();
   const [form] = Form.useForm<AssetFormValues>();
   const [editingAsset, setEditingAsset] = useState<Partial<AdminAsset> | null>(null);
   const [detailAsset, setDetailAsset] = useState<AdminAsset | null>(null);
@@ -32,11 +32,6 @@ export default function AdminAssetsPage() {
   useEffect(() => {
     if (editingAsset) form.setFieldsValue({ ...editingAsset, tagText: editingAsset.tags?.join(", ") || "" });
   }, [editingAsset, form]);
-
-  const copyValue = async (value: string) => {
-    copy(value);
-    message.success("已复制");
-  };
 
   const saveAsset = async () => {
     const value = await form.validateFields();
@@ -150,7 +145,7 @@ export default function AdminAssetsPage() {
             </Flex>
             {detailAsset.description ? <Typography.Paragraph type="secondary" style={{ margin: 0 }}>{detailAsset.description}</Typography.Paragraph> : null}
             <Input.TextArea value={detailAsset.type === "image" ? detailAsset.url || detailAsset.coverUrl : detailAsset.content} rows={7} readOnly />
-            <Button icon={<CopyOutlined />} onClick={() => void copyValue(detailAsset.type === "image" ? detailAsset.url || detailAsset.coverUrl : detailAsset.content)}>复制内容</Button>
+            <Button icon={<CopyOutlined />} onClick={() => copyText(detailAsset.type === "image" ? detailAsset.url || detailAsset.coverUrl : detailAsset.content)}>复制内容</Button>
           </Flex>
         ) : null}
       </Modal>

@@ -1,8 +1,5 @@
 import type { Metadata } from "next";
-import { AntThemeProvider } from "@/components/ant-theme-provider";
-import { QueryProvider } from "@/components/query-provider";
-import { ThemeSync } from "@/components/theme-sync";
-import { UserSessionSync } from "@/components/user-session-sync";
+import { AppProviders } from "@/components/app-providers";
 import "antd/dist/reset.css";
 import "./globals.css";
 
@@ -30,13 +27,7 @@ export default function RootLayout({
             __html: `try{var s=JSON.parse(localStorage.getItem("infinite-canvas:theme_store")||"{}");var t=s.state&&s.state.theme==="light"?"light":"dark";document.documentElement.classList.toggle("dark",t==="dark");document.documentElement.style.colorScheme=t}catch(e){}`,
           }}
         />
-        <ThemeSync />
-        <AntThemeProvider>
-          <QueryProvider>
-            <UserSessionSync />
-            {children}
-          </QueryProvider>
-        </AntThemeProvider>
+        <AppProviders>{children}</AppProviders>
       </body>
     </html>
   );

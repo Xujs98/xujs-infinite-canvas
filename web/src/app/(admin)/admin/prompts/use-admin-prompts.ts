@@ -72,30 +72,16 @@ export function useAdminPrompts() {
   });
 
   useEffect(() => {
-    if (categoriesQuery.isError) {
-      const errorMessage = categoriesQuery.error instanceof Error ? categoriesQuery.error.message : "读取提示词分类失败";
-      message.error(errorMessage);
-      if (errorMessage.includes("未登录") || errorMessage.includes("权限不足") || errorMessage.includes("登录状态无效")) {
-        clearSession();
-      }
-    }
-  }, [categoriesQuery.error, categoriesQuery.isError, clearSession, message]);
-
-  useEffect(() => {
-    if (promptsQuery.isError) {
-      const errorMessage = promptsQuery.error instanceof Error ? promptsQuery.error.message : "读取提示词失败";
-      message.error(errorMessage);
-      if (errorMessage.includes("未登录") || errorMessage.includes("权限不足") || errorMessage.includes("登录状态无效")) {
-        clearSession();
-      }
-    }
-  }, [clearSession, message, promptsQuery.error, promptsQuery.isError]);
+    const error = categoriesQuery.error || promptsQuery.error;
+    if (!error) return;
+    const errorMessage = error instanceof Error ? error.message : "读取提示词失败";
+    message.error(errorMessage);
+    if (errorMessage.includes("未登录") || errorMessage.includes("权限不足") || errorMessage.includes("登录状态无效")) clearSession();
+  }, [categoriesQuery.error, clearSession, message, promptsQuery.error]);
 
   const updateFilters = (next: Partial<{ keyword: string; category: string; tag: string[]; page: number; pageSize: number }>) => {
     const queryState = { keyword, category, tag, page, pageSize, ...next };
-    if (next.keyword !== undefined || next.category !== undefined || next.tag !== undefined || next.pageSize !== undefined) {
-      queryState.page = 1;
-    }
+    if (next.keyword !== undefined || next.category !== undefined || next.tag !== undefined || next.pageSize !== undefined) queryState.page = 1;
     setKeyword(queryState.keyword);
     setCategory(queryState.category);
     setTag(queryState.tag);
@@ -103,13 +89,7 @@ export function useAdminPrompts() {
     setPageSize(queryState.pageSize);
   };
 
-  const refreshPrompts = async () => {
-    await categoriesQuery.refetch();
-    await promptsQuery.refetch();
-  };
-
   const data = promptsQuery.data;
-  const isLoading = categoriesQuery.isFetching || promptsQuery.isFetching || saveMutation.isPending || deleteMutation.isPending;
 
   return {
     categories: categoriesQuery.data || [],
@@ -121,7 +101,7 @@ export function useAdminPrompts() {
     page,
     pageSize,
     total: data?.total || 0,
-    isLoading,
+    isLoading: categoriesQuery.isFetching || promptsQuery.isFetching || saveMutation.isPending || deleteMutation.isPending,
     isSyncing: syncMutation.isPending,
     syncCategory: (category: string) => syncMutation.mutateAsync(category),
     searchPrompts: (value = keyword) => updateFilters({ keyword: value }),
@@ -130,7 +110,10 @@ export function useAdminPrompts() {
     changePage: (value: number) => updateFilters({ page: value }),
     changePageSize: (value: number) => updateFilters({ pageSize: value }),
     resetFilters: () => updateFilters({ keyword: "", category: "", tag: [], page: 1, pageSize: defaultPageSize }),
-    refreshPrompts,
+    refreshPrompts: async () => {
+      await categoriesQuery.refetch();
+      await promptsQuery.refetch();
+    },
     savePrompt: (prompt: Partial<Prompt>) => saveMutation.mutateAsync(prompt),
     deletePrompt: (id: string) => deleteMutation.mutateAsync(id),
   };

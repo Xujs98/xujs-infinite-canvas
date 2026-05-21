@@ -3,11 +3,11 @@
 import { FolderPlus, Search } from "lucide-react";
 import { type UIEvent, useEffect, useState } from "react";
 import { App, Button, Empty, Input, Spin, Tag } from "antd";
-import copy from "copy-to-clipboard";
 
 import { PromptCard } from "@/components/prompts/prompt-card";
 import { PromptDetailDialog } from "@/components/prompts/prompt-detail-dialog";
 import { usePromptList } from "@/components/prompts/use-prompt-list";
+import { useCopyText } from "@/hooks/use-copy-text";
 import { cn } from "@/lib/utils";
 import { useAssetStore } from "@/stores/use-asset-store";
 import { ALL_PROMPTS_OPTION, type Prompt } from "@/services/api/prompts";
@@ -19,6 +19,7 @@ export default function PromptsPage() {
   const [selectedCategory, setSelectedCategory] = useState(ALL_PROMPTS_OPTION);
   const [selectedPrompt, setSelectedPrompt] = useState<Prompt | null>(null);
   const addAsset = useAssetStore((state) => state.addAsset);
+  const copyText = useCopyText();
   const { query, items: promptItems, tags: promptTags, categories: promptCategoryOptions, total: totalPrompts } = usePromptList({ keyword: titleKeyword, tags: selectedTags, category: selectedCategory });
 
   useEffect(() => {
@@ -30,11 +31,6 @@ export default function PromptsPage() {
   const toggleTag = (tag: string) => {
     if (tag === ALL_PROMPTS_OPTION) return setSelectedTags([]);
     setSelectedTags((items) => items.includes(tag) ? items.filter((item) => item !== tag) : [...items, tag]);
-  };
-
-  const copyPrompt = async (prompt: string) => {
-    copy(prompt);
-    message.success("提示词已复制");
   };
 
   const savePromptAsset = (item: Prompt) => {
@@ -93,7 +89,7 @@ export default function PromptsPage() {
           <div>
             <div className="mx-auto grid max-w-7xl gap-5 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
               {promptItems.map((item) => (
-                <PromptCard key={item.id} item={item} onOpen={() => setSelectedPrompt(item)} onCopy={() => void copyPrompt(item.prompt)} extraAction={<Button size="small" icon={<FolderPlus className="size-3.5" />} onClick={() => savePromptAsset(item)}>加入我的素材</Button>} />
+                <PromptCard key={item.id} item={item} onOpen={() => setSelectedPrompt(item)} onCopy={() => copyText(item.prompt, "提示词已复制")} extraAction={<Button size="small" icon={<FolderPlus className="size-3.5" />} onClick={() => savePromptAsset(item)}>加入我的素材</Button>} />
               ))}
             </div>
             {promptItems.length === 0 ? <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="没有找到匹配的提示词" className="py-16" /> : null}
@@ -102,7 +98,7 @@ export default function PromptsPage() {
         ) : null}
       </main>
 
-      <PromptDetailDialog prompt={selectedPrompt} onClose={() => setSelectedPrompt(null)} onCopy={(prompt) => void copyPrompt(prompt)} onSaveAsset={savePromptAsset} />
+      <PromptDetailDialog prompt={selectedPrompt} onClose={() => setSelectedPrompt(null)} onCopy={(prompt) => copyText(prompt, "提示词已复制")} onSaveAsset={savePromptAsset} />
     </div>
   );
 }

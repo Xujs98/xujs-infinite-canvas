@@ -458,7 +458,10 @@ function modelSummary(models: string[]) {
   return models.length > 3 ? `${models.length} 个模型：${preview}...` : preview;
 }
 
-function parseTabJson(tab: SettingsTabKey, value: string) {
+function parseTabJson(tab: "public", value: string): AdminSettings["public"] | null;
+function parseTabJson(tab: "private", value: string): AdminSettings["private"] | null;
+function parseTabJson(tab: SettingsTabKey, value: string): AdminSettings[SettingsTabKey] | null;
+function parseTabJson(tab: SettingsTabKey, value: string): AdminSettings[SettingsTabKey] | null {
   try {
     return tab === "public" ? normalizePublicSetting(JSON.parse(value) as Partial<AdminSettings["public"]>) : normalizePrivateSetting(JSON.parse(value) as Partial<AdminSettings["private"]>);
   } catch {

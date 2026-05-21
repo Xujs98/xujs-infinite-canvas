@@ -2,16 +2,16 @@
 
 import { CopyOutlined, DeleteOutlined, EditOutlined, ExportOutlined, EyeOutlined, PlusOutlined, ReloadOutlined, SearchOutlined, SyncOutlined } from "@ant-design/icons";
 import { ProTable, type ProColumns } from "@ant-design/pro-components";
-import { App, Button, Card, Col, Flex, Form, Image, Input, Modal, Row, Select, Space, Table, Tag, Tooltip, Typography } from "antd";
+import { Button, Card, Col, Flex, Form, Image, Input, Modal, Row, Select, Space, Table, Tag, Tooltip, Typography } from "antd";
 import { useEffect, useState } from "react";
-import copy from "copy-to-clipboard";
 
+import { useCopyText } from "@/hooks/use-copy-text";
 import type { Prompt } from "@/services/api/prompts";
-import { useAdminPrompts } from "../hooks/use-admin-prompts";
+import { useAdminPrompts } from "./use-admin-prompts";
 
 export default function AdminPromptsPage() {
   const { categories, prompts, tags, keyword, category, tag, page, pageSize, total, isLoading, isSyncing, searchPrompts, changeCategory, changeTag, changePage, changePageSize, resetFilters, refreshPrompts, syncCategory, savePrompt: saveAdminPrompt, deletePrompt } = useAdminPrompts();
-  const { message } = App.useApp();
+  const copyText = useCopyText();
   const [form] = Form.useForm<Partial<Prompt> & { tagText?: string }>();
   const [editingPrompt, setEditingPrompt] = useState<Partial<Prompt> | null>(null);
   const [detailPrompt, setDetailPrompt] = useState<Prompt | null>(null);
@@ -25,11 +25,6 @@ export default function AdminPromptsPage() {
   useEffect(() => {
     if (editingPrompt) form.setFieldsValue({ ...editingPrompt, tagText: editingPrompt.tags?.join(", ") || "" });
   }, [editingPrompt, form]);
-
-  const copyPrompt = async (value: string) => {
-    copy(value);
-    message.success("已复制");
-  };
 
   const savePrompt = async () => {
     const value = await form.validateFields();
@@ -129,7 +124,7 @@ export default function AdminPromptsPage() {
             {detailPrompt.preview ? <Typography.Paragraph type="secondary" style={{ margin: 0 }}>{detailPrompt.preview}</Typography.Paragraph> : null}
             <Input.TextArea value={detailPrompt.prompt} rows={8} readOnly />
             <Space>
-              <Button icon={<CopyOutlined />} onClick={() => void copyPrompt(detailPrompt.prompt)}>复制提示词</Button>
+              <Button icon={<CopyOutlined />} onClick={() => copyText(detailPrompt.prompt)}>复制提示词</Button>
               {detailPrompt.githubUrl ? <Button icon={<ExportOutlined />} href={detailPrompt.githubUrl} target="_blank">远程源</Button> : null}
             </Space>
           </Flex>

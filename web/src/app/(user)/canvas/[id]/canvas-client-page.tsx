@@ -2093,9 +2093,7 @@ function CanvasTopBar({
   onExpandAssistant: () => void;
 }) {
   const colorTheme = useThemeStore((state) => state.theme);
-  const setTheme = useThemeStore((state) => state.setTheme);
   const theme = canvasThemes[colorTheme];
-  const appVersion = process.env.NEXT_PUBLIC_APP_VERSION || "dev";
   const initial = (userName.trim()[0] || "U").toUpperCase();
   const titleRef = useRef<HTMLDivElement>(null);
   const accountRef = useRef<HTMLDivElement>(null);
@@ -2175,9 +2173,6 @@ function CanvasTopBar({
 
       <div className="pointer-events-auto flex items-center gap-1.5">
         <UserStatusActions
-          version={appVersion}
-          theme={colorTheme}
-          onThemeChange={setTheme}
           onOpenConfig={onOpenConfig}
           userName={userName}
           initial={initial}
