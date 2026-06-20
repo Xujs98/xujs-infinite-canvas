@@ -1,3 +1,4 @@
+import axios from "axios";
 import { apiDelete, apiGet, apiPost, compactApiParams } from "@/services/api/request";
 import type { Prompt, PromptListResponse } from "@/services/api/prompts";
 
@@ -23,6 +24,7 @@ export type AdminUser = {
     inviterId: string;
     linuxDoId: string;
     status: "active" | "ban";
+    membershipExpiresAt: string;
     lastLoginAt: string;
     createdAt: string;
     updatedAt: string;
@@ -36,6 +38,7 @@ export type AdminUserListResponse = {
 export type AdminCreditLog = {
     id: string;
     userId: string;
+    username: string;
     type: string;
     amount: number;
     balance: number;
@@ -52,6 +55,8 @@ export type AdminCreditLogListResponse = {
 
 export type AdminUserQuery = {
     keyword?: string;
+    role?: string;
+    status?: string;
     page?: number;
     pageSize?: number;
 };
@@ -82,6 +87,18 @@ export async function saveAdminCreditLog(token: string, log: Partial<AdminCredit
 
 export async function deleteAdminCreditLog(token: string, id: string) {
     return apiDelete<boolean>(`/api/admin/credit-logs/${encodeURIComponent(id)}`, token);
+}
+
+export async function batchDeleteAdminCreditLogs(token: string, ids: string[]) {
+    return apiPost<boolean>("/api/admin/credit-logs/batch-delete", { ids }, token);
+}
+
+export async function batchDeleteAdminUsers(token: string, ids: string[]) {
+    return apiPost<boolean>("/api/admin/users/batch-delete", { ids }, token);
+}
+
+export async function batchUpdateAdminUserStatus(token: string, ids: string[], status: "active" | "ban") {
+    return apiPost<boolean>("/api/admin/users/batch-status", { ids, status }, token);
 }
 
 export async function fetchAdminPromptCategories(token: string) {
@@ -154,6 +171,52 @@ export async function saveAdminAsset(token: string, asset: Partial<AdminAsset>) 
 
 export async function deleteAdminAsset(token: string, id: string) {
     return apiDelete<boolean>(`/api/admin/assets/${encodeURIComponent(id)}`, token);
+}
+
+export type AdminRedeemCode = {
+    id: string;
+    code: string;
+    type: "credits" | "membership";
+    credits: number;
+    membershipDays: number;
+    status: "unused" | "used";
+    usedBy: string;
+    usedByName: string;
+    usedAt: string;
+    batchName: string;
+    remark: string;
+    createdAt: string;
+    updatedAt: string;
+};
+
+export type AdminRedeemCodeListResponse = {
+    items: AdminRedeemCode[];
+    total: number;
+};
+
+export type AdminGenerateRedeemCodesRequest = {
+    count: number;
+    type: "credits" | "membership";
+    credits?: number;
+    membershipDays?: number;
+    batchName?: string;
+    remark?: string;
+};
+
+export async function fetchAdminRedeemCodes(token: string, query: AdminUserQuery = {}) {
+    return apiGet<AdminRedeemCodeListResponse>("/api/admin/redeem-codes", compactApiParams(query), token);
+}
+
+export async function generateAdminRedeemCodes(token: string, payload: AdminGenerateRedeemCodesRequest) {
+    return apiPost<AdminRedeemCode[]>("/api/admin/redeem-codes/generate", payload, token);
+}
+
+export async function deleteAdminRedeemCode(token: string, id: string) {
+    return apiDelete<boolean>(`/api/admin/redeem-codes/${encodeURIComponent(id)}`, token);
+}
+
+export async function batchDeleteAdminRedeemCodes(token: string, ids: string[]) {
+    return apiPost<boolean>("/api/admin/redeem-codes/batch-delete", { ids }, token);
 }
 
 export type AdminModelChannel = {
@@ -232,4 +295,52 @@ export async function fetchChannelModels(token: string, payload: AdminChannelAct
 
 export async function testChannelModel(token: string, payload: AdminChannelActionRequest) {
     return apiPost<string>("/api/admin/settings/channel-test", payload, token);
+}
+
+export type AdminSystemSettings = {
+    siteName: string;
+    siteSubtitle: string;
+    siteLogo: string;
+    serviceContact: string;
+    registerGiftCredits: number;
+    allowCustomChannel: boolean;
+    allowRegister: boolean;
+    assistantEnabled: boolean;
+    emailEnabled: boolean;
+    smtpHost: string;
+    smtpPort: number;
+    smtpUsername: string;
+    smtpPassword: string;
+    smtpFrom: string;
+    smtpTLS: boolean;
+    membershipReminder: boolean;
+    emailTemplateWelcome: string;
+    emailTemplateReminder: string;
+};
+
+export async function fetchAdminSystemSettings(token: string) {
+    return apiGet<AdminSystemSettings>("/api/admin/system-settings", undefined, token);
+}
+
+export async function saveAdminSystemSettings(token: string, settings: AdminSystemSettings) {
+    return apiPost<boolean>("/api/admin/system-settings", settings, token);
+}
+
+export async function uploadAdminLogo(token: string, file: File) {
+    const formData = new FormData();
+    formData.append("file", file);
+    const response = await axios.request<{ code: number; data: { url: string }; msg: string }>({
+        url: "/api/admin/system-settings/logo",
+        method: "POST",
+        data: formData,
+        headers: { Authorization: `Bearer ${token}` },
+        validateStatus: () => true,
+    });
+    const result = response.data;
+    if (!result || result.code !== 0) throw new Error(result?.msg || "上传失败");
+    return result.data;
+}
+
+export async function removeAdminLogo(token: string) {
+    return apiDelete<boolean>("/api/admin/system-settings/logo", token);
 }

@@ -168,6 +168,22 @@
         }
     }
 
+    /* Glassmorphism utilities */
+    .glass {
+        backdrop-filter: blur(20px) saturate(1.6);
+        -webkit-backdrop-filter: blur(20px) saturate(1.6);
+    }
+
+    .glass-subtle {
+        backdrop-filter: blur(12px) saturate(1.4);
+        -webkit-backdrop-filter: blur(12px) saturate(1.4);
+    }
+
+    .glass-strong {
+        backdrop-filter: blur(32px) saturate(1.8);
+        -webkit-backdrop-filter: blur(32px) saturate(1.8);
+    }
+
     .hide-scrollbar {
         -ms-overflow-style: none;
         scrollbar-width: none;
@@ -463,6 +479,45 @@
             transform: translate(var(--batch-from-x), var(--batch-from-y)) rotate(var(--batch-from-rotate)) scale(0.72);
         }
     }
+}
+
+/* Hover toolbar animation - outside @layer for higher specificity */
+@keyframes toolbar-fade-in {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+@keyframes toolbar-slide-in {
+    from { opacity: 0; transform: translateY(14px) scale(0.96); }
+    to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes toolbar-scale-in {
+    from { opacity: 0; transform: scale(0.72); }
+    to { opacity: 1; transform: scale(1); }
+}
+
+@keyframes toolbar-bounce-in {
+    0% { opacity: 0; transform: translateY(18px) scale(0.85); }
+    45% { opacity: 1; transform: translateY(-6px) scale(1.04); }
+    70% { transform: translateY(2px) scale(0.98); }
+    100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.animate-toolbar-fade {
+    animation: toolbar-fade-in 0.3s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.animate-toolbar-slide {
+    animation: toolbar-slide-in 0.35s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.animate-toolbar-scale {
+    animation: toolbar-scale-in 0.3s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+.animate-toolbar-bounce {
+    animation: toolbar-bounce-in 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) both;
 }
 
 ::view-transition-old(root),

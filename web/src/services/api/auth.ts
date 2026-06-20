@@ -1,4 +1,4 @@
-import { apiGet, apiPost } from "@/services/api/request";
+import { apiGet, apiPost, apiPut } from "@/services/api/request";
 
 export const AUTH_TOKEN_KEY = "infinite-canvas-auth-token-v1";
 
@@ -11,6 +11,7 @@ export type AuthUser = {
     avatarUrl: string;
     role: UserRole;
     credits: number;
+    membershipExpiresAt: string;
     createdAt: string;
     updatedAt: string;
 };
@@ -35,4 +36,12 @@ export async function register(payload: AuthPayload) {
 
 export async function fetchCurrentUser(token?: string) {
     return apiGet<AuthUser>("/api/auth/me", undefined, token);
+}
+
+export async function redeemCode(token: string, code: string) {
+    return apiPost<AuthUser>("/api/v1/redeem-code", { code }, token);
+}
+
+export async function updateProfile(token: string, data: { displayName?: string; password?: string }) {
+    return apiPut<AuthUser>("/api/v1/profile", data, token);
 }

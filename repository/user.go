@@ -3,6 +3,7 @@ package repository
 import (
 	"errors"
 	"strings"
+	"time"
 
 	"github.com/basketikun/infinite-canvas/model"
 	"gorm.io/gorm"
@@ -19,6 +20,16 @@ func ListUsers(q model.Query) ([]model.User, int64, error) {
 	if keyword := strings.TrimSpace(q.Keyword); keyword != "" {
 		like := "%" + keyword + "%"
 		tx = tx.Where("username LIKE ? OR display_name LIKE ? OR email LIKE ? OR linux_do_id LIKE ?", like, like, like, like)
+	}
+	if q.Role == "member" {
+		tx = tx.Where("membership_expires_at != '' AND membership_expires_at > ?", time.Now().Format(time.RFC3339))
+	} else if q.Role == "user" {
+		tx = tx.Where("role = ? AND (membership_expires_at = '' OR membership_expires_at <= ?)", q.Role, time.Now().Format(time.RFC3339))
+	} else if q.Role != "" {
+		tx = tx.Where("role = ?", q.Role)
+	}
+	if q.Status != "" {
+		tx = tx.Where("status = ?", q.Status)
 	}
 
 	var total int64
@@ -156,6 +167,17 @@ func DeleteCreditLog(id string) error {
 	return db.Delete(&model.CreditLog{}, "id = ?", id).Error
 }
 
+func BatchDeleteCreditLogs(ids []string) error {
+	if len(ids) == 0 {
+		return nil
+	}
+	db, err := DB()
+	if err != nil {
+		return err
+	}
+	return db.Delete(&model.CreditLog{}, "id IN ?", ids).Error
+}
+
 // DeleteUser 删除指定用户。
 func DeleteUser(id string) error {
 	db, err := DB()
@@ -165,6 +187,30 @@ func DeleteUser(id string) error {
 	return db.Delete(&model.User{}, "id = ?", id).Error
 }
 
+// BatchDeleteUsers 批量删除用户。
+func BatchDeleteUsers(ids []string) error {
+	if len(ids) == 0 {
+		return nil
+	}
+	db, err := DB()
+	if err != nil {
+		return err
+	}
+	return db.Delete(&model.User{}, "id IN ?", ids).Error
+}
+
+// BatchUpdateUserStatus 批量更新用户状态。
+func BatchUpdateUserStatus(ids []string, status model.UserStatus) error {
+	if len(ids) == 0 {
+		return nil
+	}
+	db, err := DB()
+	if err != nil {
+		return err
+	}
+	return db.Model(&model.User{}).Where("id IN ?", ids).Update("status", status).Error
+}
+
 // GetUserByLinuxDoID 根据 Linux.do ID 查询用户。
 func GetUserByLinuxDoID(id string) (model.User, bool, error) {
 	db, err := DB()
@@ -172,6 +218,26 @@ func GetUserByLinuxDoID(id string) (model.User, bool, error) {
 		return model.User{}, false, err
 	}
 	return findUser(db, "linux_do_id = ?", id)
+}
+
+// GetUsersByIDs 批量查询用户，返回 id -> username 映射。
+func GetUsersByIDs(ids []string) (map[string]string, error) {
+	if len(ids) == 0 {
+		return nil, nil
+	}
+	db, err := DB()
+	if err != nil {
+		return nil, err
+	}
+	var users []model.User
+	if err := db.Select("id, username").Where("id IN ?", ids).Find(&users).Error; err != nil {
+		return nil, err
+	}
+	m := make(map[string]string, len(users))
+	for _, u := range users {
+		m[u.ID] = u.Username
+	}
+	return m, nil
 }
 
 // findUser 查询单个用户，并将未命中转换为 ok=false。

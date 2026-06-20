@@ -21,6 +21,7 @@ description: 当前后端主要数据表与字段说明
 
 - `users`
 - `credit_logs`
+- `redeem_codes`
 - `prompts`
 - `assets`
 - `settings`
@@ -48,6 +49,7 @@ description: 当前后端主要数据表与字段说明
 | `linux_do_id` | string | Linux.do 用户 ID |
 | `wechat_id` | string | 微信用户 ID |
 | `status` | string | 用户状态：`active`、`ban` |
+| `membership_expires_at` | string | 会员到期时间，为空表示非会员 |
 | `last_login_at` | string | 最近登录时间 |
 | `extra` | json | 扩展信息，第三方资料按平台命名空间保存，如 `linuxDo` |
 | `created_at` | string | 创建时间 |
@@ -198,3 +200,30 @@ description: 当前后端主要数据表与字段说明
 | `admin_adjust` | 后台手动调整 |
 | `ai_consume` | 调用后端模型接口消费 |
 | `ai_refund` | 后端模型接口调用失败返还 |
+| `redeem` | 兑换卡密 |
+
+### redeem_codes
+
+卡密表。用于管理员生成卡密，用户兑换算力点或会员时长。
+
+| 字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `id` | string | 主键 |
+| `code` | string | 卡密码，唯一索引 |
+| `type` | string | 类型：`credits`、`membership` |
+| `credits` | number | 算力点面值 |
+| `membership_days` | number | 会员天数面值 |
+| `status` | string | 状态：`unused`、`used` |
+| `used_by` | string | 使用者用户 ID |
+| `used_at` | string | 使用时间 |
+| `batch_name` | string | 批次名称 |
+| `remark` | string | 备注 |
+| `created_at` | string | 创建时间 |
+| `updated_at` | string | 更新时间 |
+
+`type` 取值：
+
+| 值 | 说明 |
+| --- | --- |
+| `credits` | 兑换算力点，面值取 `credits` 字段 |
+| `membership` | 兑换会员时长，面值取 `membership_days` 字段 |

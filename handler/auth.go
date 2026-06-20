@@ -21,13 +21,14 @@ type registerRequest struct {
 }
 
 type saveUserRequest struct {
-	ID          string           `json:"id"`
-	Username    string           `json:"username"`
-	Password    string           `json:"password"`
-	Email       string           `json:"email"`
-	DisplayName string           `json:"displayName"`
-	Role        model.UserRole   `json:"role"`
-	Status      model.UserStatus `json:"status"`
+	ID                  string           `json:"id"`
+	Username            string           `json:"username"`
+	Password            string           `json:"password"`
+	Email               string           `json:"email"`
+	DisplayName         string           `json:"displayName"`
+	Role                model.UserRole   `json:"role"`
+	Status              model.UserStatus `json:"status"`
+	MembershipExpiresAt string           `json:"membershipExpiresAt"`
 }
 
 type adjustUserCreditsRequest struct {
@@ -110,12 +111,13 @@ func AdminSaveUser(w http.ResponseWriter, r *http.Request) {
 	var request saveUserRequest
 	_ = json.NewDecoder(r.Body).Decode(&request)
 	user, err := service.SaveUser(model.User{
-		ID:          request.ID,
-		Username:    request.Username,
-		Email:       request.Email,
-		DisplayName: request.DisplayName,
-		Role:        request.Role,
-		Status:      request.Status,
+		ID:                  request.ID,
+		Username:            request.Username,
+		Email:               request.Email,
+		DisplayName:         request.DisplayName,
+		Role:                request.Role,
+		Status:              request.Status,
+		MembershipExpiresAt: request.MembershipExpiresAt,
 	}, request.Password)
 	if err != nil {
 		FailError(w, err)
@@ -163,6 +165,41 @@ func AdminDeleteCreditLog(w http.ResponseWriter, r *http.Request, id string) {
 	OK(w, true)
 }
 
+func UpdateProfile(w http.ResponseWriter, r *http.Request) {
+	user, ok := service.UserFromContext(r.Context())
+	if !ok {
+		Fail(w, "未登录或权限不足")
+		return
+	}
+	var request struct {
+		DisplayName string `json:"displayName"`
+		Password    string `json:"password"`
+	}
+	_ = json.NewDecoder(r.Body).Decode(&request)
+	updated, err := service.UpdateProfile(user.ID, request.DisplayName, request.Password)
+	if err != nil {
+		FailError(w, err)
+		return
+	}
+	OK(w, updated)
+}
+
+func AdminBatchDeleteCreditLogs(w http.ResponseWriter, r *http.Request) {
+	var request struct {
+		IDs []string `json:"ids"`
+	}
+	_ = json.NewDecoder(r.Body).Decode(&request)
+	if len(request.IDs) == 0 {
+		Fail(w, "请选择要删除的日志")
+		return
+	}
+	if err := service.BatchDeleteCreditLogs(request.IDs); err != nil {
+		FailError(w, err)
+		return
+	}
+	OK(w, true)
+}
+
 func loginRedirect(r *http.Request, redirect string, token string, message string) string {
 	values := url.Values{}
 	if strings.TrimSpace(token) != "" {
@@ -179,6 +216,43 @@ func loginRedirect(r *http.Request, redirect string, token string, message strin
 
 func AdminDeleteUser(w http.ResponseWriter, r *http.Request, id string) {
 	if err := service.DeleteUser(id); err != nil {
+		FailError(w, err)
+		return
+	}
+	OK(w, true)
+}
+
+func AdminBatchDeleteUsers(w http.ResponseWriter, r *http.Request) {
+	var request struct {
+		IDs []string `json:"ids"`
+	}
+	_ = json.NewDecoder(r.Body).Decode(&request)
+	if len(request.IDs) == 0 {
+		Fail(w, "请选择要删除的用户")
+		return
+	}
+	if err := service.BatchDeleteUsers(request.IDs); err != nil {
+		FailError(w, err)
+		return
+	}
+	OK(w, true)
+}
+
+func AdminBatchUpdateUserStatus(w http.ResponseWriter, r *http.Request) {
+	var request struct {
+		IDs    []string          `json:"ids"`
+		Status model.UserStatus  `json:"status"`
+	}
+	_ = json.NewDecoder(r.Body).Decode(&request)
+	if len(request.IDs) == 0 {
+		Fail(w, "请选择要操作的用户")
+		return
+	}
+	if request.Status != model.UserStatusActive && request.Status != model.UserStatusBan {
+		Fail(w, "无效的状态值")
+		return
+	}
+	if err := service.BatchUpdateUserStatus(request.IDs, request.Status); err != nil {
 		FailError(w, err)
 		return
 	}

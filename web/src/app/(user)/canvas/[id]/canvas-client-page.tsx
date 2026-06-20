@@ -15,10 +15,12 @@ import { resolveImageUrl, uploadImage, type UploadedImage } from "@/services/ima
 import { resolveMediaUrl, uploadMediaFile, type UploadedFile } from "@/services/file-storage";
 import { nanoid } from "nanoid";
 import { getDataUrlByteSize, readImageMeta } from "@/lib/image-utils";
-import { canvasThemes, type CanvasBackgroundMode } from "@/lib/canvas-theme";
+import { type CanvasBackgroundMode, type CanvasTheme } from "@/lib/canvas-theme";
+import { useCanvasTheme } from "@/hooks/use-canvas-theme";
 import { UserStatusActions } from "@/components/layout/user-status-actions";
 import { useAssetStore } from "@/stores/use-asset-store";
 import { useThemeStore } from "@/stores/use-theme-store";
+import { useUserStore } from "@/stores/use-user-store";
 import { cropDataUrl, splitDataUrl, upscaleDataUrl } from "../utils/canvas-image-data";
 import { fitNodeSize, nodeSizeFromRatio } from "../utils/canvas-node-size";
 import { App, Button, Dropdown, Modal } from "antd";
@@ -28,6 +30,7 @@ import { CanvasConfigComposer } from "../components/canvas-config-composer";
 import { CanvasConfigNodePanel } from "../components/canvas-config-node-panel";
 import { CanvasAssistantPanel } from "../components/canvas-assistant-panel";
 import { CanvasLocalAgentPanel } from "../components/canvas-local-agent-panel";
+import type { CanvasAgentMode } from "../components/canvas-agent-chat-ui";
 import { CanvasNodeContextMenu } from "../components/canvas-context-menu";
 import { CanvasNodeAngleDialog, type CanvasImageAngleParams } from "../components/canvas-node-angle-dialog";
 import { CanvasNodeCropDialog, type CanvasImageCropRect } from "../components/canvas-node-crop-dialog";
@@ -43,6 +46,9 @@ import { CanvasNodePromptPanel, type CanvasNodeGenerationMode } from "../compone
 import { CanvasToolbar } from "../components/canvas-toolbar";
 import { AssetPickerModal, type AssetPickerTab, type InsertAssetPayload } from "../components/asset-picker-modal";
 import { CanvasZoomControls } from "../components/canvas-zoom-controls";
+import { PanoramaViewer, usePanoramaViewer } from "../components/canvas-panorama-viewer";
+import { CanvasJimengModal } from "../components/canvas-jimeng-settings-popover";
+import { CanvasTimelineEditor, createDefaultTimeline, type TimelineData } from "../components/canvas-timeline-editor";
 import { useCanvasStore } from "../stores/use-canvas-store";
 import { applyCanvasAgentOps, type CanvasAgentOp, type CanvasAgentSnapshot } from "../utils/canvas-agent-ops";
 import { buildCanvasResourceReferences, buildNodeMentionReferences } from "../utils/canvas-resource-references";
@@ -165,7 +171,7 @@ function CanvasRefreshShell() {
 }
 
 function ConnectionCreateMenu({ pending, onCreate, onClose }: { pending: PendingConnectionCreate; onCreate: (type: CanvasNodeType.Image | CanvasNodeType.Text | CanvasNodeType.Config | CanvasNodeType.Video | CanvasNodeType.Audio) => void; onClose: () => void }) {
-    const theme = canvasThemes[useThemeStore((state) => state.theme)];
+    const theme = useCanvasTheme();
     return (
         <div
             className="absolute z-[120] w-[300px] rounded-[18px] border p-3 shadow-2xl backdrop-blur"
@@ -193,7 +199,7 @@ function ConnectionCreateMenu({ pending, onCreate, onClose }: { pending: Pending
     );
 }
 
-function ConnectionCreateOption({ theme, icon, title, description, onClick }: { theme: (typeof canvasThemes)[keyof typeof canvasThemes]; icon: React.ReactNode; title: string; description?: string; onClick?: () => void }) {
+function ConnectionCreateOption({ theme, icon, title, description, onClick }: { theme: CanvasTheme; icon: React.ReactNode; title: string; description?: string; onClick?: () => void }) {
     return (
         <button type="button" className="flex h-16 w-full cursor-pointer items-center gap-3 rounded-2xl px-3 text-left transition" style={{ color: theme.node.text }} onClick={onClick} onMouseEnter={(event) => (event.currentTarget.style.background = theme.node.fill)} onMouseLeave={(event) => (event.currentTarget.style.background = "transparent")}>
             <span className="grid size-11 shrink-0 place-items-center rounded-xl" style={{ background: theme.node.fill, color: theme.node.muted }}>
@@ -244,6 +250,23 @@ function InfiniteCanvasPage() {
     const effectiveConfig = useEffectiveConfig();
     const isAiConfigReady = useConfigStore((state) => state.isAiConfigReady);
     const openConfigDialog = useConfigStore((state) => state.openConfigDialog);
+    const publicSystemSettings = useConfigStore((state) => state.publicSystemSettings);
+    const agentVisible = publicSystemSettings?.agentVisible ?? true;
+    const user = useUserStore((state) => state.user);
+    const agentAccessLevel = publicSystemSettings?.agentAccessLevel ?? "guest,registered";
+    const hasAgentAccess = (() => {
+        if (user?.role === "admin") return true;
+        const levels = agentAccessLevel.split(",").map((s) => s.trim());
+        if (!user || user.role === "guest") return levels.includes("guest");
+        if (user.role === "user") {
+            if (levels.includes("registered")) return true;
+            const isMember = user.membershipExpiresAt && new Date(user.membershipExpiresAt).getTime() > Date.now();
+            if (isMember && levels.includes("member")) return true;
+            return false;
+        }
+        return false;
+    })();
+    const showAgent = agentVisible && hasAgentAccess;
     const addAsset = useAssetStore((state) => state.addAsset);
     const cleanupAssetImages = useAssetStore((state) => state.cleanupImages);
     const hydrated = useCanvasStore((state) => state.hydrated);
@@ -253,7 +276,7 @@ function InfiniteCanvasPage() {
     const renameProject = useCanvasStore((state) => state.renameProject);
     const deleteProjects = useCanvasStore((state) => state.deleteProjects);
     const currentProject = useCanvasStore((state) => state.projects.find((project) => project.id === projectId));
-    const theme = canvasThemes[useThemeStore((state) => state.theme)];
+    const theme = useCanvasTheme();
     const [nodes, setNodes] = useState<CanvasNodeData[]>([]);
     const [connections, setConnections] = useState<CanvasConnection[]>([]);
     const [chatSessions, setChatSessions] = useState<CanvasAssistantSession[]>([]);
@@ -294,7 +317,12 @@ function InfiniteCanvasPage() {
     const [assistantMounted, setAssistantMounted] = useState(false);
     const [localAgentCollapsed, setLocalAgentCollapsed] = useState(true);
     const [localAgentMounted, setLocalAgentMounted] = useState(false);
+    const [agentMode, setAgentMode] = useState<CanvasAgentMode>("online");
     const [agentUndoSnapshot, setAgentUndoSnapshot] = useState<CanvasAgentSnapshot | null>(null);
+    const { panoramaImage, openPanorama, closePanorama } = usePanoramaViewer();
+    const [jimengNodeId, setJimengNodeId] = useState<string | null>(null);
+    const [timelineOpen, setTimelineOpen] = useState(false);
+    const [timelineData, setTimelineData] = useState<TimelineData>(createDefaultTimeline());
     const [titleEditing, setTitleEditing] = useState(false);
     const [titleDraft, setTitleDraft] = useState("");
     const [historyState, setHistoryState] = useState({ canUndo: false, canRedo: false });
@@ -2369,7 +2397,9 @@ function InfiniteCanvasPage() {
                     onUndo={undoCanvas}
                     onRedo={redoCanvas}
                     assistantCollapsed={assistantCollapsed}
+                    assistantEnabled={publicSystemSettings?.assistantEnabled ?? true}
                     localAgentOpen={localAgentOpen}
+                    agentVisible={showAgent}
                     onExpandAssistant={() => {
                         setAssistantMounted(true);
                         setAssistantCollapsed(false);
@@ -2545,10 +2575,15 @@ function InfiniteCanvasPage() {
                     onSuperResolve={(node) => setSuperResolveNodeId(node.id)}
                     onAngle={(node) => setAngleNodeId(node.id)}
                     onViewImage={(node) => setPreviewNodeId(node.id)}
+                    onPanorama={(node) => {
+                        const src = node.metadata?.content || node.data?.src;
+                        if (src) openPanorama(typeof src === "string" ? src : URL.createObjectURL(src));
+                    }}
                     onReversePrompt={createImageReversePromptNodes}
                     onRetry={(node) => void handleRetryNode(node)}
                     onToggleFreeResize={(node) => toggleNodeFreeResize(node.id)}
                     onDelete={(node) => deleteNodes(new Set([node.id]))}
+                    onJimeng={(node) => setJimengNodeId(node.id)}
                 />
 
                 <CanvasToolbar
@@ -2578,6 +2613,7 @@ function InfiniteCanvasPage() {
                         setAssetPickerTab("my-assets");
                         setAssetPickerOpen(true);
                     }}
+                    onOpenTimeline={() => setTimelineOpen(true)}
                 />
 
                 {isMiniMapOpen ? <Minimap nodes={nodes} viewport={viewport} viewportSize={size} onViewportChange={setViewport} /> : null}
@@ -2672,9 +2708,15 @@ function InfiniteCanvasPage() {
                     onPasteImage={pasteAssistantImage}
                     onCollapseStart={() => setAssistantCollapsed(true)}
                     onCollapse={() => setAssistantMounted(false)}
+                    agentMode={agentMode}
+                    onAgentModeChange={setAgentMode}
+                    snapshot={agentSnapshot}
+                    onApplyOps={applyAgentOps}
+                    canUndoOps={Boolean(agentUndoSnapshot)}
+                    onUndoOps={undoAgentOps}
                 />
             ) : null}
-            {localAgentMounted ? (
+            {localAgentMounted && showAgent ? (
                 <CanvasLocalAgentPanel
                     snapshot={agentSnapshot}
                     canUndoOps={Boolean(agentUndoSnapshot)}
@@ -2684,6 +2726,51 @@ function InfiniteCanvasPage() {
                     onCollapseStart={closeLocalAgent}
                 />
             ) : null}
+            {panoramaImage ? (
+                <PanoramaViewer imageUrl={panoramaImage} open onClose={closePanorama} />
+            ) : null}
+
+            {/* Jimeng Modal */}
+            <CanvasJimengModal
+                open={!!jimengNodeId}
+                onClose={() => setJimengNodeId(null)}
+                mode="image"
+                prompt={nodes.find((n) => n.id === jimengNodeId)?.metadata?.prompt || ""}
+                referenceImages={
+                    nodes.find((n) => n.id === jimengNodeId)?.metadata?.content
+                        ? [nodes.find((n) => n.id === jimengNodeId)!.metadata!.content as string]
+                        : []
+                }
+                onResult={(urls) => {
+                    const url = urls[0];
+                    if (url && jimengNodeId) {
+                        setNodes((prev) =>
+                            prev.map((n) =>
+                                n.id === jimengNodeId
+                                    ? { ...n, metadata: { ...n.metadata, content: url, status: "success" as const } }
+                                    : n,
+                            ),
+                        );
+                    }
+                    setJimengNodeId(null);
+                }}
+                onError={() => setJimengNodeId(null)}
+            />
+
+            {/* Timeline Editor Modal */}
+            <Modal
+                title="视频时间线编辑器"
+                open={timelineOpen}
+                onCancel={() => setTimelineOpen(false)}
+                width={900}
+                footer={null}
+                destroyOnHidden
+            >
+                <CanvasTimelineEditor
+                    data={timelineData}
+                    onChange={setTimelineData}
+                />
+            </Modal>
         </main>
     );
 }
@@ -2706,7 +2793,9 @@ function CanvasTopBar({
     onUndo,
     onRedo,
     assistantCollapsed,
+    assistantEnabled,
     localAgentOpen,
+    agentVisible,
     onExpandAssistant,
     onToggleLocalAgent,
 }: {
@@ -2727,16 +2816,19 @@ function CanvasTopBar({
     onUndo: () => void;
     onRedo: () => void;
     assistantCollapsed: boolean;
+    assistantEnabled: boolean;
     localAgentOpen: boolean;
+    agentVisible: boolean;
     onExpandAssistant: () => void;
     onToggleLocalAgent: () => void;
 }) {
-    const colorTheme = useThemeStore((state) => state.theme);
-    const theme = canvasThemes[colorTheme];
+    const theme = useCanvasTheme();
     const titleRef = useRef<HTMLDivElement>(null);
     const accountRef = useRef<HTMLDivElement>(null);
     const [shortcutsOpen, setShortcutsOpen] = useState(false);
     const [accountOpen, setAccountOpen] = useState(false);
+    const user = useUserStore((state) => state.user);
+    const isAdmin = user?.role === "admin";
 
     useEffect(() => {
         if (!isTitleEditing) return;
@@ -2765,7 +2857,7 @@ function CanvasTopBar({
                         menu={{
                             items: [
                                 { key: "home", icon: <Home className="size-4" />, label: "主页", onClick: onHome },
-                                { key: "docs", icon: <BookOpen className="size-4" />, label: "文档", onClick: () => window.open(DOCS_URL, "_blank", "noopener,noreferrer") },
+                                ...(isAdmin ? [{ key: "docs", icon: <BookOpen className="size-4" />, label: "文档", onClick: () => window.open(DOCS_URL, "_blank", "noopener,noreferrer") }] : []),
                                 { key: "projects", icon: <Images className="size-4" />, label: "我的画布", onClick: onProjects },
                                 { type: "divider" },
                                 { key: "new", icon: <Plus className="size-4" />, label: "新建画布", onClick: onCreateProject },
@@ -2823,16 +2915,18 @@ function CanvasTopBar({
                         }}
                     />
                     <span className="h-6 w-px" style={{ background: theme.toolbar.border }} />
-                    <Button
-                        type="text"
-                        className="!h-10 !rounded-xl !px-3 !font-medium"
-                        style={{ background: localAgentOpen ? theme.toolbar.activeBg : theme.toolbar.panel, color: theme.node.text, boxShadow: "0 10px 30px rgba(28,25,23,.10)" }}
-                        icon={<Bot className="size-4" />}
-                        onClick={onToggleLocalAgent}
-                    >
-                        Agent
-                    </Button>
-                    {assistantCollapsed ? (
+                    {agentVisible ? (
+                        <Button
+                            type="text"
+                            className="!h-10 !rounded-xl !px-3 !font-medium"
+                            style={{ background: localAgentOpen ? theme.toolbar.activeBg : theme.toolbar.panel, color: theme.node.text, boxShadow: "0 10px 30px rgba(28,25,23,.10)" }}
+                            icon={<Bot className="size-4" />}
+                            onClick={onToggleLocalAgent}
+                        >
+                            Agent
+                        </Button>
+                    ) : null}
+                    {assistantCollapsed && assistantEnabled ? (
                         <>
                             <Button
                                 type="text"

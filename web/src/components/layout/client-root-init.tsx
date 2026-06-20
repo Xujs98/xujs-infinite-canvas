@@ -14,6 +14,7 @@ export function ClientRootInit({ children }: { children: ReactNode }) {
     const pathname = usePathname();
     const hydrateUser = useUserStore((state) => state.hydrateUser);
     const loadPublicSettings = useConfigStore((state) => state.loadPublicSettings);
+    const loadPublicSystemSettings = useConfigStore((state) => state.loadPublicSystemSettings);
     const publicSettings = useConfigStore((state) => state.publicSettings);
     const updateConfig = useConfigStore((state) => state.updateConfig);
     const openConfigDialog = useConfigStore((state) => state.openConfigDialog);
@@ -21,7 +22,8 @@ export function ClientRootInit({ children }: { children: ReactNode }) {
 
     useEffect(() => {
         void loadPublicSettings();
-    }, [loadPublicSettings]);
+        void loadPublicSystemSettings();
+    }, [loadPublicSettings, loadPublicSystemSettings]);
 
     useEffect(() => {
         if (!isLoginPage) void hydrateUser();

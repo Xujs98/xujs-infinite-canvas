@@ -99,6 +99,12 @@ func proxyAIRequest(w http.ResponseWriter, r *http.Request, path string) {
 	if contentType != "" {
 		request.Header.Set("Content-Type", contentType)
 	}
+	// 会员有效期内免扣算力点。
+	if service.IsMembershipActive(user.MembershipExpiresAt) {
+		service.LogMembershipFreeUsage(user.ID, modelName, credits, path)
+		copyAIResponse(w, request, nil)
+		return
+	}
 	if err := service.ConsumeUserCredits(user.ID, modelName, credits, path); err != nil {
 		FailError(w, err)
 		return

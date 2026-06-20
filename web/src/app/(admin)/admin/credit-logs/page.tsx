@@ -15,14 +15,17 @@ const creditLogTypeLabels: Record<string, string> = {
     admin_adjust: "后台调整",
     ai_consume: "模型消费",
     ai_refund: "失败返还",
+    membership_free: "会员免费",
 };
 
 export default function AdminCreditLogsPage() {
-    const { logs, keyword, page, pageSize, total, isLoading, searchLogs, changePage, changePageSize, resetFilters, refreshLogs, saveLog: saveAdminLog, deleteLog } = useAdminCreditLogs();
+    const { logs, keyword, page, pageSize, total, isLoading, searchLogs, changePage, changePageSize, resetFilters, refreshLogs, saveLog: saveAdminLog, deleteLog, batchDeleteLogs } = useAdminCreditLogs();
     const [form] = Form.useForm<CreditLogFormValues>();
     const [keywordText, setKeywordText] = useState(keyword);
     const [editingLog, setEditingLog] = useState<Partial<AdminCreditLog> | null>(null);
     const [deletingLog, setDeletingLog] = useState<AdminCreditLog | null>(null);
+    const [selectedIds, setSelectedIds] = useState<string[]>([]);
+    const [batchDeleteOpen, setBatchDeleteOpen] = useState(false);
 
     useEffect(() => setKeywordText(keyword), [keyword]);
 
@@ -36,12 +39,18 @@ export default function AdminCreditLogsPage() {
         setEditingLog(null);
     };
 
+    const handleBatchDelete = async () => {
+        await batchDeleteLogs(selectedIds);
+        setSelectedIds([]);
+        setBatchDeleteOpen(false);
+    };
+
     const columns: ProColumns<AdminCreditLog>[] = [
         {
-            title: "用户 ID",
-            dataIndex: "userId",
-            width: 220,
-            render: (_, item) => <Typography.Text copyable>{item.userId}</Typography.Text>,
+            title: "用户",
+            dataIndex: "username",
+            width: 160,
+            render: (_, item) => <Typography.Text>{item.username || item.userId}</Typography.Text>,
         },
         {
             title: "类型",
@@ -53,7 +62,7 @@ export default function AdminCreditLogsPage() {
             title: "变动",
             dataIndex: "amount",
             width: 100,
-            render: (_, item) => <Typography.Text type={item.amount >= 0 ? "success" : "danger"}>{item.amount}</Typography.Text>,
+            render: (_, item) => item.type === "membership_free" ? <Typography.Text type="success">会员免费</Typography.Text> : <Typography.Text type={item.amount >= 0 ? "success" : "danger"}>{item.amount}</Typography.Text>,
         },
         {
             title: "余额",
@@ -130,6 +139,7 @@ export default function AdminCreditLogsPage() {
                     defaultSize="middle"
                     tableLayout="fixed"
                     cardProps={{ variant: "borderless" }}
+                    rowSelection={{ selectedRowKeys: selectedIds, onChange: (keys) => setSelectedIds(keys.map(String)) }}
                     headerTitle={
                         <Space>
                             <Typography.Text strong>算力点日志</Typography.Text>
@@ -138,6 +148,9 @@ export default function AdminCreditLogsPage() {
                     }
                     options={{ density: true, setting: true, reload: () => void refreshLogs() }}
                     toolBarRender={() => [
+                        <Button key="batch-delete" danger icon={<DeleteOutlined />} disabled={!selectedIds.length} onClick={() => setBatchDeleteOpen(true)}>
+                            批量删除{selectedIds.length ? ` ${selectedIds.length}` : ""}
+                        </Button>,
                         <Button key="add" type="primary" icon={<PlusOutlined />} onClick={() => setEditingLog({ type: "admin_adjust", amount: 0, balance: 0 })}>
                             新增
                         </Button>,
@@ -215,6 +228,18 @@ export default function AdminCreditLogsPage() {
                 cancelText="取消"
             >
                 确定删除这条算力点日志吗？
+            </Modal>
+
+            <Modal
+                title="批量删除日志"
+                open={batchDeleteOpen}
+                onCancel={() => setBatchDeleteOpen(false)}
+                onOk={() => void handleBatchDelete()}
+                okText="删除"
+                okButtonProps={{ danger: true }}
+                cancelText="取消"
+            >
+                确定删除已选中的 {selectedIds.length} 条日志吗？
             </Modal>
         </main>
     );

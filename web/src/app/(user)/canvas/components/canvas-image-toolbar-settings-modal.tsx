@@ -1,10 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
-import { Button, Card, Checkbox, Form, Modal, Space, Switch, Tag, Tooltip, Typography, theme as antdTheme } from "antd";
-import { Ellipsis, Image as ImageIcon, Settings2 } from "lucide-react";
+import { Button, Card, Modal, Segmented, Space, Tag, Tooltip, Typography, theme as antdTheme } from "antd";
+import { Ellipsis, Eye, Image as ImageIcon, Settings2, Check } from "lucide-react";
 
-import type { ImageQuickToolId } from "./canvas-image-toolbar-tools";
+import type { ImageQuickToolId, ToolbarAnimationMode, ToolbarLabelMode } from "./canvas-image-toolbar-tools";
 
 export type ImageToolbarSettingsTool = {
     id: ImageQuickToolId;
@@ -31,22 +31,40 @@ type PreviewScroll = {
     content: number;
 };
 
+const labelModeOptions: { value: ToolbarLabelMode; label: string }[] = [
+    { value: "icon", label: "仅图标" },
+    { value: "side", label: "图标+文字" },
+    { value: "below", label: "图标上·文字下" },
+];
+
+const animationModeOptions: { value: ToolbarAnimationMode; label: string }[] = [
+    { value: "none", label: "无动画" },
+    { value: "fade", label: "淡入" },
+    { value: "slide", label: "滑入" },
+    { value: "scale", label: "缩放" },
+    { value: "bounce", label: "弹跳" },
+];
+
 export function ImageToolSettingsModal({
     open,
     tools,
     selectedIds,
-    showLabels,
+    labelMode,
+    animationMode,
     onToggle,
-    onShowLabelsChange,
+    onLabelModeChange,
+    onAnimationModeChange,
     onCancel,
     onSave,
 }: {
     open: boolean;
     tools: ImageToolbarSettingsTool[];
     selectedIds: ImageQuickToolId[];
-    showLabels: boolean;
+    labelMode: ToolbarLabelMode;
+    animationMode: ToolbarAnimationMode;
     onToggle: (id: ImageQuickToolId, visible: boolean) => void;
-    onShowLabelsChange: (value: boolean) => void;
+    onLabelModeChange: (value: ToolbarLabelMode) => void;
+    onAnimationModeChange: (value: ToolbarAnimationMode) => void;
     onCancel: () => void;
     onSave: () => void;
 }) {
@@ -54,6 +72,7 @@ export function ImageToolSettingsModal({
     const previewToolbarRef = useRef<HTMLDivElement>(null);
     const scrollbarTrackRef = useRef<HTMLInputElement>(null);
     const [previewScroll, setPreviewScroll] = useState<PreviewScroll>({ left: 0, max: 0, viewport: 1, content: 1 });
+    const [animPreviewKey, setAnimPreviewKey] = useState(0);
     const selected = useMemo(() => new Set(selectedIds), [selectedIds]);
     const selectedTools = tools.filter((tool) => selected.has(tool.id));
     const previewTools: PreviewTool[] = [
@@ -114,64 +133,53 @@ export function ImageToolSettingsModal({
             resizeObserver?.disconnect();
             window.removeEventListener("resize", syncPreviewScroll);
         };
-    }, [open, selectedIds, showLabels, previewTools.length, syncPreviewScroll]);
+    }, [open, selectedIds, labelMode, previewTools.length, syncPreviewScroll]);
 
     const scrollbarWidth = scrollbarTrackRef.current?.clientWidth || previewScroll.viewport;
     const scrollbarThumbWidth = previewScroll.max > 0 ? Math.min(scrollbarWidth, Math.max(64, (previewScroll.viewport / previewScroll.content) * scrollbarWidth)) : scrollbarWidth;
 
+    const previewAnimClass = animationMode === "none" ? "" : animationMode === "fade" ? "animate-toolbar-fade" : animationMode === "slide" ? "animate-toolbar-slide" : animationMode === "scale" ? "animate-toolbar-scale" : "animate-toolbar-bounce";
+
     return (
         <Modal
-            title="自定义工具栏"
+            title={
+                <div className="flex items-center gap-2">
+                    <Settings2 className="size-5 text-blue-500" />
+                    <span>自定义工具栏</span>
+                </div>
+            }
             open={open}
             centered
             width={760}
             onCancel={onCancel}
             destroyOnHidden
             footer={
-                <div className="flex items-center justify-between gap-3">
-                    <div className="flex items-center gap-2">
-                        <span>显示按钮文字</span>
-                        <Switch checked={showLabels} onChange={onShowLabelsChange} />
-                    </div>
-                    <Space>
-                        <Button onClick={onCancel}>取消</Button>
-                        <Button type="primary" onClick={onSave}>
-                            保存
-                        </Button>
-                    </Space>
+                <div className="flex items-center justify-end gap-2">
+                    <Button onClick={onCancel}>取消</Button>
+                    <Button type="primary" onClick={onSave}>保存</Button>
                 </div>
             }
         >
-            <Typography.Paragraph type="secondary" className="!mb-4">
-                选择你想在图片节点编辑栏中使用的快捷工具。
-            </Typography.Paragraph>
-
+            {/* Preview section */}
             <Card
                 size="small"
-                title={
-                    <Space size={6}>
-                        <Settings2 className="size-4" />
-                        节点预览
-                    </Space>
-                }
-                className="mb-4"
+                className="mb-5"
+                styles={{ body: { padding: 0 } }}
             >
-                <div className="relative flex min-h-[300px] w-full justify-center pt-20 pb-9">
+                <div className="relative flex min-h-[280px] w-full justify-center overflow-hidden rounded-lg bg-gradient-to-b from-neutral-50 to-neutral-100 pt-20 pb-9 dark:from-neutral-900 dark:to-neutral-950">
                     <div
+                        key={animPreviewKey}
                         ref={previewToolbarRef}
-                        className="hide-scrollbar absolute left-2 right-2 top-3 z-10 flex h-12 items-center overflow-x-auto rounded-[18px] border px-1 text-[13px]"
+                        className={`hide-scrollbar absolute left-2 right-2 top-3 z-10 flex h-12 items-center overflow-x-auto rounded-[18px] border px-1 text-[13px] ${previewAnimClass}`}
                         style={{ background: token.colorBgElevated, borderColor: token.colorBorderSecondary, boxShadow: token.boxShadowSecondary, color: token.colorText }}
                         onScroll={syncPreviewScroll}
                     >
                         {previewTools.map((tool) => (
-                            <PreviewToolbarItem key={tool.id} tool={tool} showLabels={showLabels} />
+                            <PreviewToolbarItem key={tool.id} tool={tool} labelMode={labelMode} />
                         ))}
                     </div>
-                    <div
-                        className="flex h-48 w-full max-w-[360px] flex-col items-center justify-center rounded-xl border"
-                        style={{ background: token.colorFillAlter, borderColor: token.colorBorderSecondary, color: token.colorTextSecondary }}
-                    >
-                        <ImageIcon className="mb-2 size-8" />
+                    <div className="flex h-48 w-full max-w-[360px] flex-col items-center justify-center rounded-xl border border-dashed border-neutral-300 bg-white/60 dark:border-neutral-700 dark:bg-neutral-800/60">
+                        <ImageIcon className="mb-2 size-8 text-neutral-400" />
                         <Typography.Text type="secondary">图片节点</Typography.Text>
                     </div>
                     <input
@@ -189,42 +197,75 @@ export function ImageToolSettingsModal({
                 </div>
             </Card>
 
-            <Form layout="vertical" className="!mb-0">
-                <Form.Item
-                    className="!mb-4"
-                    label={
-                        <Space size={8}>
-                            <span>快捷工具</span>
-                            <Tag className="m-0">
-                                {selectedTools.length}/{tools.length}
-                            </Tag>
-                        </Space>
-                    }
-                >
-                    <Checkbox.Group value={selectedIds} className="grid w-full gap-3 md:grid-cols-3" onChange={(values) => updateSelectedTools(values as ImageQuickToolId[])}>
-                        {tools.map((tool) => (
-                            <Checkbox key={tool.id} value={tool.id} className="m-0">
-                                <span className="inline-flex items-center gap-2">
-                                    {tool.icon}
-                                    {tool.label}
+            {/* Settings section */}
+            <div className="mb-5 grid grid-cols-2 gap-4">
+                <div className="rounded-lg border border-neutral-200 p-3 dark:border-neutral-700">
+                    <div className="mb-2 text-xs font-medium text-neutral-500">按钮样式</div>
+                    <Segmented block size="small" value={labelMode} options={labelModeOptions} onChange={(value) => onLabelModeChange(value as ToolbarLabelMode)} />
+                </div>
+                <div className="rounded-lg border border-neutral-200 p-3 dark:border-neutral-700">
+                    <div className="mb-2 flex items-center justify-between">
+                        <span className="text-xs font-medium text-neutral-500">出场动画</span>
+                        <Button
+                            type="text"
+                            size="small"
+                            icon={<Eye className="size-3" />}
+                            className="!text-xs !text-neutral-400"
+                            onClick={() => setAnimPreviewKey((k) => k + 1)}
+                        >
+                            预览
+                        </Button>
+                    </div>
+                    <Segmented block size="small" value={animationMode} options={animationModeOptions} onChange={(value) => { onAnimationModeChange(value as ToolbarAnimationMode); setAnimPreviewKey((k) => k + 1); }} />
+                </div>
+            </div>
+
+            {/* Tools selection */}
+            <div>
+                <div className="mb-3 flex items-center gap-2">
+                    <span className="text-sm font-medium">快捷工具</span>
+                    <Tag color="blue" className="m-0">
+                        {selectedTools.length}/{tools.length}
+                    </Tag>
+                </div>
+                <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4">
+                    {tools.map((tool) => {
+                        const isSelected = selected.has(tool.id);
+                        return (
+                            <button
+                                key={tool.id}
+                                type="button"
+                                className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-left text-xs transition-all ${
+                                    isSelected
+                                        ? "border-blue-400 bg-blue-50 text-blue-700 dark:border-blue-500 dark:bg-blue-950 dark:text-blue-300"
+                                        : "border-neutral-200 bg-white text-neutral-500 hover:border-neutral-300 hover:bg-neutral-50 dark:border-neutral-700 dark:bg-neutral-800 dark:hover:border-neutral-600"
+                                }`}
+                                onClick={() => onToggle(tool.id, !isSelected)}
+                            >
+                                <span className="flex size-5 shrink-0 items-center justify-center">
+                                    {isSelected ? <Check className="size-3.5 text-blue-500" /> : tool.icon}
                                 </span>
-                            </Checkbox>
-                        ))}
-                    </Checkbox.Group>
-                </Form.Item>
-            </Form>
+                                <span className="truncate">{tool.label}</span>
+                            </button>
+                        );
+                    })}
+                </div>
+            </div>
         </Modal>
     );
 }
 
-function PreviewToolbarItem({ tool, showLabels }: { tool: PreviewTool; showLabels: boolean }) {
+function PreviewToolbarItem({ tool, labelMode }: { tool: PreviewTool; labelMode: ToolbarLabelMode }) {
+    const hasText = labelMode !== "icon";
+    const isBelow = labelMode === "below" && hasText;
     return (
         <Tooltip title={tool.title}>
-            <span className="flex h-12 shrink-0 items-center px-1.5" style={{ color: tool.danger ? "#ef4444" : undefined }}>
-                <span className={`flex h-9 items-center rounded-lg px-2 ${showLabels ? "gap-2" : "justify-center"}`}>
+            <span className={`flex shrink-0 items-center px-1.5 ${isBelow ? "h-14 flex-col justify-center gap-0.5" : "h-12"}`} style={{ color: tool.danger ? "#ef4444" : undefined }}>
+                <span className={`flex items-center rounded-lg ${isBelow ? "h-7 px-1.5" : `h-9 ${hasText ? "gap-2 px-2" : "justify-center px-2"}`}`}>
                     {tool.icon}
-                    {showLabels ? <span className="whitespace-nowrap">{tool.label}</span> : null}
+                    {hasText && !isBelow ? <span className="whitespace-nowrap">{tool.label}</span> : null}
                 </span>
+                {isBelow ? <span className="px-1 text-[10px] leading-tight opacity-70">{tool.label}</span> : null}
             </span>
         </Tooltip>
     );

@@ -33,12 +33,16 @@ export type ImageToolDefinition = {
     run: (node: CanvasNodeData, handlers: ImageToolHandlers) => void;
 };
 
+export type ToolbarLabelMode = "icon" | "side" | "below";
+export type ToolbarAnimationMode = "none" | "fade" | "slide" | "scale" | "bounce";
+
 export type ImageQuickToolsConfig = {
     ids: ImageQuickToolId[];
-    showLabels: boolean;
+    labelMode: ToolbarLabelMode;
+    animationMode: ToolbarAnimationMode;
 };
 
-export const IMAGE_QUICK_TOOLS_STORAGE_KEY = "canvas-image-quick-tools-v6";
+export const IMAGE_QUICK_TOOLS_STORAGE_KEY = "canvas-image-quick-tools-v7";
 
 const defaultBaseToolIds: ImageQuickToolId[] = ["info", "delete", "saveAsset", "download", "edit"];
 
@@ -164,14 +168,26 @@ export function normalizeImageQuickToolIds(value: unknown[]) {
     return allIds.filter((id) => value.includes(id) && ids.has(id));
 }
 
+function migrateLabelMode(data: Record<string, unknown>): ToolbarLabelMode {
+    if (typeof data.labelMode === "string" && ["icon", "side", "below"].includes(data.labelMode)) return data.labelMode as ToolbarLabelMode;
+    if (data.showLabels === false) return "icon";
+    return "side";
+}
+
 export function readImageQuickToolsConfig(value: unknown): ImageQuickToolsConfig {
-    if (Array.isArray(value)) return { ids: normalizeImageQuickToolIds(value), showLabels: true };
-    if (!value || typeof value !== "object") return { ids: defaultImageQuickToolIds, showLabels: true };
-    const data = value as Partial<ImageQuickToolsConfig>;
+    if (Array.isArray(value)) return { ids: normalizeImageQuickToolIds(value), labelMode: "side", animationMode: "slide" };
+    if (!value || typeof value !== "object") return { ids: defaultImageQuickToolIds, labelMode: "side", animationMode: "slide" };
+    const data = value as Record<string, unknown>;
     return {
-        ids: Array.isArray(data.ids) ? normalizeImageQuickToolIds(data.ids) : defaultImageQuickToolIds,
-        showLabels: data.showLabels !== false,
+        ids: Array.isArray(data.ids) ? normalizeImageQuickToolIds(data.ids as unknown[]) : defaultImageQuickToolIds,
+        labelMode: migrateLabelMode(data),
+        animationMode: migrateAnimationMode(data),
     };
+}
+
+function migrateAnimationMode(data: Record<string, unknown>): ToolbarAnimationMode {
+    if (typeof data.animationMode === "string" && ["none", "fade", "slide", "scale", "bounce"].includes(data.animationMode)) return data.animationMode as ToolbarAnimationMode;
+    return "slide";
 }
 
 function resolveToolText(value: string | ((node: CanvasNodeData) => string), node: CanvasNodeData) {

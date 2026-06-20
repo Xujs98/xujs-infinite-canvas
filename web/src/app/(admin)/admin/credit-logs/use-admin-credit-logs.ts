@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { App } from "antd";
 
-import { deleteAdminCreditLog, fetchAdminCreditLogs, saveAdminCreditLog, type AdminCreditLog } from "@/services/api/admin";
+import { batchDeleteAdminCreditLogs, deleteAdminCreditLog, fetchAdminCreditLogs, saveAdminCreditLog, type AdminCreditLog } from "@/services/api/admin";
 import { useUserStore } from "@/stores/use-user-store";
 
 const defaultPageSize = 10;
@@ -43,6 +43,15 @@ export function useAdminCreditLogs() {
         onError: (error) => message.error(error instanceof Error ? error.message : "删除失败"),
     });
 
+    const batchDeleteMutation = useMutation({
+        mutationFn: (ids: string[]) => batchDeleteAdminCreditLogs(token, ids),
+        onSuccess: async () => {
+            await queryClient.invalidateQueries({ queryKey: ["admin", "credit-logs"] });
+            message.success("日志已批量删除");
+        },
+        onError: (error) => message.error(error instanceof Error ? error.message : "批量删除失败"),
+    });
+
     useEffect(() => {
         if (query.isError) {
             const errorMessage = query.error instanceof Error ? query.error.message : "读取日志失败";
@@ -67,7 +76,7 @@ export function useAdminCreditLogs() {
         page,
         pageSize,
         total: data?.total || 0,
-        isLoading: query.isFetching || saveMutation.isPending || deleteMutation.isPending,
+        isLoading: query.isFetching || saveMutation.isPending || deleteMutation.isPending || batchDeleteMutation.isPending,
         searchLogs: (value = keyword) => updateFilters({ keyword: value }),
         changePage: (value: number) => updateFilters({ page: value }),
         changePageSize: (value: number) => updateFilters({ pageSize: value }),
@@ -75,5 +84,6 @@ export function useAdminCreditLogs() {
         refreshLogs: () => query.refetch(),
         saveLog: (log: Partial<AdminCreditLog>) => saveMutation.mutateAsync(log),
         deleteLog: (id: string) => deleteMutation.mutateAsync(id),
+        batchDeleteLogs: (ids: string[]) => batchDeleteMutation.mutateAsync(ids),
     };
 }

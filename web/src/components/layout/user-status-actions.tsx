@@ -1,18 +1,21 @@
 "use client";
 
 import type { CSSProperties, RefObject } from "react";
-import { Avatar, Dropdown, Tooltip } from "antd";
-import { BookOpen, Keyboard, LogOut, Settings2, Shield } from "lucide-react";
+import { useState } from "react";
+import { App, Avatar, Dropdown, Input, Modal, Tooltip } from "antd";
+import { BookOpen, Headset, Keyboard, KeyRound, LogOut, Settings2, Shield } from "lucide-react";
 import type { ItemType } from "antd/es/menu/interface";
 import Link from "next/link";
 
 import { AnimatedThemeToggler } from "@/components/ui/animated-theme-toggler";
 import { GitHubLink } from "@/components/layout/github-link";
 import { VersionReleaseModal } from "@/components/layout/version-release-modal";
+import AnnouncementBell from "@/components/announcement-bell";
 import { CreditSymbol } from "@/constant/credits";
 import { DOCS_URL } from "@/constant/env";
 import { cn } from "@/lib/utils";
-import { canvasThemes } from "@/lib/canvas-theme";
+import { useCanvasTheme } from "@/hooks/use-canvas-theme";
+import { redeemCode } from "@/services/api/auth";
 import { useConfigStore } from "@/stores/use-config-store";
 import { useThemeStore } from "@/stores/use-theme-store";
 import { useUserStore } from "@/stores/use-user-store";
@@ -28,12 +31,19 @@ type UserStatusActionsProps = {
 };
 
 export function UserStatusActions({ showConfig = true, variant = "default", onOpenShortcuts, accountOpen, onAccountOpenChange, accountRef, getPopupContainer }: UserStatusActionsProps) {
+    const { message } = App.useApp();
     const theme = useThemeStore((state) => state.theme);
     const setTheme = useThemeStore((state) => state.setTheme);
     const user = useUserStore((state) => state.user);
+    const token = useUserStore((state) => state.token);
+    const setSession = useUserStore((state) => state.setSession);
     const logout = useUserStore((state) => state.clearSession);
     const openConfigDialog = useConfigStore((state) => state.openConfigDialog);
-    const canvasTheme = canvasThemes[theme];
+    const serviceContact = useConfigStore((state) => state.publicSystemSettings?.serviceContact);
+    const [redeemOpen, setRedeemOpen] = useState(false);
+    const [redeemValue, setRedeemValue] = useState("");
+    const [redeemLoading, setRedeemLoading] = useState(false);
+    const canvasTheme = useCanvasTheme();
     const userName = user?.displayName || user?.username || "";
     const credits = user?.credits ?? 0;
     const avatarUrl = user?.avatarUrl?.trim();
@@ -44,9 +54,31 @@ export function UserStatusActions({ showConfig = true, variant = "default", onOp
     const gitHubClassName = "size-7 text-base";
     const gitHubStyle = iconStyle;
     const avatarStyle: CSSProperties | undefined = variant === "canvas" ? { borderColor: canvasTheme.toolbar.border, color: canvasTheme.node.text, background: "transparent" } : undefined;
+    const handleRedeem = async () => {
+        const code = redeemValue.trim();
+        if (!code) {
+            message.warning("请输入卡密");
+            return;
+        }
+        setRedeemLoading(true);
+        try {
+            const updatedUser = await redeemCode(token, code);
+            setSession(token, updatedUser);
+            message.success("兑换成功");
+            setRedeemOpen(false);
+            setRedeemValue("");
+        } catch (error) {
+            message.error(error instanceof Error ? error.message : "兑换失败");
+        } finally {
+            setRedeemLoading(false);
+        }
+    };
+
     const menuItems: ItemType[] = [
         { key: "user", disabled: true, label: <span className="font-medium text-current">{userName}</span> },
+        { key: "profile", icon: <BookOpen className="size-4" />, label: <Link href="/profile">个人中心</Link> },
         ...(user?.role === "admin" ? [{ key: "admin", icon: <Shield className="size-4" />, label: <Link href="/admin">管理后台</Link> }] : []),
+        { key: "redeem", icon: <KeyRound className="size-4" />, label: "兑换卡密", onClick: () => setRedeemOpen(true) },
         ...(onOpenShortcuts ? [{ key: "shortcuts", icon: <Keyboard className="size-4" />, label: "快捷键", onClick: onOpenShortcuts }] : []),
         { type: "divider" },
         { key: "logout", icon: <LogOut className="size-4" />, label: "退出登录", onClick: logout },
@@ -54,17 +86,37 @@ export function UserStatusActions({ showConfig = true, variant = "default", onOp
 
     return (
         <div className="inline-flex shrink-0 items-center gap-1">
-            <a href={DOCS_URL} target="_blank" rel="noopener noreferrer" className={naturalIconClass} style={iconStyle} aria-label="文档" title="文档">
-                <BookOpen className="size-4" />
-            </a>
+            {user?.role === "admin" && (
+                <a href={DOCS_URL} target="_blank" rel="noopener noreferrer" className={naturalIconClass} style={iconStyle} aria-label="文档" title="文档">
+                    <BookOpen className="size-4" />
+                </a>
+            )}
             {showConfig ? (
                 <button type="button" className={naturalIconClass} style={iconStyle} onClick={() => openConfigDialog(false)} aria-label="配置" title="配置">
                     <Settings2 className="size-4" />
                 </button>
             ) : null}
             <AnimatedThemeToggler theme={theme} onThemeChange={setTheme} className={naturalIconClass} style={iconStyle} aria-label={theme === "dark" ? "切换到浅色主题" : "切换到深色主题"} title={theme === "dark" ? "切换到浅色主题" : "切换到深色主题"} />
-            <VersionReleaseModal style={versionStyle} />
-            <GitHubLink className={cn("bg-transparent hover:bg-transparent dark:hover:bg-transparent", gitHubClassName)} style={gitHubStyle} />
+            {user?.role === "admin" && <VersionReleaseModal style={versionStyle} />}
+            {user?.role === "admin" && <GitHubLink className={cn("bg-transparent hover:bg-transparent dark:hover:bg-transparent", gitHubClassName)} style={gitHubStyle} />}
+            {serviceContact ? (
+                <Tooltip title={<span>点击复制：{serviceContact}</span>} placement="bottom">
+                    <button
+                        type="button"
+                        className={naturalIconClass}
+                        style={iconStyle}
+                        aria-label="客服"
+                        title="客服"
+                        onClick={() => {
+                            void navigator.clipboard.writeText(serviceContact);
+                            message.success("客服联系方式已复制");
+                        }}
+                    >
+                        <Headset className="size-4" />
+                    </button>
+                </Tooltip>
+            ) : null}
+            <AnnouncementBell />
             {variant === "canvas" && user ? (
                 <Tooltip title="当前算力点余额" placement="bottom">
                     <div className="flex h-8 shrink-0 items-center gap-1.5 px-1.5 text-xs font-medium tabular-nums opacity-75 transition hover:opacity-100" style={{ color: canvasTheme.node.text }}>
@@ -100,6 +152,27 @@ export function UserStatusActions({ showConfig = true, variant = "default", onOp
                     </Dropdown>
                 </div>
             ) : null}
+            <Modal
+                title="兑换卡密"
+                open={redeemOpen}
+                onCancel={() => {
+                    setRedeemOpen(false);
+                    setRedeemValue("");
+                }}
+                onOk={() => void handleRedeem()}
+                okText="兑换"
+                cancelText="取消"
+                confirmLoading={redeemLoading}
+                destroyOnHidden
+            >
+                <Input
+                    value={redeemValue}
+                    onChange={(e) => setRedeemValue(e.target.value)}
+                    placeholder="请输入卡密"
+                    onPressEnter={() => void handleRedeem()}
+                    autoFocus
+                />
+            </Modal>
         </div>
     );
 }

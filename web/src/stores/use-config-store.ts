@@ -86,16 +86,29 @@ export const defaultWebdavSyncConfig: WebdavSyncConfig = {
     lastSyncedAt: "",
 };
 
+export type PublicSystemSettings = {
+    siteName: string;
+    siteSubtitle: string;
+    siteLogo: string;
+    serviceContact: string;
+    agentEnabled: boolean;
+    agentVisible: boolean;
+    agentAccessLevel: string;
+    assistantEnabled: boolean;
+};
+
 type ConfigStore = {
     config: AiConfig;
     webdav: WebdavSyncConfig;
     publicSettings: AdminPublicSettings | null;
+    publicSystemSettings: PublicSystemSettings | null;
     isPublicSettingsLoading: boolean;
     isConfigOpen: boolean;
     shouldPromptContinue: boolean;
     updateConfig: <K extends keyof AiConfig>(key: K, value: AiConfig[K]) => void;
     updateWebdavConfig: <K extends keyof WebdavSyncConfig>(key: K, value: WebdavSyncConfig[K]) => void;
     loadPublicSettings: () => Promise<void>;
+    loadPublicSystemSettings: () => Promise<void>;
     isAiConfigReady: (config: AiConfig, model: string) => boolean;
     openConfigDialog: (shouldPromptContinue?: boolean) => void;
     setConfigDialogOpen: (isOpen: boolean) => void;
@@ -190,6 +203,7 @@ export const useConfigStore = create<ConfigStore>()(
             config: defaultConfig,
             webdav: defaultWebdavSyncConfig,
             publicSettings: null,
+            publicSystemSettings: null,
             isPublicSettingsLoading: false,
             isConfigOpen: false,
             shouldPromptContinue: false,
@@ -214,6 +228,13 @@ export const useConfigStore = create<ConfigStore>()(
                     set({ publicSettings: await apiGet<AdminPublicSettings>("/api/settings") });
                 } finally {
                     set({ isPublicSettingsLoading: false });
+                }
+            },
+            loadPublicSystemSettings: async () => {
+                try {
+                    set({ publicSystemSettings: await apiGet<PublicSystemSettings>("/api/system-settings") });
+                } catch {
+                    // ignore
                 }
             },
             isAiConfigReady: (config, model) => isAiConfigReady(config, model),

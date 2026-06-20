@@ -5,12 +5,11 @@ import { Button, Tooltip } from "antd";
 import { BookOpen } from "lucide-react";
 
 import { PromptSelectDialog } from "@/components/prompts/prompt-select-dialog";
-import { canvasThemes } from "@/lib/canvas-theme";
-import { useThemeStore } from "@/stores/use-theme-store";
+import { useCanvasTheme } from "@/hooks/use-canvas-theme";
 
 export function CanvasPromptLibrary({ onSelect }: { onSelect: (prompt: string) => void }) {
     const [open, setOpen] = useState(false);
-    const theme = canvasThemes[useThemeStore((state) => state.theme)];
+    const theme = useCanvasTheme();
 
     return (
         <>

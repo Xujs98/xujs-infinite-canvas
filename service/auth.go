@@ -84,11 +84,20 @@ func Register(username string, password string) (model.AuthSession, error) {
 	if err != nil {
 		return model.AuthSession{}, err
 	}
+	// 读取注册赠送算力点。
+	giftCredits := 0
+	sysSettings, sysErr := repository.GetSystemSettings()
+	if sysErr == nil {
+		if v, ok := sysSettings[model.SettingRegisterGiftCredits]; ok {
+			fmt.Sscanf(v, "%d", &giftCredits)
+		}
+	}
 	user, err := repository.SaveUser(model.User{
 		ID:        newID("user"),
 		Username:  username,
 		Password:  hash,
 		Role:      model.UserRoleUser,
+		Credits:   giftCredits,
 		AffCode:   newAffCode(),
 		Status:    model.UserStatusActive,
 		CreatedAt: now(),
@@ -270,6 +279,11 @@ func SaveUser(user model.User, password string) (model.User, error) {
 	} else if saved, ok, err := repository.GetUserByID(user.ID); err != nil {
 		return user, err
 	} else if ok {
+		// 管理员保护：不可禁用、不可降级。
+		if saved.Role == model.UserRoleAdmin {
+			user.Role = model.UserRoleAdmin
+			user.Status = model.UserStatusActive
+		}
 		user.CreatedAt = saved.CreatedAt
 		user.Password = saved.Password
 		user.AvatarURL = saved.AvatarURL
@@ -300,6 +314,32 @@ func SaveUser(user model.User, password string) (model.User, error) {
 	user, err := repository.SaveUser(user)
 	user.Password = ""
 	return user, err
+}
+
+func UpdateProfile(userID string, displayName string, password string) (model.AuthUser, error) {
+	user, ok, err := repository.GetUserByID(userID)
+	if err != nil || !ok {
+		if err != nil {
+			return model.AuthUser{}, err
+		}
+		return model.AuthUser{}, safeMessageError{message: "用户不存在"}
+	}
+	if displayName != "" {
+		user.DisplayName = displayName
+	}
+	if password != "" {
+		hash, err := hashPassword(password)
+		if err != nil {
+			return model.AuthUser{}, err
+		}
+		user.Password = hash
+	}
+	user.UpdatedAt = now()
+	user, err = repository.SaveUser(user)
+	if err != nil {
+		return model.AuthUser{}, err
+	}
+	return model.PublicUser(user), nil
 }
 
 func AdjustUserCredits(id string, credits int) (model.User, error) {
@@ -354,6 +394,20 @@ func ConsumeUserCredits(userID string, modelName string, credits int, path strin
 	return err
 }
 
+func LogMembershipFreeUsage(userID string, modelName string, credits int, path string) {
+	extra, _ := json.Marshal(map[string]string{"model": modelName, "path": path})
+	_, _ = repository.SaveCreditLog(model.CreditLog{
+		ID:        newID("credit"),
+		UserID:    userID,
+		Type:      model.CreditLogTypeMembershipFree,
+		Amount:    0,
+		Balance:   0,
+		Remark:    "调用模型 " + modelName,
+		Extra:     string(extra),
+		CreatedAt: now(),
+	})
+}
+
 func RefundUserCredits(userID string, modelName string, credits int, path string) error {
 	if credits <= 0 {
 		return nil
@@ -384,7 +438,36 @@ func ListCreditLogs(q model.Query) (model.CreditLogList, error) {
 	if err != nil {
 		return model.CreditLogList{}, err
 	}
+	// 收集用户 ID，批量查询用户名。
+	ids := make([]string, 0)
+	for _, l := range logs {
+		if l.UserID != "" {
+			ids = append(ids, l.UserID)
+		}
+	}
+	if len(ids) > 0 {
+		nameMap, err := repository.GetUsersByIDs(ids)
+		if err == nil {
+			for i := range logs {
+				if name, ok := nameMap[logs[i].UserID]; ok {
+					logs[i].Username = name
+				}
+			}
+		}
+	}
 	return model.CreditLogList{Items: logs, Total: int(total)}, nil
+}
+
+// IsMembershipActive 判断会员是否在有效期内。
+func IsMembershipActive(expiresAt string) bool {
+	if expiresAt == "" {
+		return false
+	}
+	t, err := time.Parse(time.RFC3339, expiresAt)
+	if err != nil {
+		return false
+	}
+	return t.After(time.Now())
 }
 
 func SaveCreditLog(log model.CreditLog) (model.CreditLog, error) {
@@ -399,8 +482,48 @@ func DeleteCreditLog(id string) error {
 	return repository.DeleteCreditLog(id)
 }
 
+func BatchDeleteCreditLogs(ids []string) error {
+	return repository.BatchDeleteCreditLogs(ids)
+}
+
 func DeleteUser(id string) error {
+	user, ok, err := repository.GetUserByID(id)
+	if err != nil {
+		return err
+	}
+	if !ok {
+		return safeMessageError{message: "用户不存在"}
+	}
+	if user.Role == model.UserRoleAdmin {
+		return safeMessageError{message: "不能删除管理员"}
+	}
 	return repository.DeleteUser(id)
+}
+
+func BatchDeleteUsers(ids []string) error {
+	for _, id := range ids {
+		user, ok, err := repository.GetUserByID(id)
+		if err != nil {
+			return err
+		}
+		if ok && user.Role == model.UserRoleAdmin {
+			return safeMessageError{message: "不能删除管理员"}
+		}
+	}
+	return repository.BatchDeleteUsers(ids)
+}
+
+func BatchUpdateUserStatus(ids []string, status model.UserStatus) error {
+	for _, id := range ids {
+		user, ok, err := repository.GetUserByID(id)
+		if err != nil {
+			return err
+		}
+		if ok && user.Role == model.UserRoleAdmin {
+			return safeMessageError{message: "不能修改管理员状态"}
+		}
+	}
+	return repository.BatchUpdateUserStatus(ids, status)
 }
 
 func GuestUser() model.AuthUser {

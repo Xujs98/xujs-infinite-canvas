@@ -35,14 +35,30 @@ func New() *gin.Engine {
 	v1.POST("/audio/speech", gin.WrapF(handler.AIAudioSpeech))
 	v1.POST("/videos", gin.WrapF(handler.AIVideos))
 	v1.POST("/media/references", gin.WrapF(handler.UploadReferenceMedia))
+	v1.POST("/redeem-code", gin.WrapF(handler.RedeemCode))
+	v1.PUT("/profile", gin.WrapF(handler.UpdateProfile))
 	v1.GET("/videos/:id", func(c *gin.Context) {
 		handler.AIVideo(c.Writer, c.Request, c.Param("id"))
 	})
 	v1.GET("/videos/:id/content", func(c *gin.Context) {
 		handler.AIVideoContent(c.Writer, c.Request, c.Param("id"))
 	})
+
+	// Jimeng (即梦) CLI integration
+	api.GET("/jimeng/status", gin.WrapF(handler.JimengStatus))
+	api.GET("/jimeng/credit", middleware.UserAuth, gin.WrapF(handler.JimengCredit))
+	api.POST("/jimeng/login/start", gin.WrapF(handler.JimengLoginStart))
+	api.GET("/jimeng/login/status", gin.WrapF(handler.JimengLoginStatus))
+	api.POST("/jimeng/logout", gin.WrapF(handler.JimengLogout))
+	api.POST("/jimeng/generate/image", middleware.UserAuth, gin.WrapF(handler.JimengGenerateImage))
+	api.POST("/jimeng/generate/video", middleware.UserAuth, gin.WrapF(handler.JimengGenerateVideo))
+	api.GET("/jimeng/task/:id", middleware.UserAuth, func(c *gin.Context) {
+		handler.JimengTaskStatus(c.Writer, c.Request, c.Param("id"))
+	})
+	api.POST("/jimeng/query-media", middleware.UserAuth, gin.WrapF(handler.JimengQueryMedia))
 	api.GET("/prompts", middleware.OptionalAuth, gin.WrapF(handler.Prompts))
 	api.GET("/assets", middleware.OptionalAuth, gin.WrapF(handler.Assets))
+	api.GET("/system-settings", gin.WrapF(handler.GetPublicSystemSettings))
 	api.POST("/admin/login", gin.WrapF(handler.AdminLogin))
 
 	admin := api.Group("/admin", middleware.AdminAuth)
@@ -51,11 +67,14 @@ func New() *gin.Engine {
 	admin.POST("/users/:id/credits", func(c *gin.Context) {
 		handler.AdminAdjustUserCredits(c.Writer, c.Request, c.Param("id"))
 	})
+	admin.POST("/users/batch-delete", gin.WrapF(handler.AdminBatchDeleteUsers))
+	admin.POST("/users/batch-status", gin.WrapF(handler.AdminBatchUpdateUserStatus))
 	admin.DELETE("/users/:id", func(c *gin.Context) {
 		handler.AdminDeleteUser(c.Writer, c.Request, c.Param("id"))
 	})
 	admin.GET("/credit-logs", gin.WrapF(handler.AdminCreditLogs))
 	admin.POST("/credit-logs", gin.WrapF(handler.AdminSaveCreditLog))
+	admin.POST("/credit-logs/batch-delete", gin.WrapF(handler.AdminBatchDeleteCreditLogs))
 	admin.DELETE("/credit-logs/:id", func(c *gin.Context) {
 		handler.AdminDeleteCreditLog(c.Writer, c.Request, c.Param("id"))
 	})
@@ -63,6 +82,10 @@ func New() *gin.Engine {
 	admin.POST("/settings", gin.WrapF(handler.AdminSaveSettings))
 	admin.POST("/settings/channel-models", gin.WrapF(handler.AdminChannelModels))
 	admin.POST("/settings/channel-test", gin.WrapF(handler.AdminTestChannelModel))
+	admin.GET("/system-settings", gin.WrapF(handler.AdminGetSystemSettings))
+	admin.POST("/system-settings", gin.WrapF(handler.AdminSaveSystemSettings))
+	admin.POST("/system-settings/logo", gin.WrapF(handler.AdminUploadLogo))
+	admin.DELETE("/system-settings/logo", gin.WrapF(handler.AdminRemoveLogo))
 	admin.GET("/prompt-categories", gin.WrapF(handler.AdminPromptCategories))
 	admin.POST("/prompt-categories/sync", gin.WrapF(handler.AdminSyncPromptCategories))
 	admin.GET("/prompts", gin.WrapF(handler.AdminPrompts))
@@ -76,6 +99,26 @@ func New() *gin.Engine {
 	admin.DELETE("/assets/:id", func(c *gin.Context) {
 		handler.AdminDeleteAsset(c.Writer, c.Request, c.Param("id"))
 	})
+	admin.GET("/redeem-codes", gin.WrapF(handler.AdminRedeemCodes))
+	admin.POST("/redeem-codes/generate", gin.WrapF(handler.AdminGenerateRedeemCodes))
+	admin.POST("/redeem-codes/batch-delete", gin.WrapF(handler.AdminBatchDeleteRedeemCodes))
+	admin.DELETE("/redeem-codes/:id", func(c *gin.Context) {
+		handler.AdminDeleteRedeemCode(c.Writer, c.Request, c.Param("id"))
+	})
+	admin.GET("/announcements", gin.WrapF(handler.AdminAnnouncements))
+	admin.POST("/announcements", gin.WrapF(handler.AdminSaveAnnouncement))
+	admin.DELETE("/announcements/:id", func(c *gin.Context) {
+		handler.AdminDeleteAnnouncement(c.Writer, c.Request, c.Param("id"))
+	})
+	admin.POST("/announcements/batch-delete", gin.WrapF(handler.AdminBatchDeleteAnnouncements))
+	admin.POST("/announcements/batch-pinned", gin.WrapF(handler.AdminBatchUpdateAnnouncementPinned))
+	admin.GET("/agent/status", gin.WrapF(handler.AdminAgentStatus))
+	admin.POST("/agent/start", gin.WrapF(handler.AdminAgentStart))
+	admin.POST("/agent/stop", gin.WrapF(handler.AdminAgentStop))
+	admin.GET("/agent/settings", gin.WrapF(handler.AdminGetAgentSettings))
+	admin.POST("/agent/settings", gin.WrapF(handler.AdminSaveAgentSettings))
+	api.Any("/agent/*path", gin.WrapF(handler.AgentProxy))
+	api.GET("/announcements", gin.WrapF(handler.PublicAnnouncements))
 
 	router.NoRoute(middleware.NotFoundJSON)
 

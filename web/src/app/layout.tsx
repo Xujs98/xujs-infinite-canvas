@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Script from "next/script";
 import { AntdRegistry } from "@ant-design/nextjs-registry";
 import { AppProviders } from "@/components/layout/app-providers";
+import { DynamicTitle } from "@/components/layout/dynamic-title";
 import "antd/dist/reset.css";
 import "./globals.css";
 import React from "react";
@@ -32,7 +33,10 @@ export default function RootLayout({
                     }}
                 />
                 <AntdRegistry>
-                    <AppProviders>{children}</AppProviders>
+                    <AppProviders>
+                        <DynamicTitle />
+                        {children}
+                    </AppProviders>
                 </AntdRegistry>
             </body>
         </html>

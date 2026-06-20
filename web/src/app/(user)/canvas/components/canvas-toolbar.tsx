@@ -1,11 +1,14 @@
 import type { CSSProperties, MouseEvent as ReactMouseEvent, ReactNode, RefObject } from "react";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Button, Segmented, Switch } from "antd";
-import { CircleDot, Eraser, FolderOpen, Grid2x2, Hand, Image as ImageIcon, Info, Library, Moon, Music2, Palette, Redo2, Settings2, Square, Sun, Trash2, Type, Undo2, Upload, Video } from "lucide-react";
+import { CircleDot, Eraser, FolderOpen, Grid2x2, Hand, Image as ImageIcon, Info, Library, Moon, Music2, Palette, Redo2, Settings2, Square, Sun, Trash2, Type, Undo2, Upload, Video, Clapperboard } from "lucide-react";
 
-import { canvasThemes, type CanvasBackgroundMode, type CanvasColorTheme, type CanvasTheme } from "@/lib/canvas-theme";
+import { canvasThemes, type CanvasBackgroundMode, type CanvasColorTheme, type CanvasTheme, type ThemePalette, themePaletteLabels, themePalettePreviews } from "@/lib/canvas-theme";
+import { useCanvasTheme } from "@/hooks/use-canvas-theme";
 import { useThemeStore } from "@/stores/use-theme-store";
 import { AnimatedThemeToggler } from "@/components/ui/animated-theme-toggler";
+
+const allPalettes: ThemePalette[] = ["stone", "blue", "emerald", "rose", "amber", "violet"];
 
 export function CanvasToolbar({
     selectedCount,
@@ -28,6 +31,7 @@ export function CanvasToolbar({
     onShowImageInfoChange,
     onOpenAssetLibrary,
     onOpenMyAssets,
+    onOpenTimeline,
 }: {
     selectedCount: number;
     canUndo: boolean;
@@ -49,15 +53,32 @@ export function CanvasToolbar({
     onShowImageInfoChange: (show: boolean) => void;
     onOpenAssetLibrary: () => void;
     onOpenMyAssets: () => void;
+    onOpenTimeline: () => void;
 }) {
     const wrapRef = useRef<HTMLDivElement>(null);
     const colorTheme = useThemeStore((state) => state.theme);
     const setTheme = useThemeStore((state) => state.setTheme);
-    const theme = canvasThemes[colorTheme];
+    const palette = useThemeStore((state) => state.palette);
+    const setPalette = useThemeStore((state) => state.setPalette);
+    const theme = useCanvasTheme();
     const [hovered, setHovered] = useState<string | null>(null);
     const [tipX, setTipX] = useState(0);
     const [appearanceOpen, setAppearanceOpen] = useState(false);
     const [panelX, setPanelX] = useState(0);
+    const panelRef = useRef<HTMLDivElement>(null);
+
+    // 点击工具栏和面板外部时关闭画布外观面板
+    useEffect(() => {
+        if (!appearanceOpen) return;
+        const handlePointerDown = (e: PointerEvent) => {
+            const target = e.target instanceof Element ? e.target : null;
+            if (!target) return;
+            if (wrapRef.current?.contains(target) || panelRef.current?.contains(target)) return;
+            setAppearanceOpen(false);
+        };
+        window.addEventListener("pointerdown", handlePointerDown);
+        return () => window.removeEventListener("pointerdown", handlePointerDown);
+    }, [appearanceOpen]);
     const dockStyle = { background: theme.toolbar.panel, borderColor: theme.toolbar.border, color: theme.toolbar.item, boxShadow: colorTheme === "dark" ? "0 18px 45px rgba(0,0,0,.32)" : "0 16px 40px rgba(28,25,23,.12)" };
     const hoverStyle = { background: theme.toolbar.itemHover, color: theme.toolbar.activeText };
     const activeStyle = { background: theme.toolbar.activeBg, color: theme.toolbar.activeText };
@@ -66,7 +87,7 @@ export function CanvasToolbar({
     return (
         <div className="pointer-events-none absolute bottom-5 z-50 flex justify-center" style={{ left: 300, right: 16 }}>
             {tip ? <DockTip label={tip} x={tipX} theme={theme} /> : null}
-            <div ref={wrapRef} className="thin-scrollbar pointer-events-auto flex h-14 max-w-full items-center gap-1 overflow-x-auto rounded-xl border px-2 shadow-lg backdrop-blur [&>*]:shrink-0" style={dockStyle}>
+            <div ref={wrapRef} className="thin-scrollbar glass pointer-events-auto flex h-14 max-w-full items-center gap-1 overflow-x-auto rounded-xl border px-2 shadow-lg [&>*]:shrink-0" style={dockStyle}>
                 <ToolbarButton id="tool-hand" label="移动/选择" active={!selectedCount} hovered={hovered} activeStyle={activeStyle} hoverStyle={hoverStyle} wrapRef={wrapRef} onTipX={setTipX} onHover={setHovered} onClick={onDeselect}>
                     <Hand className="size-4.5" />
                 </ToolbarButton>
@@ -91,6 +112,9 @@ export function CanvasToolbar({
                 </ToolbarButton>
                 <ToolbarButton id="tool-config" label="生成配置" hovered={hovered} hoverStyle={hoverStyle} wrapRef={wrapRef} onTipX={setTipX} onHover={setHovered} onClick={onAddConfig}>
                     <Settings2 className="size-4.5" />
+                </ToolbarButton>
+                <ToolbarButton id="tool-timeline" label="时间线" hovered={hovered} hoverStyle={hoverStyle} wrapRef={wrapRef} onTipX={setTipX} onHover={setHovered} onClick={onOpenTimeline}>
+                    <Clapperboard className="size-4.5" />
                 </ToolbarButton>
                 <ToolbarButton id="tool-upload" label="上传素材" hovered={hovered} hoverStyle={hoverStyle} wrapRef={wrapRef} onTipX={setTipX} onHover={setHovered} onClick={onUpload}>
                     <Upload className="size-4.5" />
@@ -135,7 +159,8 @@ export function CanvasToolbar({
 
             {appearanceOpen ? (
                 <div
-                    className="pointer-events-auto absolute bottom-[72px] z-30 w-[248px] -translate-x-1/2 rounded-xl border p-2.5 shadow-xl backdrop-blur"
+                    ref={panelRef}
+                    className="pointer-events-auto glass absolute bottom-[72px] z-30 w-[264px] -translate-x-1/2 rounded-xl border p-2.5 shadow-xl"
                     style={{ left: panelX || "50%", background: theme.toolbar.panel, borderColor: theme.toolbar.border, color: theme.toolbar.item }}
                 >
                     <div className="px-1 pb-2 text-sm font-medium opacity-65">画布外观</div>
@@ -149,6 +174,34 @@ export function CanvasToolbar({
                             <Moon className="size-4" />
                             深色
                         </CanvasThemeButton>
+                    </div>
+                    <div className="mt-3 px-1 pb-1.5 text-[11px] font-medium opacity-50">颜色主题</div>
+                    <div className="grid grid-cols-3 gap-1.5">
+                        {allPalettes.map((p) => {
+                            const preview = themePalettePreviews[p];
+                            const active = palette === p;
+                            return (
+                                <button
+                                    key={p}
+                                    type="button"
+                                    className="flex flex-col items-center gap-1 rounded-lg px-1.5 py-2 text-[11px] transition"
+                                    style={{
+                                        background: active ? theme.toolbar.activeBg : "transparent",
+                                        color: active ? theme.toolbar.activeText : theme.toolbar.item,
+                                        outline: active ? `1.5px solid ${theme.toolbar.activeText}` : "none",
+                                        outlineOffset: -1.5,
+                                    }}
+                                    onClick={() => setPalette(p)}
+                                >
+                                    <span className="flex gap-0.5">
+                                        <span className="inline-block size-3 rounded-full" style={{ background: preview.primary }} />
+                                        <span className="inline-block size-3 rounded-full" style={{ background: preview.accent }} />
+                                        <span className="inline-block size-3 rounded-full border" style={{ background: preview.bg, borderColor: colorTheme === "dark" ? "rgba(255,255,255,0.15)" : "rgba(0,0,0,0.1)" }} />
+                                    </span>
+                                    <span className="leading-none">{themePaletteLabels[p]}</span>
+                                </button>
+                            );
+                        })}
                     </div>
                     <div className="mt-3 px-1 pb-1.5 text-[11px] font-medium opacity-50">网格样式</div>
                     <Segmented
@@ -225,7 +278,7 @@ function ToolbarButton({
     danger?: boolean;
     children: ReactNode;
 }) {
-    const theme = canvasThemes[useThemeStore((state) => state.theme)];
+    const theme = useCanvasTheme();
 
     return (
         <Button
@@ -286,6 +339,7 @@ function toolLabel(id: string) {
     if (id === "tool-video") return "视频";
     if (id === "tool-audio") return "音频";
     if (id === "tool-config") return "生成配置";
+    if (id === "tool-timeline") return "时间线";
     if (id === "tool-upload") return "上传素材";
     if (id === "tool-library") return "素材库";
     if (id === "tool-assets") return "我的素材";
