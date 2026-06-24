@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"encoding/base64"
 	"fmt"
 	"io"
 	"net/http"
@@ -33,7 +34,7 @@ type referenceMediaUploadResult struct {
 func UploadReferenceMedia(w http.ResponseWriter, r *http.Request) {
 	publicBaseURL := strings.TrimRight(strings.TrimSpace(config.Cfg.PublicBaseURL), "/")
 	if publicBaseURL == "" {
-		Fail(w, "未配置 PUBLIC_BASE_URL，无法把本地参考素材提供给火山方舟访问")
+		Fail(w, "未配置 PUBLIC_BASE_URL，无法把本地参考素材转换为公网 URL 供上游接口访问")
 		return
 	}
 	r.Body = http.MaxBytesReader(w, r.Body, referenceMediaMaxBytes+1)
@@ -114,6 +115,53 @@ func ReferenceMedia(w http.ResponseWriter, r *http.Request, id string) {
 	}
 	w.Header().Set("Cache-Control", "public, max-age=86400")
 	http.ServeContent(w, r, id, info.ModTime(), file)
+}
+
+// uploadBase64AsMedia 将 base64 data URL 上传为参考素材，返回公网 URL
+func uploadBase64AsMedia(dataURL string) (string, error) {
+	publicBaseURL := strings.TrimRight(strings.TrimSpace(config.Cfg.PublicBaseURL), "/")
+	if publicBaseURL == "" {
+		return dataURL, fmt.Errorf("未配置 PUBLIC_BASE_URL")
+	}
+	// 解析 data URL: data:image/png;base64,iVBOR...
+	parts := strings.SplitN(dataURL, ",", 2)
+	if len(parts) != 2 {
+		return dataURL, fmt.Errorf("无效的 data URL")
+	}
+	header := parts[0] // data:image/png;base64
+	data := parts[1]
+	// 提取 MIME 类型
+	mimeType := "image/png"
+	if idx := strings.Index(header, ":"); idx >= 0 {
+		if idx2 := strings.Index(header[idx:], ";"); idx2 >= 0 {
+			mimeType = header[idx+1 : idx+idx2]
+		}
+	}
+	// 解码 base64
+	decoded, err := base64.StdEncoding.DecodeString(data)
+	if err != nil {
+		return dataURL, fmt.Errorf("base64 解码失败: %w", err)
+	}
+	// 确保目录存在
+	if err := os.MkdirAll(referenceMediaDir(), 0o755); err != nil {
+		return dataURL, fmt.Errorf("创建目录失败: %w", err)
+	}
+	// 根据 MIME 类型确定扩展名
+	ext := ".png"
+	switch mimeType {
+	case "image/jpeg":
+		ext = ".jpg"
+	case "image/webp":
+		ext = ".webp"
+	case "image/gif":
+		ext = ".gif"
+	}
+	id := uuid.NewString() + ext
+	targetPath := filepath.Join(referenceMediaDir(), id)
+	if err := os.WriteFile(targetPath, decoded, 0o644); err != nil {
+		return dataURL, fmt.Errorf("保存文件失败: %w", err)
+	}
+	return fmt.Sprintf("%s/api/media/references/%s", publicBaseURL, id), nil
 }
 
 func referenceMediaDir() string {

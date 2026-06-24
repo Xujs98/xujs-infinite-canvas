@@ -1,11 +1,12 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { Button, Card, Descriptions, Form, Space, Spin, Switch, Typography, message, Modal, Tag } from "antd";
-import { ReloadOutlined, PlayCircleOutlined, PoweroffOutlined, ExclamationCircleOutlined } from "@ant-design/icons";
+import { Button, Descriptions, Form, Space, Spin, Switch, Typography, message, Modal, Tag } from "antd";
+import { ReloadOutlined, PlayCircleOutlined, PoweroffOutlined, ExclamationCircleOutlined, SaveOutlined } from "@ant-design/icons";
 import { useUserStore } from "@/stores/use-user-store";
-
-const { Title } = Typography;
+import { getAdminColors } from "@/lib/canvas-theme";
+import { useThemeStore } from "@/stores/use-theme-store";
+import { useMemo } from "react";
 
 interface AgentStatus {
     running: boolean;
@@ -25,7 +26,7 @@ const accessLevelOptions = [
     { label: "会员", value: "member" },
 ];
 
-function AccessLevelSelector({ value = [], onChange }: { value?: string[]; onChange?: (val: string[]) => void }) {
+function AccessLevelSelector({ value = [], onChange, accentColor }: { value?: string[]; onChange?: (val: string[]) => void; accentColor: string }) {
     const handleClick = (val: string) => {
         const next = value.includes(val) ? value.filter((v) => v !== val) : [...value, val];
         onChange?.(next);
@@ -39,10 +40,10 @@ function AccessLevelSelector({ value = [], onChange }: { value?: string[]; onCha
                         key={opt.value}
                         onClick={() => handleClick(opt.value)}
                         style={{
-                            borderColor: selected ? "var(--agent-primary, #1677ff)" : undefined,
-                            color: selected ? "var(--agent-primary, #1677ff)" : undefined,
+                            borderColor: selected ? accentColor : undefined,
+                            color: selected ? accentColor : undefined,
                             fontWeight: selected ? 600 : 400,
-                            boxShadow: selected ? `0 0 0 1px var(--agent-primary, #1677ff)` : undefined,
+                            boxShadow: selected ? `0 0 0 1px ${accentColor}` : undefined,
                         }}
                     >
                         {opt.label}
@@ -65,6 +66,12 @@ export default function AgentManagementPage() {
     const [form] = Form.useForm();
     const [messageApi, contextHolder] = message.useMessage();
     const token = useUserStore((state) => state.token);
+    const palette = useThemeStore((state) => state.palette);
+    const adminColors = useMemo(() => getAdminColors(palette), [palette]);
+    const primaryBtnStyle = useMemo(() => ({
+        background: adminColors.primary,
+        borderColor: adminColors.primary,
+    }), [adminColors.primary]);
 
     const headers = { Authorization: `Bearer ${token}` };
 
@@ -88,8 +95,8 @@ export default function AgentManagementPage() {
         try {
             const res = await fetch("/api/admin/agent/settings", { headers });
             const data = await res.json();
-            if (data.success && data.data) {
-                const rawLevel = data.data.agentAccessLevel || "guest,registered";
+            if (data.code === 0 && data.data) {
+                const rawLevel = data.data.agentAccessLevel ?? "guest,registered";
                 const levelArr = rawLevel.split(",").filter(Boolean);
                 const s: AgentSettings = {
                     agentEnabled: data.data.agentEnabled ?? false,
@@ -169,7 +176,7 @@ export default function AgentManagementPage() {
             await fetch("/api/admin/agent/stop", { method: "POST", headers });
             const res = await fetch("/api/admin/agent/start", { method: "POST", headers });
             const data = await res.json();
-            if (data.success) {
+            if (data.code === 0) {
                 setStatus(data.data);
                 messageApi.success("Agent 已重启");
             }
@@ -207,16 +214,27 @@ export default function AgentManagementPage() {
     };
 
     return (
-        <div style={{ padding: 0 }}>
+        <div style={{ padding: "24px 28px" }}>
             {contextHolder}
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
-                <Title level={4} style={{ margin: 0 }}>Agent 管理</Title>
-                <Button icon={<ReloadOutlined />} onClick={() => { fetchStatus(); fetchSettings(); }} loading={loading}>
-                    刷新
-                </Button>
+            <div style={{ marginBottom: 20 }}>
+                <Typography.Title level={4} style={{ margin: 0, fontSize: 20, fontWeight: 600 }}>
+                    Agent 管理
+                </Typography.Title>
+                <Typography.Text type="secondary" style={{ fontSize: 13 }}>
+                    管理画布 Agent 服务和访问控制
+                </Typography.Text>
             </div>
 
-            <Card title="服务状态" style={{ marginBottom: 24 }}>
+            {/* 服务状态 */}
+            <div style={{ background: "#fff", borderRadius: 12, padding: "24px 28px", marginBottom: 20 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
+                    <div>
+                        <Typography.Text strong style={{ fontSize: 15 }}>服务状态</Typography.Text>
+                    </div>
+                    <Button icon={<ReloadOutlined />} onClick={() => { fetchStatus(); fetchSettings(); }} loading={loading} size="small">
+                        刷新
+                    </Button>
+                </div>
                 <Spin spinning={loading}>
                     <Descriptions column={{ xs: 1, sm: 2, md: 3 }}>
                         <Descriptions.Item label="运行状态">
@@ -237,6 +255,7 @@ export default function AgentManagementPage() {
                                         icon={<PlayCircleOutlined />}
                                         onClick={handleStart}
                                         loading={loading}
+                                        style={primaryBtnStyle}
                                     >
                                         启动
                                     </Button>
@@ -263,9 +282,18 @@ export default function AgentManagementPage() {
                         </Descriptions.Item>
                     </Descriptions>
                 </Spin>
-            </Card>
+            </div>
 
-            <Card title="访问控制">
+            {/* 访问控制 */}
+            <div style={{ background: "#fff", borderRadius: 12, padding: "24px 28px", marginBottom: 20 }}>
+                <div style={{ marginBottom: 20 }}>
+                    <Typography.Text strong style={{ fontSize: 15 }}>访问控制</Typography.Text>
+                    <div>
+                        <Typography.Text type="secondary" style={{ fontSize: 13 }}>
+                            配置 Agent 的启用状态和访问权限
+                        </Typography.Text>
+                    </div>
+                </div>
                 <Spin spinning={settingsLoading}>
                     <Form
                         form={form}
@@ -295,17 +323,17 @@ export default function AgentManagementPage() {
                             extra="选中的角色可以使用 Agent 功能，管理员始终拥有权限"
                         >
                             <Form.Item name="agentAccessLevel" noStyle>
-                                <AccessLevelSelector />
+                                <AccessLevelSelector accentColor={adminColors.primary} />
                             </Form.Item>
                         </Form.Item>
                         <Form.Item>
-                            <Button type="primary" htmlType="submit">
+                            <Button type="primary" htmlType="submit" icon={<SaveOutlined />} style={primaryBtnStyle} onMouseEnter={(e) => { e.currentTarget.style.opacity = "0.85"; }} onMouseLeave={(e) => { e.currentTarget.style.opacity = "1"; }}>
                                 保存设置
                             </Button>
                         </Form.Item>
                     </Form>
                 </Spin>
-            </Card>
+            </div>
         </div>
     );
 }

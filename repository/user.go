@@ -211,6 +211,15 @@ func BatchUpdateUserStatus(ids []string, status model.UserStatus) error {
 	return db.Model(&model.User{}).Where("id IN ?", ids).Update("status", status).Error
 }
 
+// GetUserByAffCode 根据邀请码查询用户。
+func GetUserByAffCode(code string) (model.User, bool, error) {
+	db, err := DB()
+	if err != nil {
+		return model.User{}, false, err
+	}
+	return findUser(db, "aff_code = ?", code)
+}
+
 // GetUserByLinuxDoID 根据 Linux.do ID 查询用户。
 func GetUserByLinuxDoID(id string) (model.User, bool, error) {
 	db, err := DB()

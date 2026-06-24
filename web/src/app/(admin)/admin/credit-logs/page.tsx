@@ -16,6 +16,19 @@ const creditLogTypeLabels: Record<string, string> = {
     ai_consume: "模型消费",
     ai_refund: "失败返还",
     membership_free: "会员免费",
+    invite_reward: "邀请奖励",
+    redeem: "兑换卡密",
+    check_in: "签到奖励",
+};
+
+const tagColorMap: Record<string, string> = {
+    admin_adjust: "blue",
+    ai_consume: "red",
+    ai_refund: "green",
+    membership_free: "cyan",
+    invite_reward: "purple",
+    redeem: "gold",
+    check_in: "lime",
 };
 
 export default function AdminCreditLogsPage() {
@@ -56,7 +69,7 @@ export default function AdminCreditLogsPage() {
             title: "类型",
             dataIndex: "type",
             width: 140,
-            render: (_, item) => <Tag>{creditLogTypeLabels[item.type] || item.type || "-"}</Tag>,
+            render: (_, item) => <Tag color={tagColorMap[item.type]}>{creditLogTypeLabels[item.type] || item.type || "-"}</Tag>,
         },
         {
             title: "变动",
@@ -100,7 +113,11 @@ export default function AdminCreditLogsPage() {
     ];
 
     return (
-        <main style={{ padding: 24 }}>
+        <div style={{ padding: "24px 28px" }}>
+            <div style={{ marginBottom: 20 }}>
+                <Typography.Title level={4} style={{ margin: 0, fontSize: 20, fontWeight: 600 }}>算力点日志</Typography.Title>
+                <Typography.Text type="secondary" style={{ fontSize: 13 }}>查看和管理用户算力点变动记录</Typography.Text>
+            </div>
             <Space direction="vertical" size={16} style={{ width: "100%" }}>
                 <Card variant="borderless">
                     <Form layout="vertical">
@@ -241,6 +258,6 @@ export default function AdminCreditLogsPage() {
             >
                 确定删除已选中的 {selectedIds.length} 条日志吗？
             </Modal>
-        </main>
+        </div>
     );
 }

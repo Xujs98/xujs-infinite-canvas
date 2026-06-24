@@ -18,6 +18,11 @@ type loginRequest struct {
 type registerRequest struct {
 	Username string `json:"username"`
 	Password string `json:"password"`
+	AffCode  string `json:"affCode"`
+}
+
+type bindAffCodeRequest struct {
+	AffCode string `json:"affCode"`
 }
 
 type saveUserRequest struct {
@@ -38,12 +43,28 @@ type adjustUserCreditsRequest struct {
 func Register(w http.ResponseWriter, r *http.Request) {
 	var request registerRequest
 	_ = json.NewDecoder(r.Body).Decode(&request)
-	session, err := service.Register(request.Username, request.Password)
+	session, err := service.Register(request.Username, request.Password, request.AffCode)
 	if err != nil {
 		FailError(w, err)
 		return
 	}
 	OK(w, session)
+}
+
+func BindAffCode(w http.ResponseWriter, r *http.Request) {
+	user, ok := service.UserFromContext(r.Context())
+	if !ok {
+		Fail(w, "未登录")
+		return
+	}
+	var request bindAffCodeRequest
+	_ = json.NewDecoder(r.Body).Decode(&request)
+	updated, err := service.BindAffCode(user.ID, request.AffCode)
+	if err != nil {
+		FailError(w, err)
+		return
+	}
+	OK(w, updated)
 }
 
 func Login(w http.ResponseWriter, r *http.Request) {
@@ -182,6 +203,22 @@ func UpdateProfile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	OK(w, updated)
+}
+
+func UserCreditLogs(w http.ResponseWriter, r *http.Request) {
+	user, ok := service.UserFromContext(r.Context())
+	if !ok {
+		Fail(w, "未登录")
+		return
+	}
+	q := parseQuery(r)
+	q.Keyword = user.ID + " " + q.Keyword
+	logs, err := service.ListCreditLogs(q)
+	if err != nil {
+		FailError(w, err)
+		return
+	}
+	OK(w, logs)
 }
 
 func AdminBatchDeleteCreditLogs(w http.ResponseWriter, r *http.Request) {

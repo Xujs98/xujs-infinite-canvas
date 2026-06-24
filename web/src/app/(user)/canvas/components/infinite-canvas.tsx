@@ -162,7 +162,22 @@ export function InfiniteCanvas({ containerRef, viewport, backgroundMode = "lines
         const container = containerRef.current;
         if (!container) return;
 
-        const preventWheelScroll = (event: WheelEvent) => event.preventDefault();
+        const preventWheelScroll = (event: WheelEvent) => {
+            // 检查事件目标或其祖先是否为可滚动元素，允许内部滚动
+            const target = event.target as HTMLElement | null;
+            if (target) {
+                let el: HTMLElement | null = target;
+                while (el && el !== container) {
+                    const style = window.getComputedStyle(el);
+                    const overflowY = style.overflowY;
+                    if ((overflowY === "auto" || overflowY === "scroll") && el.scrollHeight > el.clientHeight) {
+                        return; // 可滚动元素，允许默认滚动行为
+                    }
+                    el = el.parentElement;
+                }
+            }
+            event.preventDefault();
+        };
         container.addEventListener("wheel", preventWheelScroll, { passive: false });
         return () => container.removeEventListener("wheel", preventWheelScroll);
     }, [containerRef]);

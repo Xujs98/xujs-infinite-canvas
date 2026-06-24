@@ -115,7 +115,11 @@ export default function AdminAssetsPage() {
     ];
 
     return (
-        <main style={{ padding: 24 }}>
+        <div style={{ padding: "24px 28px" }}>
+            <div style={{ marginBottom: 20 }}>
+                <Typography.Title level={4} style={{ margin: 0, fontSize: 20, fontWeight: 600 }}>素材库</Typography.Title>
+                <Typography.Text type="secondary" style={{ fontSize: 13 }}>管理创作素材资源</Typography.Text>
+            </div>
             <Flex vertical gap={16}>
                 <Card variant="borderless">
                     <Form layout="vertical">
@@ -266,6 +270,6 @@ export default function AdminAssetsPage() {
             >
                 确定删除「{deletingAsset?.title}」吗？删除后会从服务器素材库中移除。
             </Modal>
-        </main>
+        </div>
     );
 }

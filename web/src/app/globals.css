@@ -241,6 +241,35 @@
         font-weight: 700;
     }
 
+    .canvas-image-settings-popover {
+        scrollbar-width: thin;
+        scrollbar-color: rgba(148, 163, 184, 0.3) transparent;
+        transition: scrollbar-color 0.2s ease;
+    }
+
+    .canvas-image-settings-popover:hover {
+        scrollbar-color: rgba(148, 163, 184, 0.55) transparent;
+    }
+
+    .canvas-image-settings-popover::-webkit-scrollbar {
+        width: 5px;
+    }
+
+    .canvas-image-settings-popover::-webkit-scrollbar-track {
+        background: transparent;
+        border-radius: 999px;
+    }
+
+    .canvas-image-settings-popover::-webkit-scrollbar-thumb {
+        background: rgba(148, 163, 184, 0.3);
+        border-radius: 999px;
+        transition: background 0.2s ease;
+    }
+
+    .canvas-image-settings-popover:hover::-webkit-scrollbar-thumb {
+        background: rgba(148, 163, 184, 0.55);
+    }
+
     .thin-scrollbar {
         scrollbar-color: rgba(120, 113, 108, 0.45) transparent;
         scrollbar-width: thin;
@@ -524,4 +553,19 @@
 ::view-transition-new(root) {
     animation: none;
     mix-blend-mode: normal;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(8px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.animate-fadeIn {
+    animation: fadeIn 0.3s cubic-bezier(0.22, 1, 0.36, 1) both;
 }

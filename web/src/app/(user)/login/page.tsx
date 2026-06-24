@@ -13,6 +13,7 @@ type LoginFormValues = {
     username: string;
     password: string;
     confirmPassword?: string;
+    inviteCode?: string;
 };
 
 // 仅放行站内相对路径，拦截开放重定向。浏览器会忽略 URL 中的 Tab/换行/回车，并把
@@ -48,6 +49,7 @@ function LoginContent() {
     const siteLogo = publicSystemSettings?.siteLogo;
     const [mode, setMode] = useState<"login" | "register">("login");
     const redirect = safeRedirect(searchParams.get("redirect"));
+    const inviteCodeFromUrl = searchParams.get("inviteCode") || "";
 
     useEffect(() => {
         const token = searchParams.get("token");
@@ -77,7 +79,8 @@ function LoginContent() {
                 return;
             }
             const action = mode === "register" ? register : login;
-            const user = await action({ username: values.username, password: values.password });
+            const affCode = mode === "register" ? (values.inviteCode || inviteCodeFromUrl) : undefined;
+            const user = await action({ username: values.username, password: values.password, affCode });
             message.success(mode === "register" ? "注册成功" : "登录成功");
             router.replace(redirect);
             router.refresh();
@@ -123,9 +126,14 @@ function LoginContent() {
                         <Input.Password prefix={<LockOutlined />} autoComplete="current-password" />
                     </Form.Item>
                     {mode === "register" ? (
-                        <Form.Item name="confirmPassword" label={<span className="font-medium text-stone-800 dark:text-stone-200">确认密码</span>} rules={[{ required: true, message: "请再次输入密码" }]}>
-                            <Input.Password prefix={<LockOutlined />} autoComplete="new-password" />
-                        </Form.Item>
+                        <>
+                            <Form.Item name="confirmPassword" label={<span className="font-medium text-stone-800 dark:text-stone-200">确认密码</span>} rules={[{ required: true, message: "请再次输入密码" }]}>
+                                <Input.Password prefix={<LockOutlined />} autoComplete="new-password" />
+                            </Form.Item>
+                            <Form.Item name="inviteCode" label={<span className="font-medium text-stone-800 dark:text-stone-200">邀请码</span>} initialValue={inviteCodeFromUrl}>
+                                <Input placeholder="选填，有邀请码请填写" disabled={!!inviteCodeFromUrl} />
+                            </Form.Item>
+                        </>
                     ) : null}
                     <Space orientation="vertical" size={12} style={{ width: "100%" }}>
                         <Button block type="primary" htmlType="submit" loading={isLoading}>

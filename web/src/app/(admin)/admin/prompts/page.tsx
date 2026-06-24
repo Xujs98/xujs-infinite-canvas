@@ -131,7 +131,11 @@ export default function AdminPromptsPage() {
     ];
 
     return (
-        <main style={{ padding: 24 }}>
+        <div style={{ padding: "24px 28px" }}>
+            <div style={{ marginBottom: 20 }}>
+                <Typography.Title level={4} style={{ margin: 0, fontSize: 20, fontWeight: 600 }}>提示词管理</Typography.Title>
+                <Typography.Text type="secondary" style={{ fontSize: 13 }}>管理 AI 创作提示词模板</Typography.Text>
+            </div>
             <Flex vertical gap={16}>
                 <Card variant="borderless">
                     <Form layout="vertical">
@@ -342,6 +346,6 @@ export default function AdminPromptsPage() {
             <Modal title="批量删除提示词" open={isBatchDeleteOpen} onCancel={() => setIsBatchDeleteOpen(false)} onOk={() => void batchDeletePrompts()} okText="删除" okButtonProps={{ danger: true }} cancelText="取消">
                 确定删除已选中的 {selectedPromptIds.length} 条提示词吗？删除后会从当前分类中删除。
             </Modal>
-        </main>
+        </div>
     );
 }

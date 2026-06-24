@@ -23,6 +23,13 @@ export function ModelPicker({ config, value, onChange, capability, className, fu
     const [open, setOpen] = useState(false);
     const options = useMemo(() => Array.from(new Set([...(config.channelMode === "local" && !capability ? [value] : []), ...selectableModelsByCapability(config, capability)].filter((model): model is string => Boolean(model)))), [capability, config, value]);
     const current = value || "";
+    const aliasMap = useMemo(() => {
+        const map = new Map<string, string>();
+        for (const item of config.modelCosts || []) {
+            if (item.alias) map.set(item.model, item.alias);
+        }
+        return map;
+    }, [config.modelCosts]);
 
     useEffect(() => {
         const closeOtherPicker = (event: Event) => {
@@ -55,7 +62,7 @@ export function ModelPicker({ config, value, onChange, capability, className, fu
                 title={current || placeholder}
             >
                 <ModelIcon model={current} />
-                <span className="canvas-model-picker-text min-w-0 flex-1 truncate text-left">{current || placeholder}</span>
+                <span className="canvas-model-picker-text min-w-0 flex-1 truncate text-left">{aliasMap.get(current) || current || placeholder}</span>
             </SelectTrigger>
             <SelectContent
                 data-canvas-no-zoom
@@ -69,8 +76,8 @@ export function ModelPicker({ config, value, onChange, capability, className, fu
             >
                 {options.length ? (
                     options.map((model) => (
-                        <SelectItem key={model} value={model} textValue={model}>
-                            <ModelLabel model={model} />
+                        <SelectItem key={model} value={model} textValue={aliasMap.get(model) || model}>
+                            <ModelLabel model={model} alias={aliasMap.get(model)} />
                         </SelectItem>
                     ))
                 ) : (
@@ -90,11 +97,11 @@ function emptyModelLabel(config: AiConfig, capability?: ModelCapability) {
     return config.models.length ? `暂无匹配的${label}模型` : "请先到配置里拉取模型列表";
 }
 
-function ModelLabel({ model }: { model: string }) {
+function ModelLabel({ model, alias }: { model: string; alias?: string }) {
     return (
         <span className="flex min-w-0 items-center gap-2">
             <ModelIcon model={model} />
-            <span className="truncate">{model}</span>
+            <span className="truncate">{alias || model}</span>
         </span>
     );
 }

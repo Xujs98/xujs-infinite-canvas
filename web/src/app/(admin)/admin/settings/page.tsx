@@ -1,10 +1,10 @@
 "use client";
 
-import { CheckCircleOutlined, DeleteOutlined, FormatPainterOutlined, LoadingOutlined, PlusOutlined, ReloadOutlined, SaveOutlined } from "@ant-design/icons";
+import { CheckCircleOutlined, DeleteOutlined, EyeOutlined, FormatPainterOutlined, LockOutlined, LoadingOutlined, PlusOutlined, ReloadOutlined, SaveOutlined, ToolOutlined } from "@ant-design/icons";
 import { json } from "@codemirror/lang-json";
 import { App, Button, Card, Checkbox, Col, Drawer, Flex, Form, Input, InputNumber, Modal, Row, Segmented, Select, Space, Switch, Table, Tabs, Tag, Typography } from "antd";
 import dynamic from "next/dynamic";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { EditorView } from "@uiw/react-codemirror";
 
 import { fetchAdminSettings, fetchChannelModels, saveAdminSettings, testChannelModel, type AdminModelChannel, type AdminModelCost, type AdminSettings } from "@/services/api/admin";
@@ -179,7 +179,12 @@ export default function AdminSettingsPage() {
         setEditingChannelIndex(index);
         setIsChannelDrawerOpen(true);
         const channel = index === null ? emptyChannel : normalizeChannel(channels[index]);
-        channelForm.setFieldsValue(channel);
+        // 转换 extraHeaders 为表单格式
+        const extraHeadersList = channel.extraHeaders
+            ? Object.entries(channel.extraHeaders).map(([key, value]) => ({ key, value }))
+            : [];
+        const extraBodyJson = channel.extraBody ? JSON.stringify(channel.extraBody, null, 2) : "";
+        channelForm.setFieldsValue({ ...channel, extraHeadersList, extraBodyJson });
         rememberModels(channel.models);
     };
 
@@ -190,7 +195,26 @@ export default function AdminSettingsPage() {
     };
 
     const saveChannel = async () => {
-        const channel = normalizeChannel(await channelForm.validateFields());
+        const values = await channelForm.validateFields();
+        const channel = normalizeChannel(values);
+        // 转换 extraHeadersList -> extraHeaders
+        if (values.extraHeadersList?.length) {
+            const headers: Record<string, string> = {};
+            for (const item of values.extraHeadersList) {
+                if (item.key?.trim()) headers[item.key.trim()] = item.value || "";
+            }
+            channel.extraHeaders = Object.keys(headers).length ? headers : undefined;
+        }
+        // 转换 extraBodyJson -> extraBody
+        if (values.extraBodyJson?.trim()) {
+            try {
+                channel.extraBody = JSON.parse(values.extraBodyJson);
+            } catch {
+                message.error("额外请求体字段 JSON 格式不正确");
+                return;
+            }
+        }
+        channel.pathPrefix = values.pathPrefix?.trim() || undefined;
         rememberModels(channel.models);
         const nextChannels = [...channels];
         if (editingChannelIndex === null) nextChannels.push(channel);
@@ -357,31 +381,70 @@ export default function AdminSettingsPage() {
         message.success("已保存");
     }
 
-    return (
-        <main style={{ padding: 24 }}>
-            <Flex vertical gap={16}>
-                <Card variant="borderless">
-                    <Flex justify="space-between" align="center" gap={16} wrap>
-                        <Tabs
-                            activeKey={activeTab}
-                            onChange={(key) => changeTab(key as SettingsTabKey)}
-                            items={[
-                                { key: "public", label: "公开配置（对外暴露）" },
-                                { key: "private", label: "私有配置（不会对外暴露）" },
-                            ]}
-                        />
-                        <Space>
-                            <Button icon={<ReloadOutlined />} loading={isLoading} onClick={() => void loadSettings()}>
-                                刷新
-                            </Button>
-                            <Button type="primary" icon={<SaveOutlined />} loading={isSaving} onClick={() => void saveSettings()}>
-                                保存设置
-                            </Button>
-                        </Space>
-                    </Flex>
-                </Card>
+    // 导航条滑动指示器
+    const navRef = useRef<HTMLDivElement>(null);
+    const tabBtnRefs = useRef<Map<string, HTMLButtonElement>>(new Map());
+    const [indicatorStyle, setIndicatorStyle] = useState({ left: 0, width: 0 });
+    const updateIndicator = useCallback(() => {
+        const btn = tabBtnRefs.current.get(activeTab);
+        const nav = navRef.current;
+        if (btn && nav) {
+            const navRect = nav.getBoundingClientRect();
+            const btnRect = btn.getBoundingClientRect();
+            setIndicatorStyle({ left: btnRect.left - navRect.left, width: btnRect.width });
+        }
+    }, [activeTab]);
+    useEffect(() => { updateIndicator(); }, [updateIndicator]);
+    useEffect(() => { window.addEventListener("resize", updateIndicator); return () => window.removeEventListener("resize", updateIndicator); }, [updateIndicator]);
 
-                <Card variant="borderless">
+    const settingsTabs = [
+        { key: "public" as const, label: "公开配置", subLabel: "对外暴露", icon: <EyeOutlined /> },
+        { key: "private" as const, label: "私有配置", subLabel: "不会对外暴露", icon: <LockOutlined /> },
+    ];
+
+    return (
+        <div className="min-h-screen p-6">
+            <div className="mx-auto max-w-[1200px]">
+                {/* 页面标题 */}
+                <div className="mb-6 flex items-center gap-3">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-blue-500 to-purple-600 text-white shadow-lg shadow-blue-500/25">
+                        <ToolOutlined className="text-lg" />
+                    </div>
+                    <div>
+                        <Typography.Title level={4} style={{ margin: 0 }}>模型设置</Typography.Title>
+                        <Typography.Text type="secondary" className="text-sm">配置 AI 模型渠道和费用</Typography.Text>
+                    </div>
+                </div>
+
+                {/* 固定导航条 */}
+                <div className="sticky top-0 z-50 mb-7 flex items-center justify-between rounded-2xl border border-gray-100 bg-white/95 px-5 py-3 shadow-sm backdrop-blur-sm">
+                    <div ref={navRef} className="relative flex items-center gap-1 rounded-2xl border border-gray-100 bg-gray-50 p-1.5">
+                        <div
+                            className="absolute top-1.5 bottom-1.5 rounded-xl bg-white shadow-sm transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)]"
+                            style={{ left: indicatorStyle.left, width: indicatorStyle.width }}
+                        />
+                        {settingsTabs.map((tab) => (
+                            <button
+                                key={tab.key}
+                                ref={(el) => { if (el) tabBtnRefs.current.set(tab.key, el); }}
+                                className={`relative z-10 flex items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-medium transition-colors duration-300 ${
+                                    activeTab === tab.key ? "text-gray-800" : "text-gray-400 hover:text-gray-600"
+                                }`}
+                                onClick={() => changeTab(tab.key)}
+                            >
+                                <span className="text-base">{tab.icon}</span>
+                                <span>{tab.label}</span>
+                            </button>
+                        ))}
+                    </div>
+                    <Space>
+                        <Button icon={<ReloadOutlined />} loading={isLoading} onClick={() => void loadSettings()}>刷新</Button>
+                        <Button type="primary" icon={<SaveOutlined />} loading={isSaving} onClick={() => void saveSettings()} className="!rounded-lg">保存设置</Button>
+                    </Space>
+                </div>
+
+                <Flex vertical gap={16}>
+                <Card variant="borderless" className="!rounded-xl !border-gray-100 !shadow-sm">
                     <Flex justify="space-between" align="center" gap={16} wrap style={{ marginBottom: 16 }}>
                         <Segmented
                             value={activeMode}
@@ -449,9 +512,24 @@ export default function AdminSettingsPage() {
                                             rowKey="model"
                                             pagination={false}
                                             size="small"
-                                            dataSource={publicModels.map((model) => ({ model, credits: modelCostCredits(modelCosts, model) }))}
+                                            dataSource={publicModels.map((model) => {
+                                                const existing = modelCosts.find((item) => item.model === model);
+                                                return { model, credits: existing?.credits || 0, alias: existing?.alias || "" };
+                                            })}
                                             columns={[
                                                 { title: "模型", dataIndex: "model" },
+                                                {
+                                                    title: "别名",
+                                                    dataIndex: "alias",
+                                                    width: 200,
+                                                    render: (_, item) => (
+                                                        <Input
+                                                            placeholder="留空显示原名"
+                                                            value={item.alias}
+                                                            onChange={(e) => setModelCost(form, setModelCosts, item.model, item.credits, e.target.value)}
+                                                        />
+                                                    ),
+                                                },
                                                 {
                                                     title: "每次调用扣除",
                                                     dataIndex: "credits",
@@ -464,7 +542,7 @@ export default function AdminSettingsPage() {
                                                             className="!w-full"
                                                             value={item.credits}
                                                             addonAfter="点"
-                                                            onChange={(value) => setModelCost(form, setModelCosts, item.model, Number(value) || 0)}
+                                                            onChange={(value) => setModelCost(form, setModelCosts, item.model, Number(value) || 0, item.alias)}
                                                         />
                                                     ),
                                                 },
@@ -666,6 +744,124 @@ export default function AdminSettingsPage() {
                                 </Form.Item>
                             </Col>
                         </Row>
+                        <Card size="small" title="请求配置（可选）" className="!mb-4" styles={{ body: { paddingTop: 12 } }}>
+                            <Row gutter={16}>
+                                <Col span={24}>
+                                    <Form.Item name="pathPrefix" label="路径前缀" help="覆盖默认的 /v1 前缀，如 /api/plan/v3">
+                                        <Input placeholder="留空使用默认 /v1" />
+                                    </Form.Item>
+                                </Col>
+                                <Col span={24}>
+                                    <Form.Item label="额外请求头" help="发送请求时附带的额外 HTTP 头">
+                                        <Form.List name="extraHeadersList">
+                                            {(fields, { add, remove }) => (
+                                                <>
+                                                    {fields.map((field) => (
+                                                        <Space key={field.key} style={{ display: "flex", marginBottom: 4 }} align="baseline">
+                                                            <Form.Item name={[field.name, "key"]} noStyle>
+                                                                <Input placeholder="Header Name" style={{ width: 160 }} />
+                                                            </Form.Item>
+                                                            <Form.Item name={[field.name, "value"]} noStyle>
+                                                                <Input placeholder="Header Value" style={{ width: 240 }} />
+                                                            </Form.Item>
+                                                            <DeleteOutlined onClick={() => remove(field.name)} />
+                                                        </Space>
+                                                    ))}
+                                                    <Button type="dashed" onClick={() => add()} block icon={<PlusOutlined />}>
+                                                        添加请求头
+                                                    </Button>
+                                                </>
+                                            )}
+                                        </Form.List>
+                                    </Form.Item>
+                                </Col>
+                                <Col span={24}>
+                                    <Form.Item name="extraBodyJson" label="额外请求体字段" help="JSON 格式，会合并到发送的请求体中">
+                                        <Input.TextArea rows={4} placeholder='{"key": "value"}' />
+                                    </Form.Item>
+                                </Col>
+                            </Row>
+                            <Row gutter={16}>
+                                <Col span={6}>
+                                    <Form.Item name="imageFormat" label="图片格式" help="选择渠道期望的图片格式">
+                                        <Select
+                                            allowClear
+                                            placeholder="base64"
+                                            options={[
+                                                { value: "base64", label: "base64（保持原始格式）" },
+                                                { value: "url", label: "url（转换为公网 URL）" },
+                                            ]}
+                                        />
+                                    </Form.Item>
+                                </Col>
+                                <Col span={6}>
+                                    <Form.Item name={["fieldMapping", "image"]} label="单图片字段" help="留空默认 image">
+                                        <Input placeholder="image" />
+                                    </Form.Item>
+                                </Col>
+                                <Col span={6}>
+                                    <Form.Item name={["fieldMapping", "images"]} label="多图片字段" help="留空默认 image_urls">
+                                        <Input placeholder="image_urls" />
+                                    </Form.Item>
+                                </Col>
+                                <Col span={6}>
+                                    <Form.Item name={["fieldMapping", "imagesType"]} label="多图片数据类型" help="默认 array">
+                                        <Select
+                                            allowClear
+                                            placeholder="array"
+                                            options={[
+                                                { value: "array", label: "array（数组）" },
+                                                { value: "string", label: "string（字符串）" },
+                                            ]}
+                                        />
+                                    </Form.Item>
+                                </Col>
+                                <Col span={6}>
+                                    <Form.Item name={["fieldMapping", "referenceVideos"]} label="视频参考字段" help="留空默认 reference_videos">
+                                        <Input placeholder="reference_videos" />
+                                    </Form.Item>
+                                </Col>
+                                <Col span={6}>
+                                    <Form.Item name={["fieldMapping", "referenceAudios"]} label="音频参考字段" help="留空默认 reference_audios">
+                                        <Input placeholder="reference_audios" />
+                                    </Form.Item>
+                                </Col>
+                            </Row>
+                        </Card>
+                        <Card size="small" title="视频接口配置（可选）" className="!mb-4" styles={{ body: { paddingTop: 12 } }}>
+                            <Row gutter={16}>
+                                <Col span={24}>
+                                    <Form.Item name={["videoConfig", "path"]} label="视频接口路径" help="覆盖默认的 /videos 路径，如 /video/generations">
+                                        <Input placeholder="留空使用默认 /videos" />
+                                    </Form.Item>
+                                </Col>
+                                <Col span={12}>
+                                    <Form.Item name={["videoConfig", "requestFormat"]} label="请求格式" help="将前端 Ark 格式自动转换为所选格式">
+                                        <Select allowClear placeholder="默认 Ark 格式" options={[{ label: "OpenAI 兼容", value: "openai" }]} />
+                                    </Form.Item>
+                                </Col>
+                                <Col span={12}>
+                                    <Form.Item name={["videoConfig", "responseFormat"]} label="响应格式" help="将上游响应自动转换为前端 Ark 格式">
+                                        <Select allowClear placeholder="默认自动检测" options={[{ label: "OpenAI 兼容", value: "openai" }]} />
+                                    </Form.Item>
+                                </Col>
+                                <Col span={8}>
+                                    <Form.Item name={["videoConfig", "taskIdField"]} label="任务 ID 字段" help="如 task_id、id">
+                                        <Input placeholder="自动检测" />
+                                    </Form.Item>
+                                </Col>
+                                <Col span={8}>
+                                    <Form.Item name={["videoConfig", "statusField"]} label="状态字段" help="如 data.status">
+                                        <Input placeholder="自动检测" />
+                                    </Form.Item>
+                                </Col>
+                                <Col span={8}>
+                                    <Form.Item name={["videoConfig", "videoUrlField"]} label="视频 URL 字段" help="如 data.result_url">
+                                        <Input placeholder="自动检测" />
+                                    </Form.Item>
+                                </Col>
+                            </Row>
+                        </Card>
                     </Form>
                 </Drawer>
                 <Modal
@@ -807,7 +1003,8 @@ export default function AdminSettingsPage() {
                     </Flex>
                 </Modal>
             </Flex>
-        </main>
+            </div>
+        </div>
     );
 }
 
@@ -840,7 +1037,7 @@ function normalizePublicSetting(setting: Partial<AdminSettings["public"]> = {}):
 }
 
 function normalizeModelCosts(items: Partial<AdminSettings["public"]["modelChannel"]["modelCosts"][number]>[]) {
-    return items.filter((item) => item.model).map((item) => ({ model: item.model || "", credits: Math.max(0, Number(item.credits) || 0) }));
+    return items.filter((item) => item.model).map((item) => ({ model: item.model || "", credits: Math.max(0, Number(item.credits) || 0), alias: item.alias || "" }));
 }
 
 function normalizePrivateSetting(setting: Partial<AdminSettings["private"]> = {}): AdminSettings["private"] {
@@ -869,6 +1066,9 @@ function normalizeChannel(item: Partial<AdminModelChannel> = {}): AdminModelChan
         weight: Math.max(1, Number(item.weight) || 1),
         enabled: item.enabled !== false,
         remark: item.remark || "",
+        videoConfig: item.videoConfig,
+        fieldMapping: item.fieldMapping,
+        imageFormat: item.imageFormat || "",
     };
 }
 
@@ -876,10 +1076,11 @@ function modelCostCredits(items: AdminSettings["public"]["modelChannel"]["modelC
     return items.find((item) => item.model === model)?.credits || 0;
 }
 
-function setModelCost(form: any, setModelCosts: (items: AdminModelCost[]) => void, model: string, credits: number) {
+function setModelCost(form: any, setModelCosts: (items: AdminModelCost[]) => void, model: string, credits: number, alias?: string) {
     const current = (form.getFieldValue(["public", "modelChannel", "modelCosts"]) || []) as AdminSettings["public"]["modelChannel"]["modelCosts"];
+    const existing = current.find((item) => item.model === model);
     const next = current.filter((item) => item.model !== model);
-    next.push({ model, credits: Math.max(0, credits) });
+    next.push({ model, credits: Math.max(0, credits), alias: alias !== undefined ? alias : (existing?.alias || "") });
     form.setFieldValue(["public", "modelChannel", "modelCosts"], next);
     setModelCosts(next);
 }

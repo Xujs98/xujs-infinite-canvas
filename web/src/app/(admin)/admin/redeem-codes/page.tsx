@@ -144,7 +144,11 @@ export default function AdminRedeemCodesPage() {
     ];
 
     return (
-        <main style={{ padding: 24 }}>
+        <div style={{ padding: "24px 28px" }}>
+            <div style={{ marginBottom: 20 }}>
+                <Typography.Title level={4} style={{ margin: 0, fontSize: 20, fontWeight: 600 }}>卡密管理</Typography.Title>
+                <Typography.Text type="secondary" style={{ fontSize: 13 }}>生成和管理兑换卡密</Typography.Text>
+            </div>
             <Space direction="vertical" size={16} style={{ width: "100%" }}>
                 <Card variant="borderless">
                     <Form layout="vertical">
@@ -331,6 +335,6 @@ export default function AdminRedeemCodesPage() {
             >
                 确定删除已选中的 {selectedIds.length} 张卡密吗？
             </Modal>
-        </main>
+        </div>
     );
 }

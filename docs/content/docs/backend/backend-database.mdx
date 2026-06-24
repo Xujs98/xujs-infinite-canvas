@@ -25,6 +25,9 @@ description: 当前后端主要数据表与字段说明
 - `prompts`
 - `assets`
 - `settings`
+- `system_settings`
+- `announcements`
+- `call_logs`
 
 后续新增表时再同步补充本文档，未实际使用的规划表不提前写入。
 
@@ -227,3 +230,19 @@ description: 当前后端主要数据表与字段说明
 | --- | --- |
 | `credits` | 兑换算力点，面值取 `credits` 字段 |
 | `membership` | 兑换会员时长，面值取 `membership_days` 字段 |
+
+### call_logs
+
+AI 接口调用日志表。记录每次用户调用 AI 接口的模型、接口类型、成功/失败状态和错误详情。
+
+| 字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `id` | string | 主键 |
+| `user_id` | string | 用户 ID，索引 |
+| `username` | string | 用户名 |
+| `model` | string | 调用的模型名称，索引 |
+| `path` | string | 接口路径，如 `/chat/completions`、`/images/generations` |
+| `success` | bool | 是否成功 |
+| `error_msg` | text | 失败时的错误信息 |
+| `credits` | number | 消耗的算力点 |
+| `created_at` | string | 调用时间，索引 |

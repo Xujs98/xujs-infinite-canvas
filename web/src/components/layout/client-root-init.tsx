@@ -5,7 +5,7 @@ import { useEffect, useRef } from "react";
 import { usePathname } from "next/navigation";
 import { App } from "antd";
 
-import { useConfigStore } from "@/stores/use-config-store";
+import { getModelClassificationDetail, useModelClassificationsVersion, useConfigStore } from "@/stores/use-config-store";
 import { useUserStore } from "@/stores/use-user-store";
 
 export function ClientRootInit({ children }: { children: ReactNode }) {
@@ -15,15 +15,33 @@ export function ClientRootInit({ children }: { children: ReactNode }) {
     const hydrateUser = useUserStore((state) => state.hydrateUser);
     const loadPublicSettings = useConfigStore((state) => state.loadPublicSettings);
     const loadPublicSystemSettings = useConfigStore((state) => state.loadPublicSystemSettings);
+    const loadModelClassifications = useConfigStore((state) => state.loadModelClassifications);
     const publicSettings = useConfigStore((state) => state.publicSettings);
     const updateConfig = useConfigStore((state) => state.updateConfig);
     const openConfigDialog = useConfigStore((state) => state.openConfigDialog);
     const isLoginPage = pathname === "/login" || pathname === "/admin/login";
 
+    // 监听分类变化，自动适配视频秒数
+    useModelClassificationsVersion();
+    const videoModel = useConfigStore((state) => state.config.videoModel);
+    const videoSeconds = useConfigStore((state) => state.config.videoSeconds);
+    const adjustedRef = useRef(false);
+    useEffect(() => {
+        const detail = getModelClassificationDetail(videoModel);
+        if (detail?.videoConfig?.durations?.length) {
+            const durations = detail.videoConfig.durations;
+            if (!durations.includes(videoSeconds) && videoSeconds !== "adaptive") {
+                updateConfig("videoSeconds", durations[0]);
+                adjustedRef.current = true;
+            }
+        }
+    }, [videoModel, videoSeconds, updateConfig]);
+
     useEffect(() => {
         void loadPublicSettings();
         void loadPublicSystemSettings();
-    }, [loadPublicSettings, loadPublicSystemSettings]);
+        void loadModelClassifications();
+    }, [loadPublicSettings, loadPublicSystemSettings, loadModelClassifications]);
 
     useEffect(() => {
         if (!isLoginPage) void hydrateUser();

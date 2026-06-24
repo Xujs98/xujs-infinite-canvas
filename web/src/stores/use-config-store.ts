@@ -1,11 +1,13 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useSyncExternalStore } from "react";
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 
 import { apiGet } from "@/services/api/request";
 import type { AdminPublicSettings } from "@/services/api/admin";
+
+export type ModelCostItem = { model: string; credits: number; alias: string };
 
 export type AiConfig = {
     channelMode: "remote" | "local";
@@ -30,6 +32,7 @@ export type AiConfig = {
     videoModels: string[];
     textModels: string[];
     audioModels: string[];
+    modelCosts: ModelCostItem[];
     quality: string;
     size: string;
     count: string;
@@ -71,6 +74,7 @@ export const defaultConfig: AiConfig = {
     videoModels: [],
     textModels: [],
     audioModels: [],
+    modelCosts: [],
     quality: "auto",
     size: "1:1",
     count: "1",
@@ -91,6 +95,11 @@ export type PublicSystemSettings = {
     siteSubtitle: string;
     siteLogo: string;
     serviceContact: string;
+    inviteRewardCredits: number;
+    checkInEnabled: boolean;
+    checkInRewardMin: number;
+    checkInRewardMax: number;
+    videoMaxTimeoutSeconds: number;
     agentEnabled: boolean;
     agentVisible: boolean;
     agentAccessLevel: string;
@@ -109,6 +118,7 @@ type ConfigStore = {
     updateWebdavConfig: <K extends keyof WebdavSyncConfig>(key: K, value: WebdavSyncConfig[K]) => void;
     loadPublicSettings: () => Promise<void>;
     loadPublicSystemSettings: () => Promise<void>;
+    loadModelClassifications: () => Promise<void>;
     isAiConfigReady: (config: AiConfig, model: string) => boolean;
     openConfigDialog: (shouldPromptContinue?: boolean) => void;
     setConfigDialogOpen: (isOpen: boolean) => void;
@@ -128,6 +138,20 @@ function resolveEffectiveConfig(config: AiConfig, modelChannel: AdminPublicSetti
     const fallbackImageModel = validDefault(modelChannel.defaultImageModel, imageModels) || preferredModel(imageModels, isImageModelName);
     const fallbackVideoModel = validDefault(modelChannel.defaultVideoModel, videoModels) || preferredModel(videoModels, isVideoModelName);
     const fallbackAudioModel = preferredModel(audioModels, isAudioModelName);
+
+    // 自动适配视频秒数：用户选择 > 模型分类配置 > 默认 "6"
+    const effectiveVideoModel = videoModels.includes(config.videoModel) ? config.videoModel : fallbackVideoModel;
+    const videoDetail = modelClassificationsCache[effectiveVideoModel];
+    const durations = videoDetail?.videoConfig?.durations;
+    let videoSeconds: string;
+    if (durations?.length) {
+        // 有分类配置时：当前值有效就用当前值，否则用第一个配置
+        videoSeconds = (config.videoSeconds && durations.includes(config.videoSeconds)) ? config.videoSeconds : durations[0];
+    } else {
+        // 无分类配置：用当前值或兜底 "6"
+        videoSeconds = config.videoSeconds || "6";
+    }
+
     return {
         ...config,
         channelMode,
@@ -136,11 +160,13 @@ function resolveEffectiveConfig(config: AiConfig, modelChannel: AdminPublicSetti
         videoModels,
         textModels,
         audioModels,
+        modelCosts: modelChannel.modelCosts || [],
         model: textModels.includes(config.model) ? config.model : fallbackModel,
         imageModel: imageModels.includes(config.imageModel) ? config.imageModel : fallbackImageModel,
-        videoModel: videoModels.includes(config.videoModel) ? config.videoModel : fallbackVideoModel,
+        videoModel: effectiveVideoModel,
         textModel: textModels.includes(config.textModel) ? config.textModel : fallbackTextModel || fallbackModel,
         audioModel: audioModels.includes(config.audioModel) ? config.audioModel : fallbackAudioModel,
+        videoSeconds,
         systemPrompt: modelChannel.systemPrompt,
     };
 }
@@ -153,22 +179,113 @@ function preferredModel(models: string[], predicate: (model: string) => boolean)
     return models.find(predicate) || "";
 }
 
+// 自定义模型分类映射（从后端加载）
+let modelClassificationsMap: Record<string, string> = {};
+
+export function setModelClassificationsMap(map: Record<string, string>) {
+    modelClassificationsMap = map;
+}
+
+export function getModelClassificationsMap() {
+    return modelClassificationsMap;
+}
+
+// 模型分类详情缓存（从后端加载）
+export type ModelClassificationDetail = {
+    id: string;
+    modelName: string;
+    capability: string;
+    videoConfig: {
+        resolutions: string[];
+        ratios: string[];
+        durations: string[]; // 支持 "adaptive" 和数字字符串如 "15"
+        maxDuration: number;
+        supportGenerateAudio: boolean;
+        supportWatermark: boolean;
+    } | null;
+    imageConfig: {
+        qualities: string[];
+        aspectRatios: string[];
+        maxCount: number;
+        supportCustomSize: boolean;
+    } | null;
+    audioConfig: {
+        voices: string[];
+        formats: string[];
+        speedRange: { min: number; max: number } | null;
+    } | null;
+};
+
+let modelClassificationsCache: Record<string, ModelClassificationDetail> = {};
+// 用于触发 React 组件重新渲染的版本号
+let modelClassificationsVersion = 0;
+let modelClassificationsListeners: Array<() => void> = [];
+
+export function onModelClassificationsChange(listener: () => void) {
+    modelClassificationsListeners.push(listener);
+    return () => {
+        modelClassificationsListeners = modelClassificationsListeners.filter((l) => l !== listener);
+    };
+}
+
+export function getModelClassificationsVersion() {
+    return modelClassificationsVersion;
+}
+
+export function setModelClassificationsCache(details: ModelClassificationDetail[]) {
+    modelClassificationsCache = {};
+    for (const item of details) {
+        modelClassificationsCache[item.modelName] = item;
+    }
+    modelClassificationsVersion++;
+    modelClassificationsListeners.forEach((l) => l());
+}
+
+export function getModelClassificationDetail(modelName: string): ModelClassificationDetail | null {
+    return modelClassificationsCache[modelName] || null;
+}
+
+// React Hook：订阅模型分类缓存变化，确保组件在分类加载后重新渲染
+export function useModelClassificationsVersion() {
+    return useSyncExternalStore(
+        onModelClassificationsChange,
+        getModelClassificationsVersion,
+        getModelClassificationsVersion,
+    );
+}
+
 function isVideoModelName(model: string) {
+    // 优先使用自定义分类
+    if (modelClassificationsMap[model]) {
+        return modelClassificationsMap[model] === "video";
+    }
     const value = model.toLowerCase();
-    return value.includes("seedance") || value.includes("video") || value.includes("sora") || value.includes("veo") || value.includes("kling") || value.includes("wan") || value.includes("hailuo");
+    return value.includes("seedance") || value.includes("video") || value.includes("sora") || value.includes("veo") || value.includes("kling") || value.includes("wan") || value.includes("hailuo") || value.includes("quanneng");
 }
 
 function isImageModelName(model: string) {
+    // 优先使用自定义分类
+    if (modelClassificationsMap[model]) {
+        return modelClassificationsMap[model] === "image";
+    }
     const value = model.toLowerCase();
     return !isVideoModelName(model) && !isAudioModelName(model) && (value.includes("seedream") || value.includes("gpt-image") || value.includes("image") || value.includes("dall-e") || value.includes("dalle") || value.includes("imagen") || value.includes("flux") || value.includes("sdxl") || value.includes("stable-diffusion") || value.includes("midjourney"));
 }
 
 function isAudioModelName(model: string) {
+    // 优先使用自定义分类
+    if (modelClassificationsMap[model]) {
+        return modelClassificationsMap[model] === "audio";
+    }
     const value = model.toLowerCase();
     return value.includes("audio") || value.includes("tts") || value.includes("speech") || value.includes("voice") || value.includes("music") || value.includes("sound");
 }
 
 function isTextModelName(model: string) {
+    // 优先使用自定义分类
+    if (modelClassificationsMap[model]) {
+        return modelClassificationsMap[model] === "text";
+    }
     return !isImageModelName(model) && !isVideoModelName(model) && !isAudioModelName(model);
 }
 
@@ -237,6 +354,27 @@ export const useConfigStore = create<ConfigStore>()(
                     // ignore
                 }
             },
+            loadModelClassifications: async () => {
+                try {
+                    const map = await apiGet<Record<string, string>>("/api/model-classifications/map");
+                    setModelClassificationsMap(map);
+                    // 同时加载详情缓存
+                    const details = await apiGet<ModelClassificationDetail[]>("/api/model-classifications/all");
+                    setModelClassificationsCache(details);
+                    // 分类缓存加载后重新计算视频秒数
+                    const { config: currentConfig } = get();
+                    const videoDetail = details.find((d) => d.modelName === currentConfig.videoModel);
+                    if (videoDetail?.videoConfig?.durations?.length) {
+                        const durations = videoDetail.videoConfig.durations;
+                        const current = currentConfig.videoSeconds || "6";
+                        if (!durations.includes(current) && current !== "adaptive") {
+                            set({ config: { ...currentConfig, videoSeconds: durations[0] } });
+                        }
+                    }
+                } catch {
+                    // ignore
+                }
+            },
             isAiConfigReady: (config, model) => isAiConfigReady(config, model),
             openConfigDialog: (shouldPromptContinue = false) => set({ isConfigOpen: true, shouldPromptContinue }),
             setConfigDialogOpen: (isConfigOpen) => set({ isConfigOpen }),
@@ -264,7 +402,7 @@ export const useConfigStore = create<ConfigStore>()(
                         audioFormat: config.audioFormat || defaultConfig.audioFormat,
                         audioSpeed: config.audioSpeed || defaultConfig.audioSpeed,
                         audioInstructions: config.audioInstructions || "",
-                        videoSeconds: config.videoSeconds || "6",
+                        videoSeconds: config.videoSeconds || "",
                         vquality: config.vquality || "720",
                         videoGenerateAudio: config.videoGenerateAudio || "true",
                         videoWatermark: config.videoWatermark || "false",
@@ -274,6 +412,29 @@ export const useConfigStore = create<ConfigStore>()(
                         textModels: Array.isArray(persistedConfig.textModels) ? normalizeModelList(config.textModels) : filterModelsByCapability(config.models, "text"),
                         audioModels: Array.isArray(persistedConfig.audioModels) ? normalizeModelList(config.audioModels) : filterModelsByCapability(config.models, "audio"),
                     },
+                };
+            },
+            onRehydrateStorage: () => {
+                return (_state, error) => {
+                    if (!error) {
+                        // hydrate 完成后，异步加载分类并适配视频秒数
+                        setTimeout(async () => {
+                            try {
+                                const details = await apiGet<ModelClassificationDetail[]>("/api/model-classifications/all");
+                                setModelClassificationsCache(details);
+                                const { config: currentConfig } = useConfigStore.getState();
+                                const videoDetail = details.find((d) => d.modelName === currentConfig.videoModel);
+                                if (videoDetail?.videoConfig?.durations?.length) {
+                                    const durations = videoDetail.videoConfig.durations;
+                                    if (!durations.includes(currentConfig.videoSeconds) && currentConfig.videoSeconds !== "adaptive") {
+                                        useConfigStore.setState({ config: { ...currentConfig, videoSeconds: durations[0] } });
+                                    }
+                                }
+                            } catch {
+                                // ignore
+                            }
+                        }, 0);
+                    }
                 };
             },
         },

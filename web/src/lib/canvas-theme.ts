@@ -146,3 +146,16 @@ export type CanvasTheme = (typeof canvasThemes)[CanvasColorTheme];
 export function getCanvasTheme(palette: ThemePalette, mode: CanvasColorTheme): ThemeColors {
     return themePalettes[palette][mode];
 }
+
+/** 后台管理根据全局主题色生成对应颜色 */
+export function getAdminColors(palette: ThemePalette) {
+    const map: Record<ThemePalette, { primary: string; light: string; hover: string }> = {
+        stone: { primary: "#171717", light: "#f5f5f5", hover: "#e8e8e8" },
+        blue: { primary: "#1d4ed8", light: "#eff6ff", hover: "#dbeafe" },
+        emerald: { primary: "#059669", light: "#ecfdf5", hover: "#d1fae5" },
+        rose: { primary: "#e11d48", light: "#fff1f2", hover: "#ffe4e6" },
+        amber: { primary: "#d97706", light: "#fffbeb", hover: "#fef3c7" },
+        violet: { primary: "#7c3aed", light: "#f5f3ff", hover: "#ede9fe" },
+    };
+    return map[palette];
+}

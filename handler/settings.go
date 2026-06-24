@@ -54,6 +54,31 @@ func AdminChannelModels(w http.ResponseWriter, r *http.Request) {
 	OK(w, models)
 }
 
+func AdminAllChannelModels(w http.ResponseWriter, r *http.Request) {
+	settings, err := service.AdminSettings()
+	if err != nil {
+		FailError(w, err)
+		return
+	}
+	models := []string{}
+	for _, channel := range settings.Private.Channels {
+		if !channel.Enabled {
+			continue
+		}
+		models = append(models, channel.Models...)
+	}
+	// 去重
+	seen := make(map[string]bool)
+	unique := []string{}
+	for _, m := range models {
+		if !seen[m] {
+			seen[m] = true
+			unique = append(unique, m)
+		}
+	}
+	OK(w, unique)
+}
+
 func AdminTestChannelModel(w http.ResponseWriter, r *http.Request) {
 	var request adminChannelActionRequest
 	_ = json.NewDecoder(r.Body).Decode(&request)

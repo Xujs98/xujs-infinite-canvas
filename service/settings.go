@@ -201,6 +201,10 @@ func SelectModelChannel(modelName string) (model.ModelChannel, error) {
 
 func BuildModelChannelURL(channel model.ModelChannel, path string) string {
 	baseURL := normalizeModelChannelBaseURL(channel.BaseURL)
+	// 如果渠道配置了 PathPrefix，使用它替代默认的 /v1
+	if strings.TrimSpace(channel.PathPrefix) != "" {
+		return strings.TrimRight(baseURL, "/") + "/" + strings.Trim(channel.PathPrefix, "/") + path
+	}
 	lowerBaseURL := strings.ToLower(baseURL)
 	if !strings.HasSuffix(lowerBaseURL, "/v1") && !strings.HasSuffix(lowerBaseURL, "/api/v3") && !strings.HasSuffix(lowerBaseURL, "/api/plan/v3") {
 		baseURL += "/v1"
@@ -283,7 +287,7 @@ func repairDefaultModel(current string, models []string, preferred func(string) 
 
 func isVideoModelName(modelName string) bool {
 	name := strings.ToLower(strings.TrimSpace(modelName))
-	return strings.Contains(name, "seedance") || strings.Contains(name, "video")
+	return strings.Contains(name, "seedance") || strings.Contains(name, "video") || strings.Contains(name, "quanneng")
 }
 
 func isImageModelName(modelName string) bool {

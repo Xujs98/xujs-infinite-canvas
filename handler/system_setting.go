@@ -20,14 +20,19 @@ func AdminGetSystemSettings(w http.ResponseWriter, r *http.Request) {
 
 // PublicSystemSettings 公开的系统设置（不需要鉴权）。
 type PublicSystemSettings struct {
-	SiteName       string `json:"siteName"`
-	SiteSubtitle   string `json:"siteSubtitle"`
-	SiteLogo       string `json:"siteLogo"`
-	ServiceContact string `json:"serviceContact"`
-	AgentEnabled   bool   `json:"agentEnabled"`
-	AgentVisible   bool   `json:"agentVisible"`
-	AgentAccessLevel string `json:"agentAccessLevel"`
-	AssistantEnabled bool  `json:"assistantEnabled"`
+	SiteName              string `json:"siteName"`
+	SiteSubtitle          string `json:"siteSubtitle"`
+	SiteLogo              string `json:"siteLogo"`
+	ServiceContact        string `json:"serviceContact"`
+	InviteRewardCredits   int    `json:"inviteRewardCredits"`
+	CheckInEnabled        bool   `json:"checkInEnabled"`
+	CheckInRewardMin      int    `json:"checkInRewardMin"`
+	CheckInRewardMax      int    `json:"checkInRewardMax"`
+	VideoMaxTimeoutSeconds int   `json:"videoMaxTimeoutSeconds"`
+	AgentEnabled          bool   `json:"agentEnabled"`
+	AgentVisible          bool   `json:"agentVisible"`
+	AgentAccessLevel      string `json:"agentAccessLevel"`
+	AssistantEnabled      bool   `json:"assistantEnabled"`
 }
 
 // GetPublicSystemSettings 获取公开的系统设置。
@@ -38,14 +43,19 @@ func GetPublicSystemSettings(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	OK(w, PublicSystemSettings{
-		SiteName:         settings.SiteName,
-		SiteSubtitle:     settings.SiteSubtitle,
-		SiteLogo:         settings.SiteLogo,
-		ServiceContact:   settings.ServiceContact,
-		AgentEnabled:     settings.AgentEnabled,
-		AgentVisible:     settings.AgentVisible,
-		AgentAccessLevel: settings.AgentAccessLevel,
-		AssistantEnabled: settings.AssistantEnabled,
+		SiteName:              settings.SiteName,
+		SiteSubtitle:          settings.SiteSubtitle,
+		SiteLogo:              settings.SiteLogo,
+		ServiceContact:        settings.ServiceContact,
+		InviteRewardCredits:   settings.InviteRewardCredits,
+		CheckInEnabled:        settings.CheckInEnabled,
+		CheckInRewardMin:      settings.CheckInRewardMin,
+		CheckInRewardMax:      settings.CheckInRewardMax,
+		VideoMaxTimeoutSeconds: settings.VideoMaxTimeoutSeconds,
+		AgentEnabled:          settings.AgentEnabled,
+		AgentVisible:          settings.AgentVisible,
+		AgentAccessLevel:      settings.AgentAccessLevel,
+		AssistantEnabled:      settings.AssistantEnabled,
 	})
 }
 

@@ -14,6 +14,10 @@ func GetSystemSettings() (model.SystemSettings, error) {
 		return model.SystemSettings{}, err
 	}
 	giftCredits, _ := strconv.Atoi(m[model.SettingRegisterGiftCredits])
+	inviteRewardCredits, _ := strconv.Atoi(m[model.SettingInviteRewardCredits])
+	checkInRewardMin, _ := strconv.Atoi(m[model.SettingCheckInRewardMin])
+	checkInRewardMax, _ := strconv.Atoi(m[model.SettingCheckInRewardMax])
+	videoMaxTimeoutSeconds, _ := strconv.Atoi(m[model.SettingVideoMaxTimeoutSeconds])
 	smtpPort, _ := strconv.Atoi(m[model.SettingSMTPPort])
 	// 如果 system_settings 中没有这两个字段，则从 public settings 读取。
 	allowCustomChannel := m[model.SettingAllowCustomChannel] == "true"
@@ -35,7 +39,12 @@ func GetSystemSettings() (model.SystemSettings, error) {
 		SiteLogo:              m[model.SettingSiteLogo],
 		ServiceContact:        m[model.SettingServiceContact],
 		RegisterGiftCredits:   giftCredits,
-		AllowCustomChannel:    allowCustomChannel,
+		InviteRewardCredits:   inviteRewardCredits,
+		CheckInEnabled:          m[model.SettingCheckInEnabled] == "true" || m[model.SettingCheckInEnabled] == "",
+		CheckInRewardMin:        checkInRewardMin,
+		CheckInRewardMax:        checkInRewardMax,
+		VideoMaxTimeoutSeconds:  videoMaxTimeoutSeconds,
+		AllowCustomChannel:      allowCustomChannel,
 		AllowRegister:         allowRegister,
 		AgentEnabled:          m[model.SettingAgentEnabled] == "true",
 		AgentVisible:          m[model.SettingAgentVisible] == "true",
@@ -62,7 +71,12 @@ func SaveSystemSettings(input model.SystemSettings) error {
 		model.SettingSiteLogo:              input.SiteLogo,
 		model.SettingServiceContact:        input.ServiceContact,
 		model.SettingRegisterGiftCredits:   strconv.Itoa(input.RegisterGiftCredits),
-		model.SettingAllowCustomChannel:    boolStr(input.AllowCustomChannel),
+		model.SettingInviteRewardCredits:   strconv.Itoa(input.InviteRewardCredits),
+		model.SettingCheckInEnabled:        boolStr(input.CheckInEnabled),
+		model.SettingCheckInRewardMin:        strconv.Itoa(input.CheckInRewardMin),
+		model.SettingCheckInRewardMax:        strconv.Itoa(input.CheckInRewardMax),
+		model.SettingVideoMaxTimeoutSeconds:  strconv.Itoa(input.VideoMaxTimeoutSeconds),
+		model.SettingAllowCustomChannel:      boolStr(input.AllowCustomChannel),
 		model.SettingAllowRegister:         boolStr(input.AllowRegister),
 		model.SettingAgentEnabled:          boolStr(input.AgentEnabled),
 		model.SettingAgentVisible:          boolStr(input.AgentVisible),

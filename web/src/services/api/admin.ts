@@ -219,6 +219,24 @@ export async function batchDeleteAdminRedeemCodes(token: string, ids: string[]) 
     return apiPost<boolean>("/api/admin/redeem-codes/batch-delete", { ids }, token);
 }
 
+export type AdminChannelFieldMapping = {
+    image?: string;
+    images?: string;
+    referenceVideos?: string;
+    referenceAudios?: string;
+    imagesType?: "string" | "array";
+};
+
+export type AdminChannelVideoConfig = {
+    path?: string;
+    requestFormat?: "" | "openai";
+    responseFormat?: "" | "openai";
+    taskIdField?: string;
+    statusField?: string;
+    videoUrlField?: string;
+    fieldMapping?: AdminChannelFieldMapping;
+};
+
 export type AdminModelChannel = {
     protocol: "openai";
     name: string;
@@ -228,6 +246,26 @@ export type AdminModelChannel = {
     weight: number;
     enabled: boolean;
     remark: string;
+    extraHeaders?: Record<string, string>;
+    extraBody?: Record<string, unknown>;
+    pathPrefix?: string;
+    videoConfig?: AdminChannelVideoConfig;
+    fieldMapping?: AdminChannelFieldMapping;
+    imageFormat?: "base64" | "url";
+};
+
+export type ChannelRequestLog = {
+    id: string;
+    modelName: string;
+    method: string;
+    url: string;
+    headers: Record<string, string>;
+    body: string;
+    bodySize: number;
+    response?: string;
+    statusCode?: number;
+    error?: string;
+    createdAt: string;
 };
 
 export type AdminPublicModelChannelSettings = {
@@ -244,6 +282,7 @@ export type AdminPublicModelChannelSettings = {
 export type AdminModelCost = {
     model: string;
     credits: number;
+    alias: string;
 };
 
 export type AdminPublicSettings = {
@@ -297,12 +336,21 @@ export async function testChannelModel(token: string, payload: AdminChannelActio
     return apiPost<string>("/api/admin/settings/channel-test", payload, token);
 }
 
+export async function fetchChannelRequestLogs(token: string, baseURL?: string) {
+    return apiGet<Record<string, ChannelRequestLog>>("/api/admin/settings/channel-request-logs", baseURL ? { baseURL } : undefined, token);
+}
+
 export type AdminSystemSettings = {
     siteName: string;
     siteSubtitle: string;
     siteLogo: string;
     serviceContact: string;
     registerGiftCredits: number;
+    inviteRewardCredits: number;
+    checkInEnabled: boolean;
+    checkInRewardMin: number;
+    checkInRewardMax: number;
+    videoMaxTimeoutSeconds: number;
     allowCustomChannel: boolean;
     allowRegister: boolean;
     assistantEnabled: boolean;
@@ -343,4 +391,130 @@ export async function uploadAdminLogo(token: string, file: File) {
 
 export async function removeAdminLogo(token: string) {
     return apiDelete<boolean>("/api/admin/system-settings/logo", token);
+}
+
+export type AdminCallLog = {
+    id: string;
+    userId: string;
+    username: string;
+    model: string;
+    path: string;
+    success: boolean;
+    errorMsg: string;
+    credits: number;
+    createdAt: string;
+};
+
+export type AdminCallLogListResponse = {
+    items: AdminCallLog[];
+    total: number;
+};
+
+export async function fetchAdminCallLogs(token: string, query: AdminUserQuery = {}) {
+    return apiGet<AdminCallLogListResponse>("/api/admin/call-logs", compactApiParams(query), token);
+}
+
+export async function batchDeleteAdminCallLogs(token: string, ids: string[]) {
+    return apiPost<boolean>("/api/admin/call-logs/batch-delete", { ids }, token);
+}
+
+// 请求管理日志
+export type AdminRequestLog = {
+    id: string;
+    userId: string;
+    username: string;
+    model: string;
+    method: string;
+    path: string;
+    url: string;
+    requestHeaders: string;
+    requestBody: string;
+    requestBodySize: number;
+    responseBody: string;
+    statusCode: number;
+    success: boolean;
+    errorMsg: string;
+    isPolling: boolean;
+    createdAt: string;
+};
+export type AdminRequestLogListResponse = {
+    items: AdminRequestLog[];
+    total: number;
+};
+export async function fetchAdminRequestLogs(token: string, query: AdminUserQuery = {}) {
+    return apiGet<AdminRequestLogListResponse>("/api/admin/request-logs", compactApiParams(query), token);
+}
+export async function batchDeleteAdminRequestLogs(token: string, ids: string[]) {
+    return apiPost<boolean>("/api/admin/request-logs/batch-delete", { ids }, token);
+}
+
+// 模型分类管理
+export type VideoModelConfig = {
+    resolutions: string[];
+    ratios: string[];
+    durations: string[]; // 支持 "adaptive" 和数字字符串如 "15"
+    maxDuration: number;
+    supportGenerateAudio: boolean;
+    supportWatermark: boolean;
+};
+
+export type ImageModelConfig = {
+    qualities: string[];
+    aspectRatios: string[];
+    maxCount: number;
+    supportCustomSize: boolean;
+};
+
+export type AudioModelConfig = {
+    voices: string[];
+    formats: string[];
+    speedRange: { min: number; max: number } | null;
+};
+
+export type AdminModelClassification = {
+    id: string;
+    modelName: string;
+    capability: string;
+    videoConfig: VideoModelConfig | null;
+    imageConfig: ImageModelConfig | null;
+    audioConfig: AudioModelConfig | null;
+    createdAt: string;
+    updatedAt: string;
+};
+
+export type AdminModelClassificationListResponse = {
+    items: AdminModelClassification[];
+    total: number;
+};
+
+export async function fetchAdminModelClassifications(token: string, query: AdminUserQuery = {}) {
+    return apiGet<AdminModelClassificationListResponse>("/api/admin/model-classifications", compactApiParams(query), token);
+}
+
+export async function createAdminModelClassification(token: string, data: Partial<AdminModelClassification>) {
+    return apiPost<AdminModelClassification>("/api/admin/model-classifications", data, token);
+}
+
+export async function updateAdminModelClassification(token: string, id: string, data: Partial<AdminModelClassification>) {
+    return axios.put(`/api/admin/model-classifications/${id}`, data, { headers: { Authorization: `Bearer ${token}` } }).then((res) => res.data?.data);
+}
+
+export async function deleteAdminModelClassification(token: string, id: string) {
+    return apiDelete<boolean>(`/api/admin/model-classifications/${id}`, token);
+}
+
+export async function batchDeleteAdminModelClassifications(token: string, ids: string[]) {
+    return apiPost<boolean>("/api/admin/model-classifications/batch-delete", { ids }, token);
+}
+
+export async function fetchModelClassificationsMap() {
+    return apiGet<Record<string, string>>("/api/model-classifications/map");
+}
+
+export async function fetchAllChannelModels(token: string) {
+    return apiGet<string[]>("/api/admin/settings/channel-models", {}, token);
+}
+
+export async function fetchAllModelClassifications() {
+    return apiGet<AdminModelClassification[]>("/api/model-classifications/all");
 }

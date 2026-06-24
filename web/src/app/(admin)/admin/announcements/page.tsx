@@ -193,7 +193,11 @@ export default function AdminAnnouncementsPage() {
   ];
 
   return (
-    <main style={{ padding: 24 }}>
+    <div style={{ padding: "24px 28px" }}>
+      <div style={{ marginBottom: 20 }}>
+        <Typography.Title level={4} style={{ margin: 0, fontSize: 20, fontWeight: 600 }}>公告管理</Typography.Title>
+        <Typography.Text type="secondary" style={{ fontSize: 13 }}>管理系统公告和通知</Typography.Text>
+      </div>
       <Space direction="vertical" size={16} style={{ width: "100%" }}>
         <Card variant="borderless">
           <Form layout="vertical">
@@ -369,6 +373,6 @@ export default function AdminAnnouncementsPage() {
       >
         <Typography.Text>确定删除公告「{deletingAnnouncement?.title}」吗？</Typography.Text>
       </Modal>
-    </main>
+    </div>
   );
 }

@@ -154,7 +154,11 @@ export default function AdminUsersPage() {
     ];
 
     return (
-        <main style={{ padding: 24 }}>
+        <div style={{ padding: "24px 28px" }}>
+            <div style={{ marginBottom: 20 }}>
+                <Typography.Title level={4} style={{ margin: 0, fontSize: 20, fontWeight: 600 }}>用户管理</Typography.Title>
+                <Typography.Text type="secondary" style={{ fontSize: 13 }}>管理平台用户账户和权限</Typography.Text>
+            </div>
             <Flex vertical gap={16}>
                 <Card variant="borderless">
                     <Form layout="vertical">
@@ -357,6 +361,6 @@ export default function AdminUsersPage() {
                 <Typography.Text>将已选中的 {selectedIds.length} 个用户状态修改为：</Typography.Text>
                 <Select value={batchStatusValue} onChange={setBatchStatusValue} options={statusOptions} style={{ width: 120, marginLeft: 8 }} />
             </Modal>
-        </main>
+        </div>
     );
 }

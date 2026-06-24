@@ -19,6 +19,7 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
 	"golang.org/x/crypto/bcrypt"
+	"gorm.io/gorm"
 )
 
 type TokenClaims struct {
@@ -58,7 +59,7 @@ func EnsureDefaultAdmin() error {
 	return err
 }
 
-func Register(username string, password string) (model.AuthSession, error) {
+func Register(username string, password string, affCode string) (model.AuthSession, error) {
 	settings, err := repository.GetSettings()
 	if err != nil {
 		return model.AuthSession{}, err
@@ -92,19 +93,75 @@ func Register(username string, password string) (model.AuthSession, error) {
 			fmt.Sscanf(v, "%d", &giftCredits)
 		}
 	}
+	userID := newID("user")
+	var inviterID string
+	affCode = strings.TrimSpace(affCode)
+	if affCode != "" {
+		if inviter, ok, err := repository.GetUserByAffCode(affCode); err == nil && ok {
+			inviterID = inviter.ID
+		}
+	}
 	user, err := repository.SaveUser(model.User{
-		ID:        newID("user"),
+		ID:        userID,
 		Username:  username,
 		Password:  hash,
 		Role:      model.UserRoleUser,
 		Credits:   giftCredits,
 		AffCode:   newAffCode(),
+		InviterID: inviterID,
 		Status:    model.UserStatusActive,
 		CreatedAt: now(),
 		UpdatedAt: now(),
 	})
 	if err != nil {
 		return model.AuthSession{}, err
+	}
+	// 记录注册赠送算力点
+	if giftCredits > 0 {
+		repository.SaveCreditLog(model.CreditLog{
+			ID:        newID("credit"),
+			UserID:    userID,
+			Type:      model.CreditLogTypeAdminAdjust,
+			Amount:    giftCredits,
+			Balance:   giftCredits,
+			Remark:    "新用户注册赠送",
+			CreatedAt: now(),
+		})
+	}
+	// 邀请人奖励算力点
+	if inviterID != "" {
+		rewardCredits := 50
+		sysSettings, sysErr := repository.GetSystemSettings()
+		if sysErr == nil {
+			if v, ok := sysSettings[model.SettingInviteRewardCredits]; ok {
+				fmt.Sscanf(v, "%d", &rewardCredits)
+			}
+		}
+		if rewardCredits > 0 {
+			db, dbErr := repository.DB()
+			if dbErr == nil {
+				db.Model(&model.User{}).Where("id = ?", inviterID).Updates(map[string]any{
+					"credits":    gorm.Expr("credits + ?", rewardCredits),
+					"aff_count":  gorm.Expr("aff_count + 1"),
+					"updated_at": now(),
+				})
+				inviter, _, _ := repository.GetUserByID(inviterID)
+			repository.SaveCreditLog(model.CreditLog{
+				ID:        newID("credit"),
+				UserID:    inviterID,
+				Type:      model.CreditLogTypeInviteReward,
+				Amount:    rewardCredits,
+				Balance:   inviter.Credits,
+				Remark:    "邀请新用户 " + username + " 注册",
+				CreatedAt: now(),
+			})
+			}
+		} else {
+			db, dbErr := repository.DB()
+			if dbErr == nil {
+				db.Model(&model.User{}).Where("id = ?", inviterID).Update("aff_count", gorm.Expr("aff_count + 1"))
+			}
+		}
 	}
 	return newSession(user)
 }
@@ -338,6 +395,67 @@ func UpdateProfile(userID string, displayName string, password string) (model.Au
 	user, err = repository.SaveUser(user)
 	if err != nil {
 		return model.AuthUser{}, err
+	}
+	return model.PublicUser(user), nil
+}
+
+// BindAffCode 补填邀请码。
+func BindAffCode(userID string, affCode string) (model.AuthUser, error) {
+	user, ok, err := repository.GetUserByID(userID)
+	if err != nil || !ok {
+		if err != nil {
+			return model.AuthUser{}, err
+		}
+		return model.AuthUser{}, safeMessageError{message: "用户不存在"}
+	}
+	if user.InviterID != "" {
+		return model.AuthUser{}, safeMessageError{message: "已绑定邀请人，无法重复绑定"}
+	}
+	affCode = strings.TrimSpace(affCode)
+	if affCode == "" {
+		return model.AuthUser{}, safeMessageError{message: "邀请码不能为空"}
+	}
+	if user.AffCode == affCode {
+		return model.AuthUser{}, safeMessageError{message: "不能使用自己的邀请码"}
+	}
+	inviter, ok, err := repository.GetUserByAffCode(affCode)
+	if err != nil || !ok {
+		if err != nil {
+			return model.AuthUser{}, err
+		}
+		return model.AuthUser{}, safeMessageError{message: "邀请码无效"}
+	}
+	user.InviterID = inviter.ID
+	user.UpdatedAt = now()
+	user, err = repository.SaveUser(user)
+	if err != nil {
+		return model.AuthUser{}, err
+	}
+	// 邀请人奖励
+	rewardCredits := 50
+	sysSettings, sysErr := repository.GetSystemSettings()
+	if sysErr == nil {
+		if v, ok := sysSettings[model.SettingInviteRewardCredits]; ok {
+			fmt.Sscanf(v, "%d", &rewardCredits)
+		}
+	}
+	db, dbErr := repository.DB()
+	if dbErr == nil {
+		updates := map[string]any{"aff_count": gorm.Expr("aff_count + 1"), "updated_at": now()}
+		if rewardCredits > 0 {
+			updates["credits"] = gorm.Expr("credits + ?", rewardCredits)
+		}
+		db.Model(&model.User{}).Where("id = ?", inviter.ID).Updates(updates)
+		inviterUpdated, _, _ := repository.GetUserByID(inviter.ID)
+		repository.SaveCreditLog(model.CreditLog{
+			ID:        newID("credit"),
+			UserID:    inviter.ID,
+			Type:      model.CreditLogTypeInviteReward,
+			Amount:    rewardCredits,
+			Balance:   inviterUpdated.Credits,
+			Remark:    "用户 " + user.Username + " 补填邀请码",
+			CreatedAt: now(),
+		})
 	}
 	return model.PublicUser(user), nil
 }

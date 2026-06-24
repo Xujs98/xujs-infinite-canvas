@@ -5,9 +5,12 @@ import { useRouter } from "next/navigation";
 import { App, Button } from "antd";
 import { Download, FileUp, Plus } from "lucide-react";
 
+import { LockOutlined } from "@ant-design/icons";
+
 import { readZip } from "@/lib/zip";
 import { setMediaBlob } from "@/services/file-storage";
 import { setImageBlob } from "@/services/image-storage";
+import { useUserStore } from "@/stores/use-user-store";
 import { CanvasDeleteProjectsDialog } from "./components/canvas-delete-projects-dialog";
 import { CanvasProjectCard } from "./components/canvas-project-card";
 import type { CanvasExportFile } from "./export-types";
@@ -18,6 +21,7 @@ import { exportCanvasProjects } from "./utils/canvas-export";
 export default function CanvasPage() {
     const { message } = App.useApp();
     const router = useRouter();
+    const token = useUserStore((s) => s.token);
     const inputRef = useRef<HTMLInputElement>(null);
     const hydrated = useCanvasStore((state) => state.hydrated);
     const projects = useCanvasStore((state) => state.projects);
@@ -55,6 +59,21 @@ export default function CanvasPage() {
             if (inputRef.current) inputRef.current.value = "";
         }
     };
+
+    if (!token) {
+        return (
+            <main className="flex h-full items-center justify-center bg-background text-stone-950 dark:text-stone-100">
+                <div className="flex flex-col items-center gap-4 text-center">
+                    <LockOutlined className="text-5xl text-stone-300 dark:text-stone-600" />
+                    <h2 className="text-xl font-medium">需要登录才可以查看完整内容</h2>
+                    <p className="text-sm text-stone-500">登录后即可创建和管理你的画布</p>
+                    <Button type="primary" size="large" onClick={() => router.push("/login")}>
+                        立即登录
+                    </Button>
+                </div>
+            </main>
+        );
+    }
 
     return (
         <main className="h-full overflow-auto bg-background text-stone-950 dark:text-stone-100">

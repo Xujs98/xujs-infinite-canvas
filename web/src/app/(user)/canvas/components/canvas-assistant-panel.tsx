@@ -735,7 +735,7 @@ export function CanvasAssistantPanel({ nodes, selectedNodeIds, sessions, activeS
                             theme={theme}
                             onPromptChange={setAgentPrompt}
                             onSubmit={() => void sendAgentMessage(agentPrompt)}
-                            left={<AgentTextModelPicker models={agentModels} value={effectiveConfig.textModel || effectiveConfig.model} theme={theme} onChange={(model) => updateConfig("textModel", model)} />}
+                            left={<AgentTextModelPicker models={agentModels} value={effectiveConfig.textModel || effectiveConfig.model} theme={theme} modelCosts={effectiveConfig.modelCosts} onChange={(model) => updateConfig("textModel", model)} />}
                         />
                     </>
                 ) : view === "history" ? (
@@ -847,16 +847,23 @@ function AgentModeHeader({ theme, agentMode, confirmTools, agentTab, agentEventL
     );
 }
 
-function AgentTextModelPicker({ models, value, theme, onChange }: { models: string[]; value: string; theme: CanvasTheme; onChange: (model: string) => void }) {
+function AgentTextModelPicker({ models, value, theme, modelCosts, onChange }: { models: string[]; value: string; theme: CanvasTheme; modelCosts?: { model: string; credits: number; alias: string }[]; onChange: (model: string) => void }) {
     const displayModels = models.length ? models : [value];
+    const aliasMap = useMemo(() => {
+        const map = new Map<string, string>();
+        for (const item of modelCosts || []) {
+            if (item.alias) map.set(item.model, item.alias);
+        }
+        return map;
+    }, [modelCosts]);
     return (
         <Select value={value} onValueChange={onChange}>
             <SelectTrigger size="sm" className="canvas-agent-model-picker h-8 max-w-[140px] shrink-0 truncate border-0 bg-transparent text-xs" style={{ color: theme.node.muted }}>
-                <SelectValue />
+                <SelectValue placeholder={aliasMap.get(value) || value} />
             </SelectTrigger>
             <SelectContent position="popper">
                 {displayModels.map((model) => (
-                    <SelectItem key={model} value={model}>{model}</SelectItem>
+                    <SelectItem key={model} value={model}>{aliasMap.get(model) || model}</SelectItem>
                 ))}
             </SelectContent>
         </Select>
@@ -896,7 +903,7 @@ function AssistantComposer({
 }) {
     const theme = useCanvasTheme();
     const activeModel = mode === "image" ? config.imageModel || config.model : config.textModel || config.model;
-    const credits = requestCreditCost({ channelMode: config.channelMode, modelCosts, model: activeModel, count: mode === "image" ? config.count : 1 });
+    const credits = requestCreditCost({ channelMode: config.channelMode, modelCosts, model: activeModel, count: mode === "image" ? config.count : 1, seconds: mode === "video" ? Number(config.videoSeconds) || 1 : 1 });
 
     return (
         <div className="px-2 pb-2" onWheelCapture={(event) => event.stopPropagation()}>

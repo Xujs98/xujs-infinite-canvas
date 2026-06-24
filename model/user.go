@@ -53,7 +53,11 @@ type AuthUser struct {
 	AvatarURL           string   `json:"avatarUrl"`
 	Role                UserRole `json:"role"`
 	Credits             int      `json:"credits"`
+	AffCode             string   `json:"affCode"`
+	AffCount            int      `json:"affCount"`
+	InviterID           string   `json:"inviterId"`
 	MembershipExpiresAt string   `json:"membershipExpiresAt"`
+	LastLoginAt         string   `json:"lastLoginAt"`
 	CreatedAt           string   `json:"createdAt"`
 	UpdatedAt           string   `json:"updatedAt"`
 }
@@ -72,7 +76,11 @@ func PublicUser(user User) AuthUser {
 		AvatarURL:           user.AvatarURL,
 		Role:                user.Role,
 		Credits:             user.Credits,
+		AffCode:             user.AffCode,
+		AffCount:            user.AffCount,
+		InviterID:           user.InviterID,
 		MembershipExpiresAt: user.MembershipExpiresAt,
+		LastLoginAt:         user.LastLoginAt,
 		CreatedAt:           user.CreatedAt,
 		UpdatedAt:           user.UpdatedAt,
 	}
@@ -86,6 +94,8 @@ const (
 	CreditLogTypeAIRefund       CreditLogType = "ai_refund"
 	CreditLogTypeRedeem         CreditLogType = "redeem"
 	CreditLogTypeMembershipFree CreditLogType = "membership_free"
+	CreditLogTypeInviteReward   CreditLogType = "invite_reward"
+	CreditLogTypeCheckIn        CreditLogType = "check_in"
 )
 
 // CreditLog 用户算力点变更流水。
