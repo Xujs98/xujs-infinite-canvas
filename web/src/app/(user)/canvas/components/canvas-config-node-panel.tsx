@@ -5,6 +5,7 @@ import { Image as ImageIcon, LoaderCircle, MessageSquare, Music2, Play, Settings
 import { Button, Segmented } from "antd";
 
 import { ModelPicker } from "@/components/model-picker";
+import { selectableModelsByCapability } from "@/stores/use-config-store";
 import { defaultConfig, getModelClassificationDetail, useConfigStore, useEffectiveConfig, type AiConfig } from "@/stores/use-config-store";
 import { CreditSymbol, requestCreditCost } from "@/constant/credits";
 import { useCanvasTheme } from "@/hooks/use-canvas-theme";
@@ -35,6 +36,7 @@ export function CanvasConfigNodePanel({ node, isRunning, inputSummary, onConfigC
     const hasAnyInput = Boolean(inputSummary.textCount || inputSummary.imageCount || inputSummary.videoCount || inputSummary.audioCount);
     const hasComposerContent = Boolean((node.metadata?.composerContent ?? node.metadata?.prompt ?? "").trim());
     const canGenerate = hasComposerContent || (mode === "audio" ? inputSummary.textCount > 0 : hasAnyInput);
+    const hasAvailableModels = selectableModelsByCapability(globalConfig, mode).length > 0;
 
     return (
         <div className="flex h-full w-full cursor-move flex-col px-3 pb-3 pt-7 text-sm" style={{ color: theme.node.text }} onWheel={(event) => event.stopPropagation()}>
@@ -113,7 +115,7 @@ export function CanvasConfigNodePanel({ node, isRunning, inputSummary, onConfigC
             <Button
                 type="primary"
                 className="mt-auto !h-9 !w-full !cursor-pointer !rounded-lg"
-                disabled={isRunning || !canGenerate}
+                disabled={isRunning || !canGenerate || !hasAvailableModels}
                 onMouseDown={(event) => event.stopPropagation()}
                 onClick={() => onGenerate(node.id)}
             >
@@ -141,7 +143,10 @@ function InputChip({ label, value, style }: { label: string; value: string; styl
 
 function buildNodeConfig(globalConfig: AiConfig, node: CanvasNodeData, mode: CanvasGenerationMode): AiConfig {
     const defaultModel = mode === "image" ? globalConfig.imageModel : mode === "video" ? globalConfig.videoModel : mode === "audio" ? globalConfig.audioModel : globalConfig.textModel;
-    const model = node.metadata?.model || defaultModel || (mode === "audio" ? defaultConfig.audioModel : globalConfig.model || defaultConfig.model);
+    const candidateModel = node.metadata?.model || defaultModel || (mode === "audio" ? defaultConfig.audioModel : globalConfig.model || defaultConfig.model);
+    // 如果节点存储的模型不在当前 mode 的可用模型列表中，回退到默认模型
+    const availableModels = selectableModelsByCapability(globalConfig, mode);
+    const model = availableModels.includes(candidateModel) ? candidateModel : (availableModels[0] || candidateModel);
     // 视频秒数：节点值 > 模型分类配置 > 全局值 > 默认 "6"
     let videoSeconds = node.metadata?.seconds || globalConfig.videoSeconds;
     const detail = getModelClassificationDetail(model);

@@ -1,6 +1,6 @@
 "use client";
 
-import { FileTextOutlined, HomeOutlined, KeyOutlined, LogoutOutlined, PictureOutlined, SettingOutlined, ToolOutlined, TransactionOutlined, UserOutlined, NotificationOutlined, RobotOutlined, AppstoreOutlined, CloudServerOutlined } from "@ant-design/icons";
+import { FileTextOutlined, HomeOutlined, KeyOutlined, LogoutOutlined, PictureOutlined, SafetyOutlined, SettingOutlined, ToolOutlined, TransactionOutlined, UserOutlined, NotificationOutlined, RobotOutlined, AppstoreOutlined, CloudServerOutlined } from "@ant-design/icons";
 import { Flex, Layout, Typography, theme } from "antd";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
@@ -21,6 +21,7 @@ const adminMenus = [
     { key: "/admin/prompts", icon: <FileTextOutlined />, label: "提示词管理" },
     { key: "/admin/assets", icon: <PictureOutlined />, label: "素材库" },
     { key: "/admin/model-classifications", icon: <AppstoreOutlined />, label: "模型管理" },
+    { key: "/admin/roles", icon: <SafetyOutlined />, label: "角色管理" },
     { key: "/admin/agent", icon: <RobotOutlined />, label: "Agent 管理" },
     { key: "/admin/call-logs", icon: <FileTextOutlined />, label: "日志管理" },
     { key: "/admin/request-logs", icon: <CloudServerOutlined />, label: "请求管理" },
@@ -43,8 +44,10 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
     const siteLogo = publicSystemSettings?.siteLogo;
     const activeKey = pathname.startsWith("/admin/system-settings")
         ? "/admin/system-settings"
-        : pathname.startsWith("/admin/model-classifications")
-          ? "/admin/model-classifications"
+        : pathname.startsWith("/admin/roles")
+          ? "/admin/roles"
+          : pathname.startsWith("/admin/model-classifications")
+            ? "/admin/model-classifications"
           : pathname.startsWith("/admin/settings")
             ? "/admin/settings"
             : pathname.startsWith("/admin/assets")

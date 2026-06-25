@@ -13,7 +13,7 @@ const defaultSettings: AdminSystemSettings = {
     checkInEnabled: true,
     checkInRewardMin: 5,
     checkInRewardMax: 20,
-    allowCustomChannel: true,
+    videoMaxTimeoutSeconds: 600,    allowCustomChannel: true,
     allowRegister: true,
     assistantEnabled: true,
     emailEnabled: false,

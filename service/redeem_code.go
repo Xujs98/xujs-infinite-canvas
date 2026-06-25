@@ -129,6 +129,7 @@ func RedeemCode(userID string, code string) (model.AuthUser, error) {
 			}
 		}
 		user.MembershipExpiresAt = base.AddDate(0, 0, item.MembershipDays).Format(time.RFC3339)
+		user.Role = model.UserRoleMember
 		user.UpdatedAt = now
 		user, err = repository.SaveUser(user)
 		if err != nil {

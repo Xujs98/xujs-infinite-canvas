@@ -1,10 +1,11 @@
 "use client";
 
-import { CopyOutlined, DeleteOutlined, EditOutlined, ExportOutlined, EyeOutlined, PlusOutlined, ReloadOutlined, SearchOutlined, SyncOutlined } from "@ant-design/icons";
+import { CopyOutlined, DeleteOutlined, DownloadOutlined, EditOutlined, ExportOutlined, EyeOutlined, PlusOutlined, ReloadOutlined, SearchOutlined, SyncOutlined, UploadOutlined } from "@ant-design/icons";
 import { ProTable, type ProColumns } from "@ant-design/pro-components";
-import { Button, Card, Col, Flex, Form, Image, Input, Modal, Row, Select, Space, Table, Tag, Tooltip, Typography } from "antd";
+import { App, Button, Card, Col, Flex, Form, Image, Input, Modal, Row, Select, Space, Table, Tag, Tooltip, Typography, Upload } from "antd";
 import { useEffect, useState } from "react";
 
+import { apiGet } from "@/services/api/request";
 import { useCopyText } from "@/hooks/use-copy-text";
 import type { Prompt } from "@/services/api/prompts";
 import { useAdminPrompts } from "./use-admin-prompts";
@@ -43,6 +44,9 @@ export default function AdminPromptsPage() {
     const [selectedPromptIds, setSelectedPromptIds] = useState<string[]>([]);
     const [isBatchDeleteOpen, setIsBatchDeleteOpen] = useState(false);
     const [isSyncOpen, setIsSyncOpen] = useState(false);
+    const { message } = App.useApp();
+    const coverUrl = Form.useWatch("coverUrl", form);
+    const [downloading, setDownloading] = useState(false);
     const defaultCategory = categories[0]?.category || "";
     const categoryName = (category: string) => categories.find((item) => item.category === category)?.name || category;
     const categoryOptions = [{ label: "全部分类", value: "" }, ...categories.map((item) => ({ label: item.name, value: item.category }))];
@@ -129,6 +133,28 @@ export default function AdminPromptsPage() {
             ),
         },
     ];
+
+    const handleDownloadCover = async () => {
+        const url = form.getFieldValue("coverUrl");
+        if (!url || !url.startsWith("http")) {
+            message.warning("请先输入有效的图片 URL");
+            return;
+        }
+        setDownloading(true);
+        try {
+            const result = await apiGet<{ dataUrl: string }>("/api/proxy-image", { url });
+            if (result?.dataUrl) {
+                form.setFieldValue("coverUrl", result.dataUrl);
+                message.success("图片已下载到本地");
+            } else {
+                message.error("下载失败，未返回图片数据");
+            }
+        } catch {
+            message.error("下载失败，请检查 URL 是否可访问");
+        } finally {
+            setDownloading(false);
+        }
+    };
 
     return (
         <div style={{ padding: "24px 28px" }}>
@@ -223,8 +249,34 @@ export default function AdminPromptsPage() {
                     <Form.Item name="category" label="分类">
                         <Select options={categories.map((item) => ({ label: item.name, value: item.category }))} />
                     </Form.Item>
-                    <Form.Item name="coverUrl" label="封面 URL">
-                        <Input />
+                    <Form.Item label="封面">
+                        <Flex gap={12} align="start">
+                            <Form.Item name="coverUrl" noStyle>
+                                <Input placeholder="输入图片 URL 或上传图片" style={{ flex: 1 }} />
+                            </Form.Item>
+<Tooltip title="下载远程图片到本地">
+                                <Button icon={<DownloadOutlined />} loading={downloading} onClick={() => void handleDownloadCover()} disabled={!coverUrl?.startsWith("http")}>
+                                    下载
+                                </Button>
+                            </Tooltip>
+                            <Upload
+                                accept="image/*"
+                                showUploadList={false}
+                                beforeUpload={(file) => {
+                                    const reader = new FileReader();
+                                    reader.onload = (e) => {
+                                        form.setFieldValue("coverUrl", e.target?.result as string);
+                                    };
+                                    reader.readAsDataURL(file);
+                                    return false;
+                                }}
+                            >
+                                <Button icon={<UploadOutlined />}>上传</Button>
+                            </Upload>
+                        </Flex>
+                        {coverUrl ? (
+                            <Image src={coverUrl} alt="封面预览" width={120} height={80} style={{ objectFit: "cover", borderRadius: 6, marginTop: 8 }} preview={{ mask: "放大" }} fallback="/logo.svg" />
+                        ) : null}
                     </Form.Item>
                     <Form.Item name="tagText" label="标签，用逗号分隔">
                         <Input />

@@ -7,6 +7,7 @@ import { App } from "antd";
 
 import { getModelClassificationDetail, useModelClassificationsVersion, useConfigStore } from "@/stores/use-config-store";
 import { useUserStore } from "@/stores/use-user-store";
+import type { AdminRole } from "@/services/api/role";
 
 export function ClientRootInit({ children }: { children: ReactNode }) {
     const { message } = App.useApp();
@@ -19,6 +20,7 @@ export function ClientRootInit({ children }: { children: ReactNode }) {
     const publicSettings = useConfigStore((state) => state.publicSettings);
     const updateConfig = useConfigStore((state) => state.updateConfig);
     const openConfigDialog = useConfigStore((state) => state.openConfigDialog);
+    const loadRoles = useConfigStore((state) => state.loadRoles);
     const isLoginPage = pathname === "/login" || pathname === "/admin/login";
 
     // 监听分类变化，自动适配视频秒数
@@ -41,11 +43,38 @@ export function ClientRootInit({ children }: { children: ReactNode }) {
         void loadPublicSettings();
         void loadPublicSystemSettings();
         void loadModelClassifications();
-    }, [loadPublicSettings, loadPublicSystemSettings, loadModelClassifications]);
+        // 加载角色数据并根据用户角色设置模型权限
+        void (async () => {
+            try {
+                const roles = await loadRoles();
+                const userRole = useUserStore.getState().user?.role;
+                if (userRole && roles.length) {
+                    const matched = roles.find((r: AdminRole) => r.name === userRole);
+                    useConfigStore.setState({ roleAllowedModels: matched?.allowedModels || [] });
+                }
+            } catch {
+                // ignore
+            }
+        })();
+    }, [loadPublicSettings, loadPublicSystemSettings, loadModelClassifications, loadRoles]);
 
     useEffect(() => {
         if (!isLoginPage) void hydrateUser();
     }, [hydrateUser, isLoginPage]);
+
+    // 用户登录态变化时重新加载角色权限
+    const user = useUserStore((s) => s.user);
+    useEffect(() => {
+        if (!user || user.role === "guest") {
+            useConfigStore.setState({ roleAllowedModels: [] });
+            return;
+        }
+        void (async () => {
+            const roles = await loadRoles();
+            const matched = roles.find((r: AdminRole) => r.name === user.role);
+            useConfigStore.setState({ roleAllowedModels: matched?.allowedModels || [] });
+        })();
+    }, [user, loadRoles]);
 
     useEffect(() => {
         if (handledConfigParams.current) return;

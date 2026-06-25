@@ -76,6 +76,7 @@ func DB() (*gorm.DB, error) {
 			&model.CheckIn{},
 			&model.ModelClassification{},
 			&model.RequestLog{},
+			&model.Role{},
 		)
 	})
 	return db, dbErr

@@ -4,8 +4,9 @@ type UserRole string
 
 const (
 	UserRoleGuest UserRole = "guest"
-	UserRoleUser  UserRole = "user"
-	UserRoleAdmin UserRole = "admin"
+	UserRoleUser   UserRole = "user"
+	UserRoleMember UserRole = "member"
+	UserRoleAdmin  UserRole = "admin"
 )
 
 type UserStatus string

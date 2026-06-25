@@ -67,7 +67,7 @@ func markTaskCompleted(path string) {
 }
 
 // LogRequest 记录 AI 代理请求
-func LogRequest(userID, username, model_, method, path, url string, requestHeaders map[string]string, requestBody string, requestBodySize int) string {
+func LogRequest(userID, username, model_, method, path, url string, requestHeaders map[string]string, requestBody string, requestBodySize int, requestMedia string) string {
 	headersJSON, _ := json.Marshal(requestHeaders)
 
 	entry := &model.RequestLog{
@@ -80,6 +80,7 @@ func LogRequest(userID, username, model_, method, path, url string, requestHeade
 		URL:             url,
 		RequestHeaders:  string(headersJSON),
 		RequestBody:     requestBody,
+		RequestMedia:    requestMedia,
 		RequestBodySize: requestBodySize,
 		IsPolling:       extractTaskID(path) != "",
 		CreatedAt:       time.Now(),

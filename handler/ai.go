@@ -76,7 +76,7 @@ func proxyAIGetRequest(w http.ResponseWriter, r *http.Request, path string) {
 	var logID string
 	shouldLog := service.ShouldLogPollingRequest(path, isPolling)
 	if shouldLog {
-		logID = service.LogRequest(user.ID, user.Username, modelName, http.MethodGet, path, upstreamURL, reqHeaders, "", 0)
+		logID = service.LogRequest(user.ID, user.Username, modelName, http.MethodGet, path, upstreamURL, reqHeaders, "", 0, "")
 	}
 
 	request, err := http.NewRequest(http.MethodGet, upstreamURL, nil)
@@ -163,7 +163,7 @@ func proxyAIRequest(w http.ResponseWriter, r *http.Request, path string) {
 	}
 	if len(channel.ExtraBody) > 0 && contentType == "application/json" {
 		var bodyMap map[string]any
-		if err := json.Unmarshal(body, &bodyMap); err == nil {
+		if err := json.Unmarshal(finalBody, &bodyMap); err == nil {
 			for k, v := range channel.ExtraBody {
 				bodyMap[k] = v
 			}
@@ -199,7 +199,7 @@ func proxyAIRequest(w http.ResponseWriter, r *http.Request, path string) {
 	LogChannelRequest(channel.BaseURL, modelName, http.MethodPost, upstreamURL, reqHeaders, safeLogBody(finalBody), len(finalBody))
 
 	// 持久化请求日志
-	logID := service.LogRequest(user.ID, user.Username, modelName, http.MethodPost, path, upstreamURL, reqHeaders, safeLogBody(finalBody), len(finalBody))
+	logID := service.LogRequest(user.ID, user.Username, modelName, http.MethodPost, path, upstreamURL, reqHeaders, safeLogBody(finalBody), len(finalBody), extractMediaFromJSON(finalBody))
 
 	log.Printf("AI proxy upstream: url=%s method=POST content_type=%s body_size=%d", upstreamURL, contentType, len(finalBody))
 	request, err := http.NewRequest(http.MethodPost, upstreamURL, bytes.NewReader(finalBody))
@@ -352,7 +352,7 @@ func copyAIResponse(w http.ResponseWriter, request *http.Request, onFailure func
 				logID = ""
 			} else if taskDone && logID == "" {
 				// 补录最终结果日志
-				logID = service.LogRequest(userID, username, modelName, http.MethodGet, path, logUpstreamURL, logReqHeaders, "", 0)
+				logID = service.LogRequest(userID, username, modelName, http.MethodGet, path, logUpstreamURL, logReqHeaders, "", 0, "")
 			}
 		}
 		if logID != "" {
@@ -608,6 +608,33 @@ func friendlyUpstreamError(code string, message string) string {
 	return ""
 }
 
+// extractMediaFromJSON 从 JSON 请求体中提取素材字段的原始值（URL 或 base64 data URL），用于日志预览。
+func extractMediaFromJSON(body []byte) string {
+	var bodyMap map[string]any
+	if err := json.Unmarshal(body, &bodyMap); err != nil {
+		return ""
+	}
+	mediaKeys := []string{"image", "images", "image_urls", "input_reference[]", "reference_images", "reference_videos", "reference_audios"}
+	media := make(map[string]any)
+	found := false
+	for _, key := range mediaKeys {
+		val, ok := bodyMap[key]
+		if !ok || val == nil {
+			continue
+		}
+		media[key] = val
+		found = true
+	}
+	if !found {
+		return ""
+	}
+	b, err := json.Marshal(media)
+	if err != nil {
+		return ""
+	}
+	return string(b)
+}
+
 func safeLogBody(body []byte) string {
 	truncated := truncateBase64InBody(body)
 	runes := []rune(string(truncated))
@@ -733,48 +760,75 @@ func isVideoTaskFailed(respText string) bool {
 // OpenAI 格式: { model, prompt, size, n, image_urls, seconds, ... }
 
 // applyFieldMappingToJSON 根据渠道字段映射转换 JSON 请求体中的字段名和类型
-// 例如：将 image(string) 转为 images(array)，或将 images(string) 转为 images(array)
+// 前端统一发送 reference_images 字段，后端根据 fieldMapping 转换为渠道期望的字段名。
 func applyFieldMappingToJSON(body []byte, fieldMapping *model.ChannelFieldMapping) ([]byte, error) {
 	var bodyMap map[string]any
 	if err := json.Unmarshal(body, &bodyMap); err != nil {
 		return body, err
 	}
 
-	imgFieldName := "image"
-	imagesFieldName := "image_urls"
-	if fieldMapping.Image != "" {
-		imgFieldName = fieldMapping.Image
-	}
-	if fieldMapping.Images != "" {
-		imagesFieldName = fieldMapping.Images
+	imagesFieldName := fieldMapping.Images
+	if imagesFieldName == "" {
+		imagesFieldName = "images"
 	}
 
 	changed := false
 
-	// 处理 images 字段：根据配置的类型确保正确格式
-	if imagesVal, ok := bodyMap[imagesFieldName]; ok {
-		switch v := imagesVal.(type) {
-		case string:
-			if fieldMapping.ImagesType != "string" {
-				// 默认转为数组
-				bodyMap[imagesFieldName] = []string{v}
-				changed = true
-			}
-			// ImagesType == "string" 保持原样
+	// 前端通用字段名 reference_images -> 渠道目标字段名
+	if refImages, ok := bodyMap["reference_images"]; ok {
+		if _, exists := bodyMap[imagesFieldName]; !exists {
+			bodyMap[imagesFieldName] = refImages
+			delete(bodyMap, "reference_images")
+			changed = true
+		} else {
+			delete(bodyMap, "reference_images")
+			changed = true
 		}
 	}
 
-	// 处理 image 字段：如果有 images 字段配置，将 image 值移到 images 数组
-	if imgFieldName != imagesFieldName {
-		if imgVal, ok := bodyMap[imgFieldName]; ok {
-			if _, hasImages := bodyMap[imagesFieldName]; !hasImages {
-				// 没有 images 字段，将 image 移到 images 作为数组
-				switch v := imgVal.(type) {
-				case string:
-					bodyMap[imagesFieldName] = []string{v}
-					delete(bodyMap, imgFieldName)
-					changed = true
-				}
+	// 兼容旧字段名 image_urls / images -> 渠道目标字段名
+	for _, srcKey := range []string{"image_urls", "images"} {
+		if srcKey == imagesFieldName {
+			continue
+		}
+		if val, ok := bodyMap[srcKey]; ok {
+			if _, exists := bodyMap[imagesFieldName]; !exists {
+				bodyMap[imagesFieldName] = val
+				delete(bodyMap, srcKey)
+				changed = true
+			} else {
+				delete(bodyMap, srcKey)
+				changed = true
+			}
+		}
+	}
+
+	// 单图字段 image -> images 数组
+	imgFieldName := "image"
+	if fieldMapping.Image != "" {
+		imgFieldName = fieldMapping.Image
+	}
+	if imgVal, ok := bodyMap[imgFieldName]; ok {
+		if _, hasImages := bodyMap[imagesFieldName]; !hasImages {
+			switch v := imgVal.(type) {
+			case string:
+				bodyMap[imagesFieldName] = []string{v}
+				delete(bodyMap, imgFieldName)
+				changed = true
+			}
+		} else {
+			delete(bodyMap, imgFieldName)
+			changed = true
+		}
+	}
+
+	// 处理 images 字段类型
+	if imagesVal, ok := bodyMap[imagesFieldName]; ok {
+		if fieldMapping.ImagesType != "string" {
+			switch v := imagesVal.(type) {
+			case string:
+				bodyMap[imagesFieldName] = []string{v}
+				changed = true
 			}
 		}
 	}
@@ -906,8 +960,8 @@ func multipartToJSON(body []byte, contentType string, fieldMapping *model.Channe
 			dataURLs = append(dataURLs, fmt.Sprintf("data:%s;base64,%s", f.MimeType, base64.StdEncoding.EncodeToString(f.Data)))
 		}
 
-		// 没有配置字段映射时，保留原始字段名
-		if !hasFieldMapping {
+		// 没有配置字段映射且不是通用参考字段时，保留原始字段名
+		if !hasFieldMapping && name != "reference_images" && name != "reference_videos" && name != "reference_audios" {
 			if len(fileList) == 1 {
 				result[name] = dataURLs[0]
 			} else {
@@ -916,34 +970,23 @@ func multipartToJSON(body []byte, contentType string, fieldMapping *model.Channe
 			continue
 		}
 
-		// 有字段映射时，根据字段名和 MIME 类型判断映射到哪个 JSON key
+		// 根据字段名和 MIME 类型判断映射到哪个 JSON key
 		key := imagesFieldName
 		_, isVideo := mimeLookup(fileList[0].MimeType)
 		_, isAudio := audioLookup(fileList[0].MimeType)
 		switch {
-		case isVideo:
+		case isVideo || name == "reference_videos":
 			key = videoFieldName
-		case isAudio:
+		case isAudio || name == "reference_audios":
 			key = audioFieldName
 		case name == imgFieldName || name == "image" || name == "input_image":
-			// 明确是单图字段名
 			if len(fileList) == 1 {
 				result[imgFieldName] = dataURLs[0]
 				continue
 			}
 			key = imagesFieldName
-		case name == imagesFieldName || strings.Contains(name, "image"):
-			// 多图字段名匹配
+		case name == "reference_images" || name == imagesFieldName || strings.Contains(name, "image"):
 			key = imagesFieldName
-		case strings.Contains(name, "reference") || strings.Contains(name, "input"):
-			// 通用参考字段：根据 MIME 类型判断
-			if isVideo {
-				key = videoFieldName
-			} else if isAudio {
-				key = audioFieldName
-			} else {
-				key = imagesFieldName
-			}
 		}
 		if key == imgFieldName && len(fileList) == 1 {
 			// 单图字段名匹配，发单个字符串

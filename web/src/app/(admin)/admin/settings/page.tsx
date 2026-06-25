@@ -697,58 +697,82 @@ export default function AdminSettingsPage() {
                     destroyOnHidden
                 >
                     <Form form={channelForm} layout="vertical" requiredMark={false} initialValues={emptyChannel}>
-                        <Row gutter={16}>
-                            <Col span={12}>
-                                <Form.Item name="name" label="渠道名称" rules={[{ required: true, message: "请输入渠道名称" }]}>
-                                    <Input />
-                                </Form.Item>
-                            </Col>
-                            <Col span={12}>
-                                <Form.Item name="protocol" label="协议">
-                                    <Select options={[{ label: "OpenAI", value: "openai" }]} />
-                                </Form.Item>
-                            </Col>
-                            <Col span={12}>
-                                <Form.Item name="weight" label="权重">
-                                    <InputNumber min={1} step={1} className="!w-full" />
-                                </Form.Item>
-                            </Col>
-                            <Col span={12}>
-                                <Form.Item name="enabled" label="启用" valuePropName="checked">
-                                    <Switch />
-                                </Form.Item>
-                            </Col>
-                            <Col span={24}>
-                                <Form.Item name="baseUrl" label="接口地址" rules={[{ required: true, message: "请输入接口地址" }]}>
-                                    <Input />
-                                </Form.Item>
-                            </Col>
-                            <Col span={24}>
-                                <Form.Item name="apiKey" label="API Key" rules={editingChannelIndex === null ? [{ required: true, message: "请输入 API Key" }] : []}>
-                                    <Input.Password placeholder={editingChannelIndex === null ? "" : "留空则沿用已保存的 API Key"} />
-                                </Form.Item>
-                            </Col>
-                            <Col span={24}>
-                                <Form.Item label="渠道可用模型">
-                                    <Space.Compact style={{ width: "100%" }}>
-                                        <Form.Item name="models" noStyle>
-                                            <Select mode="tags" maxTagCount="responsive" tokenSeparators={[",", "\n"]} options={knownModels.map((model) => ({ label: model, value: model }))} />
-                                        </Form.Item>
-                                        <Button onClick={() => openChannelModelSelector()}>选择模型</Button>
-                                    </Space.Compact>
-                                </Form.Item>
-                            </Col>
-                            <Col span={24}>
-                                <Form.Item name="remark" label="备注">
-                                    <Input.TextArea rows={3} />
-                                </Form.Item>
-                            </Col>
-                        </Row>
-                        <Card size="small" title="请求配置（可选）" className="!mb-4" styles={{ body: { paddingTop: 12 } }}>
+                        {/* 基础信息 */}
+                        <div className="mb-6">
+                            <div className="mb-3 flex items-center gap-2">
+                                <div className="h-1 w-1 rounded-full bg-blue-500" />
+                                <span className="text-sm font-medium text-gray-700">基础信息</span>
+                            </div>
+                            <Row gutter={16}>
+                                <Col span={16}>
+                                    <Form.Item name="name" label="渠道名称" rules={[{ required: true, message: "请输入渠道名称" }]}>
+                                        <Input placeholder="如：通义千问 / GPT-4o" />
+                                    </Form.Item>
+                                </Col>
+                                <Col span={8}>
+                                    <Form.Item name="enabled" label="状态" valuePropName="checked">
+                                        <Switch checkedChildren="启用" unCheckedChildren="停用" />
+                                    </Form.Item>
+                                </Col>
+                                <Col span={24}>
+                                    <Form.Item name="baseUrl" label="接口地址" rules={[{ required: true, message: "请输入接口地址" }]}>
+                                        <Input placeholder="https://api.example.com" />
+                                    </Form.Item>
+                                </Col>
+                                <Col span={24}>
+                                    <Form.Item name="apiKey" label="API Key" rules={editingChannelIndex === null ? [{ required: true, message: "请输入 API Key" }] : []}>
+                                        <Input.Password placeholder={editingChannelIndex === null ? "sk-..." : "留空则沿用已保存的 API Key"} />
+                                    </Form.Item>
+                                </Col>
+                            </Row>
+                        </div>
+
+                        {/* 模型配置 */}
+                        <div className="mb-6">
+                            <div className="mb-3 flex items-center gap-2">
+                                <div className="h-1 w-1 rounded-full bg-green-500" />
+                                <span className="text-sm font-medium text-gray-700">模型配置</span>
+                            </div>
+                            <Row gutter={16}>
+                                <Col span={8}>
+                                    <Form.Item name="protocol" label="协议">
+                                        <Select options={[{ label: "OpenAI", value: "openai" }]} />
+                                    </Form.Item>
+                                </Col>
+                                <Col span={8}>
+                                    <Form.Item name="weight" label="权重" help="数值越大，被选中概率越高">
+                                        <InputNumber min={1} step={1} className="!w-full" />
+                                    </Form.Item>
+                                </Col>
+                                <Col span={24}>
+                                    <Form.Item label="渠道可用模型">
+                                        <Space.Compact style={{ width: "100%" }}>
+                                            <Form.Item name="models" noStyle>
+                                                <Select mode="tags" maxTagCount="responsive" tokenSeparators={[",", "\n"]} options={knownModels.map((model) => ({ label: model, value: model }))} />
+                                            </Form.Item>
+                                            <Button onClick={() => openChannelModelSelector()}>选择模型</Button>
+                                        </Space.Compact>
+                                    </Form.Item>
+                                </Col>
+                            </Row>
+                        </div>
+
+                        {/* 请求配置 */}
+                        <div className="mb-6">
+                            <div className="mb-3 flex items-center gap-2">
+                                <div className="h-1 w-1 rounded-full bg-orange-500" />
+                                <span className="text-sm font-medium text-gray-700">请求配置</span>
+                                <span className="text-xs text-gray-400">（可选）</span>
+                            </div>
                             <Row gutter={16}>
                                 <Col span={24}>
                                     <Form.Item name="pathPrefix" label="路径前缀" help="覆盖默认的 /v1 前缀，如 /api/plan/v3">
                                         <Input placeholder="留空使用默认 /v1" />
+                                    </Form.Item>
+                                </Col>
+                                <Col span={12}>
+                                    <Form.Item name="imageFormat" label="图片格式" help="选择渠道期望的图片格式">
+                                        <Select allowClear placeholder="base64" options={[{ value: "base64", label: "base64（保持原始格式）" }, { value: "url", label: "url（转换为公网 URL）" }]} />
                                     </Form.Item>
                                 </Col>
                                 <Col span={24}>
@@ -767,9 +791,7 @@ export default function AdminSettingsPage() {
                                                             <DeleteOutlined onClick={() => remove(field.name)} />
                                                         </Space>
                                                     ))}
-                                                    <Button type="dashed" onClick={() => add()} block icon={<PlusOutlined />}>
-                                                        添加请求头
-                                                    </Button>
+                                                    <Button type="dashed" block icon={<PlusOutlined />} onClick={() => add()}>添加请求头</Button>
                                                 </>
                                             )}
                                         </Form.List>
@@ -781,54 +803,46 @@ export default function AdminSettingsPage() {
                                     </Form.Item>
                                 </Col>
                             </Row>
+                        </div>
+
+                        {/* 素材字段映射 */}
+                        <div className="mb-6">
+                            <div className="mb-3 flex items-center gap-2">
+                                <div className="h-1 w-1 rounded-full bg-purple-500" />
+                                <span className="text-sm font-medium text-gray-700">素材字段映射</span>
+                                <span className="text-xs text-gray-400">（可选）</span>
+                            </div>
                             <Row gutter={16}>
-                                <Col span={6}>
-                                    <Form.Item name="imageFormat" label="图片格式" help="选择渠道期望的图片格式">
-                                        <Select
-                                            allowClear
-                                            placeholder="base64"
-                                            options={[
-                                                { value: "base64", label: "base64（保持原始格式）" },
-                                                { value: "url", label: "url（转换为公网 URL）" },
-                                            ]}
-                                        />
-                                    </Form.Item>
-                                </Col>
-                                <Col span={6}>
-                                    <Form.Item name={["fieldMapping", "image"]} label="单图片字段" help="留空默认 image">
-                                        <Input placeholder="image" />
-                                    </Form.Item>
-                                </Col>
-                                <Col span={6}>
-                                    <Form.Item name={["fieldMapping", "images"]} label="多图片字段" help="留空默认 image_urls">
+                                <Col span={8}>
+                                    <Form.Item name={["fieldMapping", "images"]} label="图片字段" help="留空默认 image_urls">
                                         <Input placeholder="image_urls" />
                                     </Form.Item>
                                 </Col>
-                                <Col span={6}>
-                                    <Form.Item name={["fieldMapping", "imagesType"]} label="多图片数据类型" help="默认 array">
-                                        <Select
-                                            allowClear
-                                            placeholder="array"
-                                            options={[
-                                                { value: "array", label: "array（数组）" },
-                                                { value: "string", label: "string（字符串）" },
-                                            ]}
-                                        />
+                                <Col span={8}>
+                                    <Form.Item name={["fieldMapping", "imagesType"]} label="图片数据类型" help="默认 array">
+                                        <Select allowClear placeholder="array" options={[{ value: "array", label: "array（数组）" }, { value: "string", label: "string（字符串）" }]} />
                                     </Form.Item>
                                 </Col>
-                                <Col span={6}>
+                                <Col span={8}>
                                     <Form.Item name={["fieldMapping", "referenceVideos"]} label="视频参考字段" help="留空默认 reference_videos">
                                         <Input placeholder="reference_videos" />
                                     </Form.Item>
                                 </Col>
-                                <Col span={6}>
+                                <Col span={8}>
                                     <Form.Item name={["fieldMapping", "referenceAudios"]} label="音频参考字段" help="留空默认 reference_audios">
                                         <Input placeholder="reference_audios" />
                                     </Form.Item>
                                 </Col>
                             </Row>
-                        </Card>
-                        <Card size="small" title="视频接口配置（可选）" className="!mb-4" styles={{ body: { paddingTop: 12 } }}>
+                        </div>
+
+                        {/* 视频接口配置 */}
+                        <div className="mb-6">
+                            <div className="mb-3 flex items-center gap-2">
+                                <div className="h-1 w-1 rounded-full bg-cyan-500" />
+                                <span className="text-sm font-medium text-gray-700">视频接口配置</span>
+                                <span className="text-xs text-gray-400">（可选）</span>
+                            </div>
                             <Row gutter={16}>
                                 <Col span={24}>
                                     <Form.Item name={["videoConfig", "path"]} label="视频接口路径" help="覆盖默认的 /videos 路径，如 /video/generations">
@@ -861,7 +875,18 @@ export default function AdminSettingsPage() {
                                     </Form.Item>
                                 </Col>
                             </Row>
-                        </Card>
+                        </div>
+
+                        {/* 备注 */}
+                        <div className="mb-2">
+                            <div className="mb-3 flex items-center gap-2">
+                                <div className="h-1 w-1 rounded-full bg-gray-400" />
+                                <span className="text-sm font-medium text-gray-700">备注</span>
+                            </div>
+                            <Form.Item name="remark">
+                                <Input.TextArea rows={3} placeholder="备注信息，仅管理员可见" />
+                            </Form.Item>
+                        </div>
                     </Form>
                 </Drawer>
                 <Modal

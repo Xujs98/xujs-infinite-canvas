@@ -17,7 +17,7 @@ export type AdminUser = {
     email: string;
     displayName: string;
     avatarUrl: string;
-    role: "user" | "admin";
+    role: "user" | "member" | "admin";
     credits: number;
     affCode: string;
     affCount: number;
@@ -429,6 +429,7 @@ export type AdminRequestLog = {
     url: string;
     requestHeaders: string;
     requestBody: string;
+    requestMedia: string;
     requestBodySize: number;
     responseBody: string;
     statusCode: number;

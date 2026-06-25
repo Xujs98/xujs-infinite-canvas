@@ -1,6 +1,6 @@
 "use client";
 
-import { DeleteOutlined, EyeOutlined, ReloadOutlined, SearchOutlined } from "@ant-design/icons";
+import { DeleteOutlined, DownloadOutlined, EyeOutlined, FileImageOutlined, PlayCircleOutlined, ReloadOutlined, SearchOutlined, SoundOutlined } from "@ant-design/icons";
 import { ProTable, type ProColumns } from "@ant-design/pro-components";
 import { Button, Card, Col, Drawer, Form, Input, Modal, Row, Space, Tag, Typography } from "antd";
 import dayjs from "dayjs";
@@ -8,6 +8,81 @@ import { useEffect, useState } from "react";
 
 import { batchDeleteAdminRequestLogs, fetchAdminRequestLogs, type AdminRequestLog } from "@/services/api/admin";
 import { useUserStore } from "@/stores/use-user-store";
+
+
+const MEDIA_FIELD_KEYS = new Set(["image", "images", "image_urls", "input_reference[]", "reference_images", "reference_videos", "reference_audios"]);
+
+function isPreviewableUrl(src: string): boolean {
+    return src.startsWith("http://") || src.startsWith("https://") || src.startsWith("data:");
+}
+
+function extractMediaFromJson(text: string): { images: string[]; videos: string[]; audios: string[]; truncatedCount: number } {
+    const images: string[] = [];
+    const videos: string[] = [];
+    const audios: string[] = [];
+    let truncatedCount = 0;
+    try {
+        const obj = JSON.parse(text);
+        const collect = (val: any): string[] => {
+            if (typeof val === "string") return [val];
+            if (Array.isArray(val)) return val.filter((v): v is string => typeof v === "string");
+            return [];
+        };
+        for (const key of MEDIA_FIELD_KEYS) {
+            const val = obj[key];
+            if (val == null) continue;
+            const items = collect(val);
+            for (const item of items) {
+                if (!isPreviewableUrl(item)) { truncatedCount++; continue; }
+                if (key === "reference_videos") {
+                    videos.push(item);
+                } else if (key === "reference_audios") {
+                    audios.push(item);
+                } else {
+                    images.push(item);
+                }
+            }
+        }
+    } catch { /* not json */ }
+    return { images, videos, audios, truncatedCount };
+}
+
+function MediaPreview({ body }: { body: string }) {
+    const { images, videos, audios, truncatedCount } = extractMediaFromJson(body);
+    if (!images.length && !videos.length && !audios.length && !truncatedCount) return null;
+    return (
+        <div className="flex flex-wrap gap-2 mt-2">
+            {images.map((src, i) => (
+                <div key={i} className="group relative cursor-pointer" onClick={() => window.open(src.startsWith("data:") ? src : `/api/proxy-image?url=${encodeURIComponent(src)}`, "_blank")}>
+                    <img src={src.startsWith("data:") ? src : `/api/proxy-image?url=${encodeURIComponent(src)}`} alt={`图片${i + 1}`} className="h-20 w-20 rounded-lg border border-gray-200 object-cover transition-shadow hover:shadow-md" onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
+                    <div className="absolute inset-0 flex items-center justify-center rounded-lg bg-black/0 transition-colors group-hover:bg-black/30">
+                        <EyeOutlined className="text-white opacity-0 group-hover:opacity-100 transition-opacity text-lg" />
+                    </div>
+                </div>
+            ))}
+            {videos.map((src, i) => (
+                <div key={i} className="relative cursor-pointer" onClick={() => window.open(src, "_blank")}>
+                    <video src={src} className="h-20 w-28 rounded-lg border border-gray-200 object-cover" muted preload="metadata" />
+                    <div className="absolute inset-0 flex items-center justify-center rounded-lg bg-black/0 transition-colors hover:bg-black/30">
+                        <PlayCircleOutlined className="text-white text-2xl drop-shadow" />
+                    </div>
+                </div>
+            ))}
+            {audios.map((src, i) => (
+                <div key={i} className="flex items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2">
+                    <SoundOutlined className="text-gray-500" />
+                    <audio src={src} controls className="h-8 max-w-[200px]" preload="metadata" />
+                </div>
+            ))}
+            {truncatedCount > 0 && (
+                <div className="flex items-center gap-1.5 rounded-lg border border-dashed border-gray-300 bg-gray-50 px-3 py-2 text-xs text-gray-400">
+                    <FileImageOutlined />
+                    {truncatedCount} 个素材已截断（base64 日志不保留原始数据）
+                </div>
+            )}
+        </div>
+    );
+}
 
 function tryFormatJson(text: string): { isJson: boolean; formatted: string } {
     try {
@@ -258,6 +333,7 @@ export default function AdminRequestLogsPage() {
                             <div>
                                 <Typography.Text type="secondary" className="!text-xs">请求体 (Body) - {detailLog.requestBodySize} bytes</Typography.Text>
                                 <JsonBlock text={detailLog.requestBody} />
+                                <MediaPreview body={detailLog.requestMedia || detailLog.requestBody} />
                             </div>
                         )}
                         {detailLog.responseBody && (

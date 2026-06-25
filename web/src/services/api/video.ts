@@ -118,7 +118,7 @@ async function createOpenAIVideoTask(config: AiConfig, model: string, prompt: st
             seconds: normalizeVideoSeconds(config.videoSeconds),
             aspect_ratio: "16:9",
             resolution: normalizeVideoResolution(config.vquality),
-            image: imageDataList[0],
+            reference_images: imageDataList,
         };
         try {
             const created = unwrapVideoResponse((await axios.post<ApiVideoResponse>(aiApiUrl(config, "/videos"), payload, { headers: aiHeaders(config, "application/json") })).data);

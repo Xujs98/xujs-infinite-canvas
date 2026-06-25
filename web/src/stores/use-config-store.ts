@@ -5,6 +5,7 @@ import { create } from "zustand";
 import { persist } from "zustand/middleware";
 
 import { apiGet } from "@/services/api/request";
+import type { AdminRole } from "@/services/api/role";
 import type { AdminPublicSettings } from "@/services/api/admin";
 
 export type ModelCostItem = { model: string; credits: number; alias: string };
@@ -123,11 +124,31 @@ type ConfigStore = {
     openConfigDialog: (shouldPromptContinue?: boolean) => void;
     setConfigDialogOpen: (isOpen: boolean) => void;
     clearPromptContinue: () => void;
+    roleAllowedModels: string[];
+    loadRoles: () => Promise<void>;
 };
 
-function resolveEffectiveConfig(config: AiConfig, modelChannel: AdminPublicSettings["modelChannel"] | null) {
+function resolveEffectiveConfig(config: AiConfig, modelChannel: AdminPublicSettings["modelChannel"] | null, roleAllowedModels: string[] = []) {
+    const hasModelRestriction = roleAllowedModels.length > 0;
     const channelMode = modelChannel?.allowCustomChannel ? config.channelMode : "remote";
-    if (channelMode === "local" || !modelChannel) return { ...config, channelMode };
+    if (channelMode === "local" || !modelChannel) {
+        // local 模式下也做模型分类和角色过滤
+        const models = config.models || [];
+        const textModels = filterModelsByCapability(models, "text");
+        const imageModels = filterModelsByCapability(models, "image");
+        const videoModels = filterModelsByCapability(models, "video");
+        const audioModels = filterModelsByCapability(models, "audio");
+        const filterByRole = (list: string[]) => hasModelRestriction ? list.filter((m) => roleAllowedModels.includes(m)) : list;
+        return {
+            ...config,
+            channelMode,
+            models: filterByRole(models),
+            textModels: filterByRole(textModels),
+            imageModels: filterByRole(imageModels),
+            videoModels: filterByRole(videoModels),
+            audioModels: filterByRole(audioModels),
+        };
+    }
     const models = modelChannel.availableModels;
     const textModels = filterModelsByCapability(models, "text");
     const imageModels = filterModelsByCapability(models, "image");
@@ -152,20 +173,28 @@ function resolveEffectiveConfig(config: AiConfig, modelChannel: AdminPublicSetti
         videoSeconds = config.videoSeconds || "6";
     }
 
+    // 按角色权限过滤模型
+    const filterByRole = (models: string[]) => hasModelRestriction ? models.filter((m) => roleAllowedModels.includes(m)) : models;
+    const finalModels = filterByRole(models);
+    const finalImageModels = filterByRole(imageModels);
+    const finalVideoModels = filterByRole(videoModels);
+    const finalTextModels = filterByRole(textModels);
+    const finalAudioModels = filterByRole(audioModels);
+
     return {
         ...config,
         channelMode,
-        models,
-        imageModels,
-        videoModels,
-        textModels,
-        audioModels,
+        models: finalModels,
+        imageModels: finalImageModels,
+        videoModels: finalVideoModels,
+        textModels: finalTextModels,
+        audioModels: finalAudioModels,
         modelCosts: modelChannel.modelCosts || [],
-        model: textModels.includes(config.model) ? config.model : fallbackModel,
-        imageModel: imageModels.includes(config.imageModel) ? config.imageModel : fallbackImageModel,
-        videoModel: effectiveVideoModel,
-        textModel: textModels.includes(config.textModel) ? config.textModel : fallbackTextModel || fallbackModel,
-        audioModel: audioModels.includes(config.audioModel) ? config.audioModel : fallbackAudioModel,
+        model: finalTextModels.includes(config.model) ? config.model : fallbackModel,
+        imageModel: finalImageModels.includes(config.imageModel) ? config.imageModel : fallbackImageModel,
+        videoModel: finalVideoModels.includes(effectiveVideoModel) ? effectiveVideoModel : (finalVideoModels[0] || ""),
+        textModel: finalTextModels.includes(config.textModel) ? config.textModel : fallbackTextModel || fallbackModel,
+        audioModel: finalAudioModels.includes(config.audioModel) ? config.audioModel : fallbackAudioModel,
         videoSeconds,
         systemPrompt: modelChannel.systemPrompt,
     };
@@ -379,6 +408,15 @@ export const useConfigStore = create<ConfigStore>()(
             openConfigDialog: (shouldPromptContinue = false) => set({ isConfigOpen: true, shouldPromptContinue }),
             setConfigDialogOpen: (isConfigOpen) => set({ isConfigOpen }),
             clearPromptContinue: () => set({ shouldPromptContinue: false }),
+            roleAllowedModels: [],
+            loadRoles: async () => {
+                try {
+                    const roles = await apiGet<AdminRole[]>("/api/roles");
+                    return roles;
+                } catch {
+                    return [];
+                }
+            },
         }),
         {
             name: CONFIG_STORE_KEY,
@@ -448,7 +486,8 @@ function normalizeModelList(models: string[]) {
 export function useEffectiveConfig() {
     const config = useConfigStore((state) => state.config);
     const modelChannel = useConfigStore((state) => state.publicSettings?.modelChannel || null);
-    return useMemo(() => resolveEffectiveConfig(config, modelChannel), [config, modelChannel]);
+    const roleAllowedModels = useConfigStore((state) => state.roleAllowedModels);
+    return useMemo(() => resolveEffectiveConfig(config, modelChannel, roleAllowedModels), [config, modelChannel, roleAllowedModels]);
 }
 
 export function buildApiUrl(baseUrl: string, path: string) {

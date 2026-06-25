@@ -13,6 +13,7 @@ type RequestLog struct {
 	URL            string    `json:"url"`
 	RequestHeaders string    `json:"requestHeaders" gorm:"type:text"`
 	RequestBody    string    `json:"requestBody" gorm:"type:text"`
+	RequestMedia    string    `json:"requestMedia" gorm:"type:text"`
 	RequestBodySize int      `json:"requestBodySize"`
 	ResponseBody   string    `json:"responseBody" gorm:"type:text"`
 	StatusCode     int       `json:"statusCode"`

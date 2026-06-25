@@ -136,6 +136,17 @@ func New() *gin.Engine {
 		handler.DeleteModelClassification(c.Writer, c.Request, c.Param("id"))
 	})
 	admin.POST("/model-classifications/batch-delete", gin.WrapF(handler.BatchDeleteModelClassifications))
+	admin.GET("/roles", gin.WrapF(handler.ListRoles))
+	admin.POST("/roles", gin.WrapF(handler.CreateRole))
+	admin.PUT("/roles/:id", func(c *gin.Context) {
+		handler.UpdateRole(c.Writer, c.Request, c.Param("id"))
+	})
+	admin.DELETE("/roles/:id", func(c *gin.Context) {
+		handler.DeleteRole(c.Writer, c.Request, c.Param("id"))
+	})
+	admin.POST("/roles/batch-delete", gin.WrapF(handler.BatchDeleteRoles))
+	api.GET("/roles", gin.WrapF(handler.GetAllRoles))
+	api.GET("/proxy-image", gin.WrapF(handler.ProxyImage))
 	api.GET("/model-classifications/map", gin.WrapF(handler.GetModelClassificationsMap))
 	api.GET("/model-classifications/all", gin.WrapF(handler.GetAllModelClassifications))
 	api.Any("/agent/*path", gin.WrapF(handler.AgentProxy))

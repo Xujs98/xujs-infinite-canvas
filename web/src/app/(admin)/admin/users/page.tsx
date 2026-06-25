@@ -53,7 +53,7 @@ export default function AdminUsersPage() {
         const value = await form.validateFields();
         const userValue = { ...value };
         delete userValue.credits;
-        const role = value.role === "member" ? "user" : value.role;
+        const role = value.role;
         const membershipExpiresAt = value.membershipExpiresAt ? value.membershipExpiresAt.toISOString() : "";
         await saveAdminUser({ ...editingUser, ...userValue, role, membershipExpiresAt, password: value.password || undefined });
         setEditingUser(null);
