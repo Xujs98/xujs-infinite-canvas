@@ -7,6 +7,15 @@ import (
 	"strconv"
 )
 
+
+// RequestField 定义模型级别的自定义请求字段。
+// 字段名映射到发送给 AI API 的请求体字段；留空则不映射。
+type RequestField struct {
+	FieldName    string `json:"fieldName"`    // 前端统一字段名，如 reference_images
+	RequestKey   string `json:"requestKey"`   // 映射到请求体的字段名，如 images
+	DataType     string `json:"dataType"`     // 数据类型: string, integer, boolean, number, array, object
+}
+
 // ModelClassification 定义模型的能力分类和参数配置
 // capability: "text" | "image" | "video" | "audio"
 type ModelClassification struct {
@@ -15,6 +24,9 @@ type ModelClassification struct {
 	Capability string `json:"capability"` // text, image, video, audio
 
 	// 视频模型参数 (JSON)
+	// 模级级自定义请求字段，优先于渠道级 FieldMapping
+	RequestFields []RequestField `json:"requestFields" gorm:"type:text"`
+
 	VideoConfig *VideoModelConfig `json:"videoConfig" gorm:"type:text"`
 
 	// 图片模型参数 (JSON)

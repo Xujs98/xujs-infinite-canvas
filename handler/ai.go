@@ -10,9 +10,11 @@ import (
 	"mime"
 	"mime/multipart"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"github.com/basketikun/infinite-canvas/model"
+	"github.com/basketikun/infinite-canvas/repository"
 	"github.com/basketikun/infinite-canvas/service"
 )
 
@@ -150,6 +152,10 @@ func proxyAIRequest(w http.ResponseWriter, r *http.Request, path string) {
 			finalBody = jsonBody
 			contentType = "application/json"
 		}
+	}
+	// 应用模型级别的字段映射（优先于渠道级）
+	if contentType == "application/json" {
+		finalBody = applyRequestFields(finalBody, modelName)
 	}
 	// 应用字段映射到 JSON 请求体（仅在用户明确配置了字段映射时才启用）
 	if channel.FieldMapping != nil && (channel.FieldMapping.Image != "" || channel.FieldMapping.Images != "" || channel.FieldMapping.ReferenceVideos != "" || channel.FieldMapping.ReferenceAudios != "") {
@@ -758,6 +764,102 @@ func isVideoTaskFailed(respText string) bool {
 // convertArkToOpenAIVideoRequest 将火山方舟 Ark 格式的视频请求转换为 OpenAI 兼容格式。
 // Ark 格式: { model, content: [{type:"text",text},{type:"image_url",...}], ratio, resolution, duration, ... }
 // OpenAI 格式: { model, prompt, size, n, image_urls, seconds, ... }
+
+
+// applyRequestFields 根据模型级别的 RequestFields 转换 JSON 请求体。
+// 模型级别的字段映射优先于渠道级 FieldMapping。
+func applyRequestFields(body []byte, modelName string) []byte {
+	cls, _, err := repository.GetModelClassificationByModelName(modelName)
+	if err != nil || len(cls.RequestFields) == 0 {
+		return body
+	}
+	var bodyMap map[string]any
+	if err := json.Unmarshal(body, &bodyMap); err != nil {
+		return body
+	}
+	changed := false
+	for _, rf := range cls.RequestFields {
+		if rf.FieldName == "" || rf.RequestKey == "" {
+			continue
+		}
+		val, ok := bodyMap[rf.FieldName]
+		if !ok {
+			continue
+		}
+		// 如果目标字段已存在且不是同一个，跳过
+		if rf.FieldName != rf.RequestKey {
+			if _, exists := bodyMap[rf.RequestKey]; !exists {
+				bodyMap[rf.RequestKey] = val
+			}
+			delete(bodyMap, rf.FieldName)
+			changed = true
+		}
+		// 类型转换
+		if rf.DataType != "" {
+			if converted, ok := convertFieldType(bodyMap[rf.RequestKey], rf.DataType); ok {
+				bodyMap[rf.RequestKey] = converted
+				changed = true
+			}
+		}
+	}
+	if !changed {
+		return body
+	}
+	out, _ := json.Marshal(bodyMap)
+	return out
+}
+
+func convertFieldType(val any, dataType string) (any, bool) {
+	switch dataType {
+	case "string":
+		switch v := val.(type) {
+		case string:
+			return v, false
+		case []any:
+			return fmt.Sprintf("%v", v), true
+		default:
+			return fmt.Sprintf("%v", v), true
+		}
+	case "integer":
+		switch v := val.(type) {
+		case float64:
+			return int(v), true
+		case string:
+			if i, err := strconv.Atoi(v); err == nil {
+				return i, true
+			}
+		}
+	case "number":
+		switch v := val.(type) {
+		case string:
+			if f, err := strconv.ParseFloat(v, 64); err == nil {
+				return f, true
+			}
+		}
+	case "boolean":
+		switch v := val.(type) {
+		case bool:
+			return v, false
+		case string:
+			return v == "true" || v == "1", true
+		case float64:
+			return v != 0, true
+		}
+	case "array":
+		switch v := val.(type) {
+		case []any:
+			return v, false
+		case string:
+			return []any{v}, true
+		}
+	case "object":
+		switch val.(type) {
+		case map[string]any:
+			return val, false
+		}
+	}
+	return val, false
+}
 
 // applyFieldMappingToJSON 根据渠道字段映射转换 JSON 请求体中的字段名和类型
 // 前端统一发送 reference_images 字段，后端根据 fieldMapping 转换为渠道期望的字段名。

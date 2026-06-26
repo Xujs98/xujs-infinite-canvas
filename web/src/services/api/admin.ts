@@ -472,10 +472,17 @@ export type AudioModelConfig = {
     speedRange: { min: number; max: number } | null;
 };
 
+export type RequestFieldConfig = {
+    fieldName: string;
+    requestKey: string;
+    dataType: "string" | "integer" | "boolean" | "number" | "array" | "object";
+};
+
 export type AdminModelClassification = {
     id: string;
     modelName: string;
     capability: string;
+    requestFields: RequestFieldConfig[] | null;
     videoConfig: VideoModelConfig | null;
     imageConfig: ImageModelConfig | null;
     audioConfig: AudioModelConfig | null;

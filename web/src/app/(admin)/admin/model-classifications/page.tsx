@@ -165,6 +165,7 @@ export default function AdminModelClassificationsPage() {
             const classification: Partial<AdminModelClassification> = {
                 modelName: values.modelName,
                 capability,
+                requestFields: (values.requestFields || []).filter((f: any) => f?.fieldName && f?.requestKey && f?.dataType),
             };
 
             if (capability === "video") {
@@ -530,6 +531,49 @@ export default function AdminModelClassificationsPage() {
                             </Row>
                         </Card>
                     )}
+
+                    {/* 请求字段映射 */}
+                    <Card title="请求字段映射" size="small" style={{ marginTop: 16 }} extra={<span style={{ fontSize: 12, color: "#999" }}>自定义请求体字段名，优先于渠道设置</span>}>
+                        <Form.List name="requestFields">
+                            {(fields, { add, remove }) => (
+                                <>
+                                    {fields.map(({ key, name, ...restField }) => (
+                                        <Row key={key} gutter={8} align="middle" style={{ marginBottom: 8 }}>
+                                            <Col span={7}>
+                                                <Form.Item {...restField} name={[name, "fieldName"]} noStyle rules={[{ required: true, message: "字段名" }]}>
+                                                    <Input placeholder="前端字段名 (如 reference_images)" size="small" />
+                                                </Form.Item>
+                                            </Col>
+                                            <Col span={1}>
+                                                <span style={{ color: "#999", fontSize: 12 }}>→</span>
+                                            </Col>
+                                            <Col span={7}>
+                                                <Form.Item {...restField} name={[name, "requestKey"]} noStyle rules={[{ required: true, message: "映射字段" }]}>
+                                                    <Input placeholder="请求字段名 (如 images)" size="small" />
+                                                </Form.Item>
+                                            </Col>
+                                            <Col span={6}>
+                                                <Form.Item {...restField} name={[name, "dataType"]} noStyle rules={[{ required: true, message: "选择类型" }]}>
+                                                    <Select size="small" placeholder="数据类型" options={[
+                                                        { label: "string", value: "string" },
+                                                        { label: "integer", value: "integer" },
+                                                        { label: "boolean", value: "boolean" },
+                                                        { label: "number", value: "number" },
+                                                        { label: "array", value: "array" },
+                                                        { label: "object", value: "object" },
+                                                    ]} />
+                                                </Form.Item>
+                                            </Col>
+                                            <Col span={3}>
+                                                <Button type="link" danger size="small" icon={<span>✕</span>} onClick={() => remove(name)} />
+                                            </Col>
+                                        </Row>
+                                    ))}
+                                    <Button type="dashed" onClick={() => add()} block size="small" icon={<span>+</span>}>新增字段映射</Button>
+                                </>
+                            )}
+                        </Form.List>
+                    </Card>
                 </Form>
             </Modal>
         </div>
