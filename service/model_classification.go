@@ -30,6 +30,7 @@ func UpdateModelClassification(id string, classification model.ModelClassificati
 	}
 	existing.ModelName = classification.ModelName
 	existing.Capability = classification.Capability
+	existing.RequestFields = classification.RequestFields
 	existing.VideoConfig = classification.VideoConfig
 	existing.ImageConfig = classification.ImageConfig
 	existing.AudioConfig = classification.AudioConfig
