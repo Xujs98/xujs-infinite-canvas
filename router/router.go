@@ -2,8 +2,10 @@ package router
 
 import (
 	"net/http"
+	"os"
 
 	"github.com/basketikun/infinite-canvas/handler"
+	"github.com/basketikun/infinite-canvas/seedance"
 	"github.com/basketikun/infinite-canvas/middleware"
 	"github.com/gin-gonic/gin"
 )
@@ -151,6 +153,19 @@ func New() *gin.Engine {
 	api.GET("/model-classifications/all", gin.WrapF(handler.GetAllModelClassifications))
 	api.Any("/agent/*path", gin.WrapF(handler.AgentProxy))
 	api.GET("/announcements", gin.WrapF(handler.PublicAnnouncements))
+
+	// 视频脚本创作助手
+	workDir, _ := os.Getwd()
+	seedanceGroup := api.Group("/seedance")
+	seedanceGroup.Use(func(c *gin.Context) {
+		c.Set("workDir", workDir)
+		c.Next()
+	}, middleware.OptionalAuth)
+	seedanceGroup.GET("/ws", func(c *gin.Context) { seedance.HandleWS(c) })
+	seedanceGroup.GET("/health", func(c *gin.Context) { seedance.HandleHealth(c) })
+	seedanceGroup.GET("/output", func(c *gin.Context) { seedance.HandleOutput(c) })
+	seedanceGroup.POST("/upload", middleware.UserAuth, func(c *gin.Context) { seedance.HandleUpload(c) })
+	seedanceGroup.GET("/output/*filepath", func(c *gin.Context) { seedance.HandleOutputFile(c) })
 
 	router.NoRoute(middleware.NotFoundJSON)
 

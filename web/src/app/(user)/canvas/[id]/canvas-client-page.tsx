@@ -44,6 +44,7 @@ import { Minimap } from "../components/canvas-mini-map";
 import { CanvasNode } from "../components/canvas-node";
 import { CanvasNodePromptPanel, type CanvasNodeGenerationMode } from "../components/canvas-node-prompt-panel";
 import { CanvasToolbar } from "../components/canvas-toolbar";
+import { CanvasScriptPanel } from "../components/canvas-script-panel";
 import { AssetPickerModal, type AssetPickerTab, type InsertAssetPayload } from "../components/asset-picker-modal";
 import { CanvasZoomControls } from "../components/canvas-zoom-controls";
 import { PanoramaViewer, usePanoramaViewer } from "../components/canvas-panorama-viewer";
@@ -292,6 +293,7 @@ function InfiniteCanvasPage() {
     const [mouseWorld, setMouseWorld] = useState<Position>({ x: 0, y: 0 });
     const [selectionBox, setSelectionBox] = useState<SelectionBox | null>(null);
     const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
+    const [scriptPanelOpen, setScriptPanelOpen] = useState(false);
     const [runningNodeId, setRunningNodeId] = useState<string | null>(null);
     const [isMiniMapOpen, setIsMiniMapOpen] = useState(false);
     const [backgroundMode, setBackgroundMode] = useState<CanvasBackgroundMode>("lines");
@@ -2614,6 +2616,7 @@ function InfiniteCanvasPage() {
                     onDeselect={deselectCanvas}
                     onBackgroundModeChange={setBackgroundMode}
                     onShowImageInfoChange={setShowImageInfo}
+                    onOpenScriptAssistant={() => setScriptPanelOpen(true)}
                     onOpenAssetLibrary={() => {
                         setAssetPickerTab("library");
                         setAssetPickerOpen(true);
@@ -2624,6 +2627,8 @@ function InfiniteCanvasPage() {
                     }}
                     onOpenTimeline={() => setTimelineOpen(true)}
                 />
+
+                <CanvasScriptPanel open={scriptPanelOpen} onClose={() => setScriptPanelOpen(false)} />
 
                 {isMiniMapOpen ? <Minimap nodes={nodes} viewport={viewport} viewportSize={size} onViewportChange={setViewport} /> : null}
 

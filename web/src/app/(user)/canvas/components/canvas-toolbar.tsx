@@ -1,7 +1,7 @@
 import type { CSSProperties, MouseEvent as ReactMouseEvent, ReactNode, RefObject } from "react";
 import { useEffect, useRef, useState } from "react";
 import { Button, Segmented, Switch } from "antd";
-import { CircleDot, Eraser, FolderOpen, Grid2x2, Hand, Image as ImageIcon, Info, Library, Moon, Music2, Palette, Redo2, Settings2, Square, Sun, Trash2, Type, Undo2, Upload, Video, Clapperboard } from "lucide-react";
+import { CircleDot, Sparkles, Eraser, FolderOpen, Grid2x2, Hand, Image as ImageIcon, Info, Library, Moon, Music2, Palette, Redo2, Settings2, Square, Sun, Trash2, Type, Undo2, Upload, Video, Clapperboard } from "lucide-react";
 
 import { canvasThemes, type CanvasBackgroundMode, type CanvasColorTheme, type CanvasTheme, type ThemePalette, themePaletteLabels, themePalettePreviews } from "@/lib/canvas-theme";
 import { useCanvasTheme } from "@/hooks/use-canvas-theme";
@@ -31,6 +31,7 @@ export function CanvasToolbar({
     onShowImageInfoChange,
     onOpenAssetLibrary,
     onOpenMyAssets,
+    onOpenScriptAssistant,
     onOpenTimeline,
 }: {
     selectedCount: number;
@@ -53,6 +54,7 @@ export function CanvasToolbar({
     onShowImageInfoChange: (show: boolean) => void;
     onOpenAssetLibrary: () => void;
     onOpenMyAssets: () => void;
+    onOpenScriptAssistant?: () => void;
     onOpenTimeline: () => void;
 }) {
     const wrapRef = useRef<HTMLDivElement>(null);
@@ -113,6 +115,11 @@ export function CanvasToolbar({
                 <ToolbarButton id="tool-config" label="生成配置" hovered={hovered} hoverStyle={hoverStyle} wrapRef={wrapRef} onTipX={setTipX} onHover={setHovered} onClick={onAddConfig}>
                     <Settings2 className="size-4.5" />
                 </ToolbarButton>
+{/* TODO: 视频脚本创作助手入口暂时隐藏
+                <ToolbarButton id="tool-script-assistant" label="视频脚本创作助手" hovered={hovered} hoverStyle={hoverStyle} wrapRef={wrapRef} onTipX={setTipX} onHover={setHovered} onClick={onOpenScriptAssistant}>
+                    <Sparkles className="size-4.5" />
+                </ToolbarButton>
+*/}
                 <ToolbarButton id="tool-timeline" label="时间线" hovered={hovered} hoverStyle={hoverStyle} wrapRef={wrapRef} onTipX={setTipX} onHover={setHovered} onClick={onOpenTimeline}>
                     <Clapperboard className="size-4.5" />
                 </ToolbarButton>

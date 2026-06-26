@@ -16,6 +16,11 @@ export default function nextConfig(phase: string): NextConfig {
     return {
         output: "standalone",
         allowedDevOrigins: isDev ? ["*.*.*.*"] : [],
+        async rewrites() {
+            return [
+                { source: "/api/seedance/:path*", destination: "http://127.0.0.1:8080/api/seedance/:path*" },
+            ];
+        },
         typescript: {
             ignoreBuildErrors: true,
         },

@@ -15,6 +15,7 @@ export enum CanvasNodeType {
     Config = "config",
     Video = "video",
     Audio = "audio",
+    Script = "script",
 }
 
 export type CanvasNodeStatus = "idle" | "success" | "loading" | "error";
@@ -72,6 +73,14 @@ export type CanvasConnection = {
     id: string;
     fromNodeId: string;
     toNodeId: string;
+};
+
+export type ScriptMessage = {
+    id: string;
+    role: "user" | "assistant" | "system";
+    content: string;
+    timestamp: number;
+    toolCall?: { name: string; status: "running" | "done" };
 };
 
 export type CanvasAssistantReference = {

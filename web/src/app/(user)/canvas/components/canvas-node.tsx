@@ -8,6 +8,7 @@ import { useCanvasTheme } from "@/hooks/use-canvas-theme";
 import { formatBytes } from "@/lib/image-utils";
 import { useThemeStore } from "@/stores/use-theme-store";
 import { CanvasResourceMentionTextarea } from "./canvas-resource-mention-textarea";
+import { ScriptNodeContent } from "./canvas-script-node-content";
 import { CanvasNodeType, type CanvasNodeData, type Position } from "../types";
 import type { CanvasResourceReference } from "../utils/canvas-resource-references";
 
@@ -350,6 +351,7 @@ const nodeContentRenderers = {
     [CanvasNodeType.Config]: EmptyImageContent,
     [CanvasNodeType.Video]: VideoNodeContent,
     [CanvasNodeType.Audio]: AudioNodeContent,
+    [CanvasNodeType.Script]: ScriptNodeContent,
 } satisfies Record<CanvasNodeType, (props: NodeContentRendererProps) => ReactNode>;
 
 function LoadingContent({ theme, node }: Pick<NodeContentRendererProps, "theme"> & { node?: CanvasNodeData }) {
