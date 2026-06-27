@@ -154,10 +154,10 @@ export default function AdminModelClassificationsPage() {
             const capability = form.getFieldValue("capability");
             // 只验证当前类型的字段
             const fieldsByType: Record<string, string[]> = {
-                video: ["modelName", "capability", "videoResolutions", "videoRatios", "videoDurations", "videoMaxDuration"],
-                image: ["modelName", "capability", "imageQualities", "imageAspectRatios", "imageMaxCount"],
-                audio: ["modelName", "capability", "audioVoices", "audioFormats"],
-                text: ["modelName", "capability"],
+                video: ["modelName", "capability", "videoResolutions", "videoRatios", "videoDurations", "videoMaxDuration", "requestFields"],
+                image: ["modelName", "capability", "imageQualities", "imageAspectRatios", "imageMaxCount", "requestFields"],
+                audio: ["modelName", "capability", "audioVoices", "audioFormats", "requestFields"],
+                text: ["modelName", "capability", "requestFields"],
             };
             const fieldsToValidate = fieldsByType[capability] || ["modelName", "capability"];
             const values = await form.validateFields(fieldsToValidate);
