@@ -75,8 +75,8 @@ export function CanvasNodePromptPanel({ node, isRunning, onPromptChange, onConfi
         const onMove = (ev: MouseEvent) => {
             if (!dragRef.current) return;
             const { startX, startY, startW, startH } = dragRef.current;
-            const newW = Math.max(360, Math.min(900, startW + ev.clientX - startX));
-            const newH = Math.max(200, Math.min(600, startH + ev.clientY - startY));
+            const newW = Math.max(360, Math.min(1200, startW + ev.clientX - startX));
+            const newH = Math.max(200, Math.min(800, startH + ev.clientY - startY));
             setPanelSize({ w: newW, h: newH });
         };
         const onUp = () => {
@@ -92,7 +92,7 @@ export function CanvasNodePromptPanel({ node, isRunning, onPromptChange, onConfi
         <div
             data-panel-root
             className="relative flex flex-col overflow-hidden rounded-2xl border p-3 shadow-2xl backdrop-blur"
-            style={{ background: theme.toolbar.panel, borderColor: theme.toolbar.border, color: theme.node.text, width: panelSize ? panelSize.w : undefined, maxHeight: panelSize ? panelSize.h : '60vh' }}
+            style={{ background: theme.toolbar.panel, borderColor: theme.toolbar.border, color: theme.node.text, width: panelSize ? panelSize.w : undefined, maxHeight: panelSize ? panelSize.h : undefined }}
             onMouseDown={(event) => event.stopPropagation()}
             onPointerDown={(event) => event.stopPropagation()}
             onWheel={(event) => event.stopPropagation()}
@@ -111,7 +111,7 @@ export function CanvasNodePromptPanel({ node, isRunning, onPromptChange, onConfi
                 references={mentionReferences}
                 onChange={updatePrompt}
                 onSubmit={submit}
-                className="thin-scrollbar h-32 max-h-[40vh] w-full flex-1 resize-none overflow-x-hidden overflow-y-auto rounded-xl border px-3 py-2 text-sm leading-5 break-words outline-none"
+                className="thin-scrollbar h-32 w-full flex-1 resize-none overflow-y-auto rounded-xl border px-3 py-2 text-sm leading-5 break-words outline-none"
                 style={{ background: theme.node.fill, borderColor: theme.node.stroke, color: theme.node.text, caretColor: theme.node.text }}
                 placeholder={promptPlaceholder(mode, hasImageContent, hasTextContent)}
             />
