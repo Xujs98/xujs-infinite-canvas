@@ -816,7 +816,20 @@ func convertFieldType(val any, dataType string) (any, bool) {
 		case string:
 			return v, false
 		case []any:
-			return fmt.Sprintf("%v", v), true
+			// 数组取第一个元素的值作为字符串
+			if len(v) > 0 {
+				first := v[0]
+				if m, ok := first.(map[string]any); ok {
+					if dataUrl, ok := m["dataUrl"].(string); ok {
+						return dataUrl, true
+					}
+				}
+				if s, ok := first.(string); ok {
+					return s, true
+				}
+				return fmt.Sprintf("%v", first), true
+			}
+			return "", true
 		default:
 			return fmt.Sprintf("%v", v), true
 		}
