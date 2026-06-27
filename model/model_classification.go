@@ -16,6 +16,35 @@ type RequestField struct {
 	DataType     string `json:"dataType"`     // 数据类型: string, integer, boolean, number, array, object
 }
 
+// RequestFields 是 []RequestField 的自定义类型，实现 GORM Value/Scan 以正确序列化为 JSON text。
+type RequestFields []RequestField
+
+func (f RequestFields) Value() (driver.Value, error) {
+	if f == nil {
+		return "[]", nil
+	}
+	b, err := json.Marshal(f)
+	if err != nil {
+		return nil, err
+	}
+	return string(b), nil
+}
+
+func (f *RequestFields) Scan(src interface{}) error {
+	if src == nil {
+		*f = nil
+		return nil
+	}
+	switch v := src.(type) {
+	case []byte:
+		return json.Unmarshal(v, f)
+	case string:
+		return json.Unmarshal([]byte(v), f)
+	default:
+		return fmt.Errorf("cannot scan %T into RequestFields", src)
+	}
+}
+
 // ModelClassification 定义模型的能力分类和参数配置
 // capability: "text" | "image" | "video" | "audio"
 type ModelClassification struct {
@@ -23,9 +52,8 @@ type ModelClassification struct {
 	ModelName  string `json:"modelName" gorm:"uniqueIndex"`
 	Capability string `json:"capability"` // text, image, video, audio
 
-	// 视频模型参数 (JSON)
-	// 模级级自定义请求字段，优先于渠道级 FieldMapping
-	RequestFields []RequestField `json:"requestFields" gorm:"type:text"`
+	// 模型级自定义请求字段，优先于渠道级 FieldMapping
+	RequestFields RequestFields `json:"requestFields" gorm:"type:text"`
 
 	VideoConfig *VideoModelConfig `json:"videoConfig" gorm:"type:text"`
 
@@ -62,13 +90,11 @@ func (c *VideoModelConfig) UnmarshalJSON(data []byte) error {
 		return err
 	}
 	if len(aux.Durations) > 0 && aux.Durations[0] == '[' {
-		// 尝试解析为字符串数组
 		var strs []string
 		if err := json.Unmarshal(aux.Durations, &strs); err == nil {
 			c.Durations = strs
 			return nil
 		}
-		// 尝试解析为数字数组并转换为字符串
 		var nums []json.Number
 		if err := json.Unmarshal(aux.Durations, &nums); err == nil {
 			c.Durations = make([]string, len(nums))
@@ -77,7 +103,6 @@ func (c *VideoModelConfig) UnmarshalJSON(data []byte) error {
 			}
 			return nil
 		}
-		// 尝试解析为 float64 数组
 		var floats []float64
 		if err := json.Unmarshal(aux.Durations, &floats); err == nil {
 			c.Durations = make([]string, len(floats))
@@ -144,8 +169,8 @@ func (c *ImageModelConfig) Scan(src interface{}) error {
 
 // AudioModelConfig 音频模型参数配置
 type AudioModelConfig struct {
-	Voices     []string   `json:"voices"`
-	Formats    []string   `json:"formats"`
+	Voices     []string    `json:"voices"`
+	Formats    []string    `json:"formats"`
 	SpeedRange *SpeedRange `json:"speedRange"`
 }
 
