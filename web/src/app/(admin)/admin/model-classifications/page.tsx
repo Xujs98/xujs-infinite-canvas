@@ -539,7 +539,7 @@ export default function AdminModelClassificationsPage() {
                                 <>
                                     {fields.map(({ key, name, ...restField }) => (
                                         <Row key={key} gutter={8} align="middle" style={{ marginBottom: 8 }}>
-                                            <Col span={7}>
+                                            <Col span={6}>
                                                 <Form.Item {...restField} name={[name, "fieldName"]} noStyle rules={[{ required: true, message: "字段名" }]}>
                                                     <Input placeholder="前端字段名 (如 reference_images)" size="small" />
                                                 </Form.Item>
@@ -547,14 +547,14 @@ export default function AdminModelClassificationsPage() {
                                             <Col span={1}>
                                                 <span style={{ color: "#999", fontSize: 12 }}>→</span>
                                             </Col>
-                                            <Col span={7}>
+                                            <Col span={6}>
                                                 <Form.Item {...restField} name={[name, "requestKey"]} noStyle rules={[{ required: true, message: "映射字段" }]}>
                                                     <Input placeholder="请求字段名 (如 images)" size="small" />
                                                 </Form.Item>
                                             </Col>
-                                            <Col span={6}>
+                                            <Col span={8}>
                                                 <Form.Item {...restField} name={[name, "dataType"]} noStyle rules={[{ required: true, message: "选择类型" }]}>
-                                                    <Select size="small" placeholder="数据类型" options={[
+                                                    <Select size="small" placeholder="数据类型" dropdownMatchSelectWidth={false} style={{ minWidth: 100 }} options={[
                                                         { label: "string", value: "string" },
                                                         { label: "integer", value: "integer" },
                                                         { label: "boolean", value: "boolean" },
