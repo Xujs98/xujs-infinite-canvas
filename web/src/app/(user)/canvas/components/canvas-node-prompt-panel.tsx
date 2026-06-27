@@ -91,8 +91,8 @@ export function CanvasNodePromptPanel({ node, isRunning, onPromptChange, onConfi
     return (
         <div
             data-panel-root
-            className="relative flex flex-col overflow-hidden rounded-2xl border p-3 shadow-2xl backdrop-blur"
-            style={{ background: theme.toolbar.panel, borderColor: theme.toolbar.border, color: theme.node.text, width: panelSize ? panelSize.w : undefined, maxHeight: panelSize ? panelSize.h : undefined }}
+            className="relative flex flex-col rounded-2xl border p-3 shadow-2xl backdrop-blur"
+            style={{ background: theme.toolbar.panel, borderColor: theme.toolbar.border, color: theme.node.text, width: panelSize ? panelSize.w : undefined, height: panelSize ? panelSize.h : undefined }}
             onMouseDown={(event) => event.stopPropagation()}
             onPointerDown={(event) => event.stopPropagation()}
             onWheel={(event) => event.stopPropagation()}
