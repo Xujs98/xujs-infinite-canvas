@@ -64,7 +64,7 @@ export function CanvasNodePromptPanel({ node, isRunning, onPromptChange, onConfi
 
     return (
         <div
-            className="overflow-hidden rounded-2xl border p-3 shadow-2xl backdrop-blur"
+            className="flex max-h-[60vh] flex-col overflow-hidden rounded-2xl border p-3 shadow-2xl backdrop-blur"
             style={{ background: theme.toolbar.panel, borderColor: theme.toolbar.border, color: theme.node.text }}
             onMouseDown={(event) => event.stopPropagation()}
             onPointerDown={(event) => event.stopPropagation()}
@@ -76,7 +76,7 @@ export function CanvasNodePromptPanel({ node, isRunning, onPromptChange, onConfi
                 references={mentionReferences}
                 onChange={updatePrompt}
                 onSubmit={submit}
-                className="thin-scrollbar h-24 w-full resize-none overflow-y-auto rounded-xl border px-3 py-2 text-sm leading-5 break-words outline-none"
+                className="thin-scrollbar max-h-[40vh] min-h-24 w-full flex-1 resize-none overflow-y-auto rounded-xl border px-3 py-2 text-sm leading-5 break-words outline-none"
                 style={{ background: theme.node.fill, borderColor: theme.node.stroke, color: theme.node.text, caretColor: theme.node.text }}
                 placeholder={promptPlaceholder(mode, hasImageContent, hasTextContent)}
             />
