@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { ArrowUp, LoaderCircle } from "lucide-react";
 import { Button } from "antd";
 
@@ -62,14 +62,49 @@ export function CanvasNodePromptPanel({ node, isRunning, onPromptChange, onConfi
         setPrompt("");
     };
 
+    const [panelSize, setPanelSize] = useState<{ w: number; h: number } | null>(null);
+    const dragRef = useRef<{ startX: number; startY: number; startW: number; startH: number } | null>(null);
+
+    const onResizeMouseDown = useCallback((e: React.MouseEvent) => {
+        e.stopPropagation();
+        e.preventDefault();
+        const el = (e.currentTarget.closest('[data-panel-root]') as HTMLElement) || e.currentTarget.closest('div');
+        if (!el) return;
+        const rect = el.getBoundingClientRect();
+        dragRef.current = { startX: e.clientX, startY: e.clientY, startW: rect.width, startH: rect.height };
+        const onMove = (ev: MouseEvent) => {
+            if (!dragRef.current) return;
+            const { startX, startY, startW, startH } = dragRef.current;
+            const newW = Math.max(360, Math.min(900, startW + ev.clientX - startX));
+            const newH = Math.max(200, Math.min(600, startH + ev.clientY - startY));
+            setPanelSize({ w: newW, h: newH });
+        };
+        const onUp = () => {
+            dragRef.current = null;
+            window.removeEventListener('mousemove', onMove);
+            window.removeEventListener('mouseup', onUp);
+        };
+        window.addEventListener('mousemove', onMove);
+        window.addEventListener('mouseup', onUp);
+    }, []);
+
     return (
         <div
-            className="flex max-h-[60vh] flex-col overflow-hidden rounded-2xl border p-3 shadow-2xl backdrop-blur"
-            style={{ background: theme.toolbar.panel, borderColor: theme.toolbar.border, color: theme.node.text }}
+            data-panel-root
+            className="relative flex flex-col overflow-hidden rounded-2xl border p-3 shadow-2xl backdrop-blur"
+            style={{ background: theme.toolbar.panel, borderColor: theme.toolbar.border, color: theme.node.text, width: panelSize ? panelSize.w : undefined, maxHeight: panelSize ? panelSize.h : '60vh' }}
             onMouseDown={(event) => event.stopPropagation()}
             onPointerDown={(event) => event.stopPropagation()}
             onWheel={(event) => event.stopPropagation()}
         >
+            <div
+                className="absolute right-0 bottom-0 z-10 flex h-5 w-5 cursor-nwse-resize items-center justify-center text-xs opacity-40 hover:opacity-80"
+                onMouseDown={onResizeMouseDown}
+            >
+                <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+                    <path d="M9 1L1 9M9 5L5 9M9 9L9 9" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
+                </svg>
+            </div>
             <CanvasResourceMentionTextarea
                 ref={textareaRef}
                 value={prompt}
