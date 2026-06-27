@@ -112,7 +112,7 @@ export const CanvasResourceMentionTextarea = forwardRef<HTMLTextAreaElement, Pro
             {showHighlight ? (
                 <div
                     ref={highlightRef}
-                    className="pointer-events-none absolute inset-0 break-words"
+                    className="pointer-events-none absolute inset-0 overflow-hidden break-words"
                     style={{
                         background: "transparent",
                         backgroundColor: "transparent",
