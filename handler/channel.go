@@ -36,11 +36,12 @@ type PublicChannelInfo struct {
 
 // PublicAvailableModels 返回模型列表和默认模型配置。
 type PublicAvailableModels struct {
-	AvailableModels   []string `json:"availableModels"`
-	DefaultModel      string   `json:"defaultModel"`
-	DefaultImageModel string   `json:"defaultImageModel"`
-	DefaultVideoModel string   `json:"defaultVideoModel"`
-	DefaultTextModel  string   `json:"defaultTextModel"`
+	AvailableModels   []string           `json:"availableModels"`
+	ModelCosts        []model.ModelCost  `json:"modelCosts"`
+	DefaultModel      string             `json:"defaultModel"`
+	DefaultImageModel string             `json:"defaultImageModel"`
+	DefaultVideoModel string             `json:"defaultVideoModel"`
+	DefaultTextModel  string             `json:"defaultTextModel"`
 }
 
 // channelToPublic 将内部渠道转为公开格式（含全部字段）。
@@ -101,6 +102,7 @@ func GetPublicAvailableModels(w http.ResponseWriter, r *http.Request) {
 
 	OK(w, PublicAvailableModels{
 		AvailableModels:   public.ModelChannel.AvailableModels,
+		ModelCosts:        public.ModelChannel.ModelCosts,
 		DefaultModel:      public.ModelChannel.DefaultModel,
 		DefaultImageModel: public.ModelChannel.DefaultImageModel,
 		DefaultVideoModel: public.ModelChannel.DefaultVideoModel,

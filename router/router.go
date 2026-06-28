@@ -41,6 +41,8 @@ func New() *gin.Engine {
 	v1.PUT("/profile", gin.WrapF(handler.UpdateProfile))
 	v1.POST("/bind-aff-code", gin.WrapF(handler.BindAffCode))
 	v1.GET("/credit-logs", gin.WrapF(handler.UserCreditLogs))
+	v1.POST("/credits/consume", gin.WrapF(handler.ConsumeCredits))
+	v1.POST("/credits/refund", gin.WrapF(handler.RefundCredits))
 	v1.POST("/checkin", gin.WrapF(handler.DailyCheckIn))
 	v1.GET("/checkin/month", gin.WrapF(handler.GetCheckInMonth))
 	v1.POST("/request-logs", gin.WrapF(handler.SubmitAppRequestLog))

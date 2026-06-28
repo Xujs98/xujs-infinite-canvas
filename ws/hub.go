@@ -98,6 +98,7 @@ func (h *Hub) SendToUser(userID string, payload interface{}) {
 	}
 	h.mu.RLock()
 	defer h.mu.RUnlock()
+	log.Printf("[WS] SendToUser: userId=%s, userClients keys=%v", userID, h.userKeys())
 	if conns, ok := h.userClients[userID]; ok {
 		for client := range conns {
 			select {
@@ -106,6 +107,14 @@ func (h *Hub) SendToUser(userID string, payload interface{}) {
 			}
 		}
 	}
+}
+
+func (h *Hub) userKeys() []string {
+	keys := make([]string, 0, len(h.userClients))
+	for k := range h.userClients {
+		keys = append(keys, k)
+	}
+	return keys
 }
 
 func (h *Hub) BroadcastJSON(payload interface{}) {
