@@ -7,15 +7,14 @@ import dayjs from "dayjs";
 import { useEffect, useState } from "react";
 
 import type { AdminUser } from "@/services/api/admin";
+import { useQuery } from "@tanstack/react-query";
 import { useAdminUsers } from "./use-admin-users";
+import { fetchAllRoles, type AdminRole } from "@/services/api/role";
+import { useUserStore } from "@/stores/use-user-store";
 
 type UserFormValues = Partial<AdminUser> & { password?: string };
 
-const roleOptions = [
-    { label: "普通用户", value: "user" },
-    { label: "管理员", value: "admin" },
-    { label: "会员", value: "member" },
-];
+// roleOptions fetched dynamically from server
 
 const statusOptions = [
     { label: "正常", value: "active" },
@@ -23,6 +22,13 @@ const statusOptions = [
 ];
 
 export default function AdminUsersPage() {
+    const token = useUserStore((state) => state.token);
+    const { data: rolesData } = useQuery({
+        queryKey: ["admin", "roles"],
+        queryFn: () => fetchAllRoles(),
+        staleTime: 60000,
+    });
+    const roleOptions = (rolesData || []).map((r: AdminRole) => ({ label: r.label, value: r.name }));
     const { users, keyword, role, status, page, pageSize, total, isLoading, searchUsers, changeRole, changeStatus, changePage, changePageSize, resetFilters, refreshUsers, saveUser: saveAdminUser, adjustCredits, deleteUser, batchDeleteUsers, batchUpdateStatus } = useAdminUsers();
     const [form] = Form.useForm<UserFormValues>();
     const [keywordText, setKeywordText] = useState(keyword);
