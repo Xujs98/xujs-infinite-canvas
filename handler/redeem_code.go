@@ -6,6 +6,7 @@ import (
 
 	"github.com/basketikun/infinite-canvas/model"
 	"github.com/basketikun/infinite-canvas/service"
+	"github.com/basketikun/infinite-canvas/ws"
 )
 
 type generateRedeemCodesRequest struct {
@@ -82,4 +83,5 @@ func RedeemCode(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	OK(w, result)
+	ws.DefaultHub.SendToUser(user.ID, map[string]any{"type": "credits-changed"})
 }

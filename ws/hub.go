@@ -10,13 +10,15 @@ import (
 )
 
 type Client struct {
-	Conn *websocket.Conn
-	Send chan []byte
-	Hub  *Hub
+	Conn   *websocket.Conn
+	Send   chan []byte
+	Hub    *Hub
+	UserID string
 }
 
 type Hub struct {
 	clients    map[*Client]bool
+	userClients map[string]map[*Client]bool
 	broadcast  chan []byte
 	register   chan *Client
 	unregister chan *Client
@@ -32,10 +34,11 @@ func init() {
 
 func NewHub() *Hub {
 	return &Hub{
-		clients:    make(map[*Client]bool),
-		broadcast:  make(chan []byte, 256),
-		register:   make(chan *Client),
-		unregister: make(chan *Client),
+		clients:     make(map[*Client]bool),
+		userClients: make(map[string]map[*Client]bool),
+		broadcast:   make(chan []byte, 256),
+		register:    make(chan *Client),
+		unregister:  make(chan *Client),
 	}
 }
 
@@ -45,13 +48,27 @@ func (h *Hub) Run() {
 		case client := <-h.register:
 			h.mu.Lock()
 			h.clients[client] = true
+			if client.UserID != "" {
+				if h.userClients[client.UserID] == nil {
+					h.userClients[client.UserID] = make(map[*Client]bool)
+				}
+				h.userClients[client.UserID][client] = true
+			}
 			h.mu.Unlock()
-			log.Printf("[WS] Client connected, total: %d", len(h.clients))
+			log.Printf("[WS] Client connected (user=%s), total: %d", client.UserID, len(h.clients))
 
 		case client := <-h.unregister:
 			h.mu.Lock()
 			if _, ok := h.clients[client]; ok {
 				delete(h.clients, client)
+				if client.UserID != "" {
+					if conns, ok := h.userClients[client.UserID]; ok {
+						delete(conns, client)
+						if len(conns) == 0 {
+							delete(h.userClients, client.UserID)
+						}
+					}
+				}
 				close(client.Send)
 			}
 			h.mu.Unlock()
@@ -68,6 +85,25 @@ func (h *Hub) Run() {
 				}
 			}
 			h.mu.RUnlock()
+		}
+	}
+}
+
+// SendToUser sends a message to all connections of a specific user.
+func (h *Hub) SendToUser(userID string, payload interface{}) {
+	data, err := json.Marshal(payload)
+	if err != nil {
+		log.Printf("[WS] marshal error: %v", err)
+		return
+	}
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+	if conns, ok := h.userClients[userID]; ok {
+		for client := range conns {
+			select {
+			case client.Send <- data:
+			default:
+			}
 		}
 	}
 }
