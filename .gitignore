@@ -1,0 +1,8 @@
+.env
+data/
+*.db
+infinite-canvas
+node_modules/
+web/.next/
+web/node_modules/
+.DS_Store
