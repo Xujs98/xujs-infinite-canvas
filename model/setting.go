@@ -72,6 +72,8 @@ type ChannelVideoConfig struct {
 	StatusField string `json:"statusField,omitempty"`
 	// 视频 URL 字段路径，支持多个兜底路径
 	VideoURLPaths []string `json:"videoUrlPaths,omitempty"`
+	// 视频下载字段路径，用于从响应中提取可下载的视频 URL（如 video_file.url、data.download_url）
+	VideoDownloadField string `json:"videoDownloadField,omitempty"`
 
 	// === 状态值定义 ===
 	// 等待中的状态值列表

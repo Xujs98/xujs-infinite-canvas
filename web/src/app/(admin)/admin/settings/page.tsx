@@ -1010,6 +1010,16 @@ export default function AdminSettingsPage() {
                                 <Col span={6}>
                                     <Form.Item name={["videoConfig", "lastFrameField"]} label="尾帧字段"><Input placeholder="可选" /></Form.Item>
                                 </Col>
+                                <Col span={12}>
+                                    <Form.Item name={["videoConfig", "videoDownloadField"]} label="视频下载字段路径" help="从轮询响应中提取可下载视频URL的字段路径，如 data.video_file.url">
+                                        <Input placeholder="留空使用默认 videoUrlPaths" />
+                                    </Form.Item>
+                                </Col>
+                                <Col span={6}>
+                                    <Form.Item name={["videoConfig", "secondsAsString"]} label="时长为字符串" valuePropName="checked" help="上游要求seconds字段为字符串类型">
+                                        <Switch />
+                                    </Form.Item>
+                                </Col>
                             </Row>
 
                             {/* 输入素材 Schema 配置 */}
@@ -1350,6 +1360,8 @@ function normalizeChannelForForm(item: Partial<AdminModelChannel> = {}): any {
         pendingValues: Array.isArray(item.videoConfig.pendingValues) ? item.videoConfig.pendingValues.join(",") : item.videoConfig.pendingValues,
         successValues: Array.isArray(item.videoConfig.successValues) ? item.videoConfig.successValues.join(",") : item.videoConfig.successValues,
         failedValues: Array.isArray(item.videoConfig.failedValues) ? item.videoConfig.failedValues.join(",") : item.videoConfig.failedValues,
+        videoDownloadField: item.videoConfig.videoDownloadField || "",
+        secondsAsString: item.videoConfig.secondsAsString ?? false,
         pollIntervalMs: item.videoConfig.pollIntervalMs != null ? String(item.videoConfig.pollIntervalMs) : undefined,
         pollTimeoutMs: item.videoConfig.pollTimeoutMs != null ? String(item.videoConfig.pollTimeoutMs) : undefined,
         imageInput: item.videoConfig.imageInput ? {
@@ -1400,6 +1412,8 @@ function normalizeChannelFromForm(values: any): AdminModelChannel {
         pendingValues: typeof values.videoConfig.pendingValues === 'string' ? values.videoConfig.pendingValues.split(',').map((s: string) => s.trim()).filter(Boolean) : values.videoConfig.pendingValues,
         successValues: typeof values.videoConfig.successValues === 'string' ? values.videoConfig.successValues.split(',').map((s: string) => s.trim()).filter(Boolean) : values.videoConfig.successValues,
         failedValues: typeof values.videoConfig.failedValues === 'string' ? values.videoConfig.failedValues.split(',').map((s: string) => s.trim()).filter(Boolean) : values.videoConfig.failedValues,
+        videoDownloadField: values.videoConfig.videoDownloadField || undefined,
+        secondsAsString: values.videoConfig.secondsAsString === true,
         pollIntervalMs: values.videoConfig.pollIntervalMs != null && values.videoConfig.pollIntervalMs !== '' ? Number(values.videoConfig.pollIntervalMs) : undefined,
         pollTimeoutMs: values.videoConfig.pollTimeoutMs != null && values.videoConfig.pollTimeoutMs !== '' ? Number(values.videoConfig.pollTimeoutMs) : undefined,
         imageInput: values.videoConfig.imageInput ? {

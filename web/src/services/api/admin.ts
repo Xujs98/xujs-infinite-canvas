@@ -250,6 +250,8 @@ export type AdminChannelVideoConfig = {
     statusMethod?: "GET" | "POST";
     statusField?: string;
     videoUrlPaths?: string[];
+    // 视频下载字段路径
+    videoDownloadField?: string;
     // 状态值
     pendingValues?: string[];
     successValues?: string[];

@@ -1,6 +1,9 @@
 package handler
 
 import (
+	"crypto/md5"
+	"encoding/json"
+	"fmt"
 	"net/http"
 
 	"github.com/basketikun/infinite-canvas/model"
@@ -9,6 +12,7 @@ import (
 
 // PublicChannelInfo 返回给 App 端的模型渠道配置（含 API Key）。
 type PublicChannelInfo struct {
+	ConfigHash string `json:"configHash,omitempty"`
 	Protocol               string                       `json:"protocol"`
 	Name                   string                       `json:"name"`
 	BaseURL                string                       `json:"baseUrl"`
@@ -41,7 +45,10 @@ type PublicAvailableModels struct {
 
 // channelToPublic 将内部渠道转为公开格式（含全部字段）。
 func channelToPublic(ch model.ModelChannel) PublicChannelInfo {
+	chJSON, _ := json.Marshal(ch)
+	hash := fmt.Sprintf("%x", md5.Sum(chJSON))
 	return PublicChannelInfo{
+		ConfigHash: hash,
 		Protocol:               ch.Protocol,
 		Name:                   ch.Name,
 		BaseURL:                ch.BaseURL,
