@@ -1015,6 +1015,11 @@ export default function AdminSettingsPage() {
                                         <Input placeholder="留空使用默认 videoUrlPaths" />
                                     </Form.Item>
                                 </Col>
+                                <Col span={12}>
+                                    <Form.Item name={["videoConfig", "videoProgressField"]} label="进度字段路径" help="从轮询响应中提取生成进度的字段路径，如 progress、data.progress">
+                                        <Input placeholder="如 progress" />
+                                    </Form.Item>
+                                </Col>
                                 <Col span={6}>
                                     <Form.Item name={["videoConfig", "secondsAsString"]} label="时长为字符串" valuePropName="checked" help="上游要求seconds字段为字符串类型">
                                         <Switch />
@@ -1361,6 +1366,7 @@ function normalizeChannelForForm(item: Partial<AdminModelChannel> = {}): any {
         successValues: Array.isArray(item.videoConfig.successValues) ? item.videoConfig.successValues.join(",") : item.videoConfig.successValues,
         failedValues: Array.isArray(item.videoConfig.failedValues) ? item.videoConfig.failedValues.join(",") : item.videoConfig.failedValues,
         videoDownloadField: item.videoConfig.videoDownloadField || "",
+        videoProgressField: item.videoConfig.videoProgressField || "",
         secondsAsString: item.videoConfig.secondsAsString ?? false,
         pollIntervalMs: item.videoConfig.pollIntervalMs != null ? String(item.videoConfig.pollIntervalMs) : undefined,
         pollTimeoutMs: item.videoConfig.pollTimeoutMs != null ? String(item.videoConfig.pollTimeoutMs) : undefined,
@@ -1413,6 +1419,7 @@ function normalizeChannelFromForm(values: any): AdminModelChannel {
         successValues: typeof values.videoConfig.successValues === 'string' ? values.videoConfig.successValues.split(',').map((s: string) => s.trim()).filter(Boolean) : values.videoConfig.successValues,
         failedValues: typeof values.videoConfig.failedValues === 'string' ? values.videoConfig.failedValues.split(',').map((s: string) => s.trim()).filter(Boolean) : values.videoConfig.failedValues,
         videoDownloadField: values.videoConfig.videoDownloadField || undefined,
+        videoProgressField: values.videoConfig.videoProgressField || undefined,
         secondsAsString: values.videoConfig.secondsAsString === true,
         pollIntervalMs: values.videoConfig.pollIntervalMs != null && values.videoConfig.pollIntervalMs !== '' ? Number(values.videoConfig.pollIntervalMs) : undefined,
         pollTimeoutMs: values.videoConfig.pollTimeoutMs != null && values.videoConfig.pollTimeoutMs !== '' ? Number(values.videoConfig.pollTimeoutMs) : undefined,

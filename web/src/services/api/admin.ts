@@ -252,6 +252,7 @@ export type AdminChannelVideoConfig = {
     videoUrlPaths?: string[];
     // 视频下载字段路径
     videoDownloadField?: string;
+    videoProgressField?: string;
     // 状态值
     pendingValues?: string[];
     successValues?: string[];
