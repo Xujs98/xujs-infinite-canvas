@@ -6,7 +6,20 @@ import (
 
 	"github.com/basketikun/infinite-canvas/model"
 	"github.com/basketikun/infinite-canvas/service"
+	"github.com/basketikun/infinite-canvas/ws"
 )
+
+
+func broadcastRolesChanged() {
+	roles, err := service.GetAllRoles()
+	if err != nil {
+		return
+	}
+	ws.DefaultHub.BroadcastJSON(map[string]any{
+		"type": "roles-changed",
+		"data": roles,
+	})
+}
 
 func ListRoles(w http.ResponseWriter, r *http.Request) {
 	q := parseQuery(r)
@@ -51,6 +64,7 @@ func CreateRole(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	OK(w, result)
+	broadcastRolesChanged()
 }
 
 func UpdateRole(w http.ResponseWriter, r *http.Request, id string) {
@@ -69,6 +83,7 @@ func UpdateRole(w http.ResponseWriter, r *http.Request, id string) {
 		return
 	}
 	OK(w, result)
+	broadcastRolesChanged()
 }
 
 func DeleteRole(w http.ResponseWriter, r *http.Request, id string) {
@@ -81,6 +96,7 @@ func DeleteRole(w http.ResponseWriter, r *http.Request, id string) {
 		return
 	}
 	OK(w, true)
+	broadcastRolesChanged()
 }
 
 func BatchDeleteRoles(w http.ResponseWriter, r *http.Request) {
