@@ -8,6 +8,7 @@ import (
 
 	"github.com/basketikun/infinite-canvas/model"
 	"github.com/basketikun/infinite-canvas/service"
+	"github.com/basketikun/infinite-canvas/ws"
 )
 
 type loginRequest struct {
@@ -156,6 +157,7 @@ func AdminAdjustUserCredits(w http.ResponseWriter, r *http.Request, id string) {
 		return
 	}
 	OK(w, user)
+	ws.DefaultHub.SendToUser(id, map[string]any{"type": "credits-changed"})
 }
 
 func AdminCreditLogs(w http.ResponseWriter, r *http.Request) {
