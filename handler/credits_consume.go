@@ -69,7 +69,7 @@ func ConsumeCredits(w http.ResponseWriter, r *http.Request) {
 	// 会员免扣
 	if service.IsMembershipActive(user.MembershipExpiresAt) {
 		service.LogMembershipFreeUsage(user.ID, req.Model, credits, "app:"+req.MediaType)
-		OK(w, ConsumeCreditsResponse{RequiredCredits: credits, Balance: user.Credits})
+		OK(w, ConsumeCreditsResponse{RequiredCredits: 0, Balance: user.Credits})
 		return
 	}
 
