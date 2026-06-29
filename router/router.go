@@ -5,8 +5,8 @@ import (
 	"os"
 
 	"github.com/basketikun/infinite-canvas/handler"
-	"github.com/basketikun/infinite-canvas/seedance"
 	"github.com/basketikun/infinite-canvas/middleware"
+	"github.com/basketikun/infinite-canvas/seedance"
 	"github.com/gin-gonic/gin"
 )
 
@@ -66,6 +66,7 @@ func New() *gin.Engine {
 	})
 	api.POST("/jimeng/query-media", middleware.UserAuth, gin.WrapF(handler.JimengQueryMedia))
 	api.GET("/prompts", middleware.OptionalAuth, gin.WrapF(handler.Prompts))
+	api.GET("/prompt-presets", middleware.OptionalAuth, gin.WrapF(handler.PromptPresets))
 	api.GET("/assets", middleware.OptionalAuth, gin.WrapF(handler.Assets))
 	api.GET("/system-settings", gin.WrapF(handler.GetPublicSystemSettings))
 	api.GET("/available-models", gin.WrapF(handler.GetPublicAvailableModels))
@@ -108,6 +109,12 @@ func New() *gin.Engine {
 	admin.POST("/prompts/batch-delete", gin.WrapF(handler.AdminDeletePrompts))
 	admin.DELETE("/prompts/:id", func(c *gin.Context) {
 		handler.AdminDeletePrompt(c.Writer, c.Request, c.Param("id"))
+	})
+	admin.GET("/prompt-presets", gin.WrapF(handler.AdminPromptPresets))
+	admin.POST("/prompt-presets", gin.WrapF(handler.AdminSavePromptPreset))
+	admin.POST("/prompt-presets/batch-delete", gin.WrapF(handler.AdminDeletePromptPresets))
+	admin.DELETE("/prompt-presets/:id", func(c *gin.Context) {
+		handler.AdminDeletePromptPreset(c.Writer, c.Request, c.Param("id"))
 	})
 	admin.GET("/assets", gin.WrapF(handler.AdminAssets))
 	admin.POST("/assets", gin.WrapF(handler.AdminSaveAsset))
