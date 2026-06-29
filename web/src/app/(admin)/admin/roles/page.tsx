@@ -1,11 +1,12 @@
 "use client";
 
-import { DeleteOutlined, EditOutlined, LockOutlined, PlusOutlined, SafetyOutlined, SearchOutlined, TeamOutlined } from "@ant-design/icons";
-import { App, Button, Card, Col, Form, Input, InputNumber, Modal, Row, Select, Space, Switch, Table, Tag, Tooltip, Typography, Empty, Spin } from "antd";
+import { DeleteOutlined, EditOutlined, GiftOutlined, LockOutlined, PlusOutlined, SafetyOutlined, SearchOutlined } from "@ant-design/icons";
+import { App, Button, Card, Col, Form, Input, Modal, Row, Select, Space, Table, Tag, Tooltip, Typography } from "antd";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { useUserStore } from "@/stores/use-user-store";
-import { fetchAllChannelModels } from "@/services/api/admin";import { type AdminRole, fetchAdminRoles, createAdminRole, updateAdminRole, deleteAdminRole, batchDeleteAdminRoles } from "@/services/api/role";
+import { fetchAllChannelModels } from "@/services/api/admin";
+import { type AdminRole, fetchAdminRoles, createAdminRole, updateAdminRole, deleteAdminRole, batchDeleteAdminRoles } from "@/services/api/role";
 
 const builtinRoleColors: Record<string, string> = {
     admin: "#f5222d",
@@ -64,6 +65,7 @@ export default function AdminRolesPage() {
                     label: values.label,
                     description: values.description,
                     allowedModels: values.allowedModels || [],
+                    freeModels: values.freeModels || [],
                 });
                 message.success("更新成功");
             } else {
@@ -72,6 +74,7 @@ export default function AdminRolesPage() {
                     label: values.label,
                     description: values.description,
                     allowedModels: values.allowedModels || [],
+                    freeModels: values.freeModels || [],
                 });
                 message.success("创建成功");
             }
@@ -110,7 +113,7 @@ export default function AdminRolesPage() {
     const openCreate = () => {
         setEditingItem(null);
         form.resetFields();
-        form.setFieldsValue({ allowedModels: [] });
+        form.setFieldsValue({ allowedModels: [], freeModels: [] });
         setModalOpen(true);
     };
 
@@ -121,6 +124,7 @@ export default function AdminRolesPage() {
             label: item.label,
             description: item.description,
             allowedModels: item.allowedModels || [],
+            freeModels: item.freeModels || [],
         });
         setModalOpen(true);
     };
@@ -156,7 +160,7 @@ export default function AdminRolesPage() {
         {
             title: "模型权限",
             dataIndex: "allowedModels",
-            width: 360,
+            width: 300,
             render: (_: unknown, item: AdminRole) => {
                 const models = item.allowedModels || [];
                 if (models.length === 0) {
@@ -168,6 +172,25 @@ export default function AdminRolesPage() {
                             <Tag key={m}>{m}</Tag>
                         ))}
                         {models.length > 4 && <Tag>+{models.length - 4}</Tag>}
+                    </Space>
+                );
+            },
+        },
+        {
+            title: "免费模型",
+            dataIndex: "freeModels",
+            width: 300,
+            render: (_: unknown, item: AdminRole) => {
+                const models = item.freeModels || [];
+                if (models.length === 0) {
+                    return <Tag color="default">未配置</Tag>;
+                }
+                return (
+                    <Space size={[4, 4]} wrap>
+                        {models.slice(0, 4).map((m) => (
+                            <Tag key={m} color="cyan">{m}</Tag>
+                        ))}
+                        {models.length > 4 && <Tag color="cyan">+{models.length - 4}</Tag>}
                     </Space>
                 );
             },
@@ -195,6 +218,7 @@ export default function AdminRolesPage() {
     }, [channelModels]);
 
     const allowedModelsValue = Form.useWatch("allowedModels", form);
+    const freeModelsValue = Form.useWatch("freeModels", form);
 
     return (
         <div className="min-h-screen p-6">
@@ -305,6 +329,32 @@ export default function AdminRolesPage() {
                                 <LockOutlined className="text-xs text-gray-400" />
                                 <Typography.Text type="secondary" className="text-xs">
                                     仅可使用 {allowedModelsValue.length} 个指定模型
+                                </Typography.Text>
+                            </div>
+                        )}
+                    </Form.Item>
+                    <Form.Item label="可免费使用模型">
+                        <div className="mb-2 flex items-center gap-2">
+                            <Typography.Text type="secondary" className="text-xs">默认不选中；选中的模型调用时不扣除算力点</Typography.Text>
+                        </div>
+                        <Form.Item name="freeModels" noStyle>
+                            <Select
+                                mode="tags"
+                                placeholder="输入模型名称或从下拉选择"
+                                options={modelOptions}
+                                maxTagCount="responsive"
+                                allowClear
+                                showSearch
+                                filterOption={(input, option) =>
+                                    (option?.label as string)?.toLowerCase().includes(input.toLowerCase())
+                                }
+                            />
+                        </Form.Item>
+                        {freeModelsValue && freeModelsValue.length > 0 && (
+                            <div className="mt-2 flex items-center gap-2">
+                                <GiftOutlined className="text-xs text-cyan-500" />
+                                <Typography.Text type="secondary" className="text-xs">
+                                    {freeModelsValue.length} 个模型将免费调用
                                 </Typography.Text>
                             </div>
                         )}

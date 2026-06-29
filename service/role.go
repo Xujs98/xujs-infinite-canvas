@@ -24,6 +24,7 @@ func EnsureBuiltinRoles() {
 				Label:         r.label,
 				Description:   r.desc,
 				AllowedModels: []string{},
+				FreeModels:    []string{},
 				IsBuiltin:     true,
 				CreatedAt:     now(),
 				UpdatedAt:     now(),
@@ -60,6 +61,7 @@ func UpdateRole(id string, role model.Role) (model.Role, error) {
 	current.Label = role.Label
 	current.Description = role.Description
 	current.AllowedModels = role.AllowedModels
+	current.FreeModels = role.FreeModels
 	current.UpdatedAt = now()
 	return repository.SaveRole(current)
 }
@@ -81,6 +83,15 @@ func GetRoleAllowedModels(roleName string) ([]string, bool) {
 	return role.AllowedModels, true
 }
 
+// GetRoleFreeModels 获取角色可免费使用的模型列表，空列表表示没有免费模型。
+func GetRoleFreeModels(roleName string) ([]string, bool) {
+	role, ok, _ := repository.GetRoleByName(roleName)
+	if !ok {
+		return nil, false
+	}
+	return role.FreeModels, true
+}
+
 // IsModelAllowedForRole 检查角色是否可以使用指定模型。
 func IsModelAllowedForRole(roleName, modelName string) bool {
 	allowed, ok := GetRoleAllowedModels(roleName)
@@ -88,6 +99,20 @@ func IsModelAllowedForRole(roleName, modelName string) bool {
 		return true
 	}
 	for _, m := range allowed {
+		if m == modelName {
+			return true
+		}
+	}
+	return false
+}
+
+// IsModelFreeForRole 检查角色是否可免费使用指定模型。
+func IsModelFreeForRole(roleName, modelName string) bool {
+	freeModels, ok := GetRoleFreeModels(roleName)
+	if !ok || len(freeModels) == 0 {
+		return false
+	}
+	for _, m := range freeModels {
 		if m == modelName {
 			return true
 		}

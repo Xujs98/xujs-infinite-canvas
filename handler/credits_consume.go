@@ -72,6 +72,11 @@ func ConsumeCredits(w http.ResponseWriter, r *http.Request) {
 		OK(w, ConsumeCreditsResponse{RequiredCredits: 0, Balance: user.Credits})
 		return
 	}
+	if service.IsModelFreeForRole(string(user.Role), req.Model) {
+		service.LogRoleFreeUsage(user.ID, string(user.Role), req.Model, credits, "app:"+req.MediaType)
+		OK(w, ConsumeCreditsResponse{RequiredCredits: 0, Balance: user.Credits})
+		return
+	}
 
 	// 扣除算力点
 	path := "app:" + req.MediaType

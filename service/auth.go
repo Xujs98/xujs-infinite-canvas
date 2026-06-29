@@ -146,15 +146,15 @@ func Register(username string, password string, affCode string) (model.AuthSessi
 					"updated_at": now(),
 				})
 				inviter, _, _ := repository.GetUserByID(inviterID)
-			repository.SaveCreditLog(model.CreditLog{
-				ID:        newID("credit"),
-				UserID:    inviterID,
-				Type:      model.CreditLogTypeInviteReward,
-				Amount:    rewardCredits,
-				Balance:   inviter.Credits,
-				Remark:    "邀请新用户 " + username + " 注册",
-				CreatedAt: now(),
-			})
+				repository.SaveCreditLog(model.CreditLog{
+					ID:        newID("credit"),
+					UserID:    inviterID,
+					Type:      model.CreditLogTypeInviteReward,
+					Amount:    rewardCredits,
+					Balance:   inviter.Credits,
+					Remark:    "邀请新用户 " + username + " 注册",
+					CreatedAt: now(),
+				})
 			}
 		} else {
 			db, dbErr := repository.DB()
@@ -521,6 +521,20 @@ func LogMembershipFreeUsage(userID string, modelName string, credits int, path s
 		Amount:    0,
 		Balance:   0,
 		Remark:    "调用模型 " + modelName,
+		Extra:     string(extra),
+		CreatedAt: now(),
+	})
+}
+
+func LogRoleFreeUsage(userID string, roleName string, modelName string, credits int, path string) {
+	extra, _ := json.Marshal(map[string]string{"model": modelName, "path": path, "role": roleName})
+	_, _ = repository.SaveCreditLog(model.CreditLog{
+		ID:        newID("credit"),
+		UserID:    userID,
+		Type:      model.CreditLogTypeRoleFree,
+		Amount:    0,
+		Balance:   0,
+		Remark:    "角色免费调用模型 " + modelName,
 		Extra:     string(extra),
 		CreatedAt: now(),
 	})

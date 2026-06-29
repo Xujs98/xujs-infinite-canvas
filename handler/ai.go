@@ -232,6 +232,11 @@ func proxyAIRequest(w http.ResponseWriter, r *http.Request, path string) {
 		copyAIResponse(w, request, nil, user.ID, user.Username, modelName, path, credits, extraArgs...)
 		return
 	}
+	if service.IsModelFreeForRole(string(user.Role), modelName) {
+		service.LogRoleFreeUsage(user.ID, string(user.Role), modelName, credits, path)
+		copyAIResponse(w, request, nil, user.ID, user.Username, modelName, path, credits, extraArgs...)
+		return
+	}
 	if err := service.ConsumeUserCredits(user.ID, modelName, credits, path); err != nil {
 		go service.LogCall(user.ID, user.Username, modelName, path, false, err.Error(), credits)
 		FailError(w, err)
@@ -668,7 +673,7 @@ func truncateBase64InBody(body []byte) []byte {
 		// 查找 ";base64," 标记
 		b64Marker := strings.Index(str[idx:], ";base64,")
 		if b64Marker == -1 {
-			result.WriteString(str[i:idx+5])
+			result.WriteString(str[i : idx+5])
 			i = idx + 5
 			continue
 		}
@@ -766,7 +771,6 @@ func isVideoTaskFailed(respText string) bool {
 // convertArkToOpenAIVideoRequest 将火山方舟 Ark 格式的视频请求转换为 OpenAI 兼容格式。
 // Ark 格式: { model, content: [{type:"text",text},{type:"image_url",...}], ratio, resolution, duration, ... }
 // OpenAI 格式: { model, prompt, size, n, image_urls, seconds, ... }
-
 
 // applyRequestFields 根据模型级别的 RequestFields 转换 JSON 请求体。
 // 模型级别的字段映射优先于渠道级 FieldMapping。
@@ -1156,11 +1160,11 @@ func convertArkToOpenAIVideoRequest(body []byte) ([]byte, error) {
 			} `json:"audio_url"`
 			Role string `json:"role"`
 		} `json:"content"`
-		Ratio          string `json:"ratio"`
-		Resolution     string `json:"resolution"`
-		Duration       any    `json:"duration"`
-		GenerateAudio  any    `json:"generate_audio"`
-		Watermark      any    `json:"watermark"`
+		Ratio         string `json:"ratio"`
+		Resolution    string `json:"resolution"`
+		Duration      any    `json:"duration"`
+		GenerateAudio any    `json:"generate_audio"`
+		Watermark     any    `json:"watermark"`
 	}
 	if err := json.Unmarshal(body, &req); err != nil {
 		return body, err

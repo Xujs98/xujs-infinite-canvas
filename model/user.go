@@ -3,7 +3,7 @@ package model
 type UserRole string
 
 const (
-	UserRoleGuest UserRole = "guest"
+	UserRoleGuest  UserRole = "guest"
 	UserRoleUser   UserRole = "user"
 	UserRoleMember UserRole = "member"
 	UserRoleAdmin  UserRole = "admin"
@@ -95,6 +95,7 @@ const (
 	CreditLogTypeAIRefund       CreditLogType = "ai_refund"
 	CreditLogTypeRedeem         CreditLogType = "redeem"
 	CreditLogTypeMembershipFree CreditLogType = "membership_free"
+	CreditLogTypeRoleFree       CreditLogType = "role_free"
 	CreditLogTypeInviteReward   CreditLogType = "invite_reward"
 	CreditLogTypeCheckIn        CreditLogType = "check_in"
 )
