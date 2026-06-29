@@ -79,8 +79,19 @@ func DB() (*gorm.DB, error) {
 			&model.RequestLog{},
 			&model.Role{},
 		)
+		if dbErr != nil {
+			return
+		}
+		dbErr = ensureRoleFreeModelsColumn(db)
 	})
 	return db, dbErr
+}
+
+func ensureRoleFreeModelsColumn(db *gorm.DB) error {
+	if db.Migrator().HasColumn(&model.Role{}, "free_models") {
+		return nil
+	}
+	return db.Exec("ALTER TABLE roles ADD COLUMN free_models text").Error
 }
 
 func dialector(driver string, dsn string) gorm.Dialector {
