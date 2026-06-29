@@ -2,7 +2,7 @@
 
 import { CheckCircleOutlined, DeleteOutlined, EyeOutlined, FormatPainterOutlined, LockOutlined, LoadingOutlined, PlusOutlined, ReloadOutlined, SaveOutlined, ToolOutlined } from "@ant-design/icons";
 import { json } from "@codemirror/lang-json";
-import { App, Button, Card, Checkbox, Col, Drawer, Flex, Form, Input, InputNumber, Modal, Row, Segmented, Select, Space, Switch, Table, Tabs, Tag, Typography } from "antd";
+import { App, Button, Card, Checkbox, Col, Flex, Form, Input, InputNumber, Modal, Row, Segmented, Select, Space, Switch, Table, Tabs, Tag, Typography } from "antd";
 import dynamic from "next/dynamic";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { EditorView } from "@uiw/react-codemirror";
@@ -402,6 +402,8 @@ export default function AdminSettingsPage() {
         { key: "public" as const, label: "公开配置", subLabel: "对外暴露", icon: <EyeOutlined /> },
         { key: "private" as const, label: "私有配置", subLabel: "不会对外暴露", icon: <LockOutlined /> },
     ];
+    const channelSectionClass = "mb-4 rounded-xl border border-gray-100 bg-gray-50/50 p-4";
+    const channelNestedSectionClass = "mb-4 mt-4 rounded-xl border border-gray-100 bg-white p-4";
 
     return (
         <div className="min-h-screen p-6">
@@ -682,12 +684,13 @@ export default function AdminSettingsPage() {
                         </div>
                     )}
                 </Card>
-                <Drawer
+                <Modal
                     title={editingChannelIndex === null ? "新增渠道" : "编辑渠道"}
                     open={isChannelDrawerOpen}
-                    size={560}
-                    onClose={closeChannelDrawer}
-                    extra={
+                    width={1120}
+                    centered
+                    onCancel={closeChannelDrawer}
+                    footer={
                         <Space>
                             <Button onClick={closeChannelDrawer}>取消</Button>
                             <Button type="primary" onClick={() => void saveChannel()}>
@@ -695,11 +698,12 @@ export default function AdminSettingsPage() {
                             </Button>
                         </Space>
                     }
+                    styles={{ body: { maxHeight: "calc(100vh - 220px)", overflowY: "auto", paddingTop: 18 } }}
                     destroyOnHidden
                 >
                     <Form form={channelForm} layout="vertical" requiredMark={false} initialValues={emptyChannel}>
                         {/* 基础信息 */}
-                        <div className="mb-6">
+                        <div className={channelSectionClass}>
                             <div className="mb-3 flex items-center gap-2">
                                 <div className="h-1 w-1 rounded-full bg-blue-500" />
                                 <span className="text-sm font-medium text-gray-700">基础信息</span>
@@ -729,7 +733,7 @@ export default function AdminSettingsPage() {
                         </div>
 
                         {/* 模型配置 */}
-                        <div className="mb-6">
+                        <div className={channelSectionClass}>
                             <div className="mb-3 flex items-center gap-2">
                                 <div className="h-1 w-1 rounded-full bg-green-500" />
                                 <span className="text-sm font-medium text-gray-700">模型配置</span>
@@ -759,7 +763,7 @@ export default function AdminSettingsPage() {
                         </div>
 
                         {/* 请求配置 */}
-                        <div className="mb-6">
+                        <div className={channelSectionClass}>
                             <div className="mb-3 flex items-center gap-2">
                                 <div className="h-1 w-1 rounded-full bg-orange-500" />
                                 <span className="text-sm font-medium text-gray-700">请求配置</span>
@@ -807,7 +811,7 @@ export default function AdminSettingsPage() {
                         </div>
 
                         {/* 素材字段映射 */}
-                        <div className="mb-6">
+                        <div className={channelSectionClass}>
                             <div className="mb-3 flex items-center gap-2">
                                 <div className="h-1 w-1 rounded-full bg-purple-500" />
                                 <span className="text-sm font-medium text-gray-700">素材字段映射</span>
@@ -838,7 +842,7 @@ export default function AdminSettingsPage() {
                         </div>
 
                         {/* App 端配置 */}
-                        <div className="mb-6">
+                        <div className={channelSectionClass}>
                             <div className="mb-3 flex items-center gap-2">
                                 <div className="h-1 w-1 rounded-full bg-violet-500" />
                                 <span className="text-sm font-medium text-gray-700">App 端配置</span>
@@ -897,7 +901,7 @@ export default function AdminSettingsPage() {
 
                         {/* 视频接口配置（仅 mediaType=video 时显示） */}
                         {channelMediaType === "video" && (
-                        <div className="mb-6">
+                        <div className={channelSectionClass}>
                             <div className="mb-3 flex items-center gap-2">
                                 <div className="h-1 w-1 rounded-full bg-cyan-500" />
                                 <span className="text-sm font-medium text-gray-700">视频接口配置</span>
@@ -1028,7 +1032,7 @@ export default function AdminSettingsPage() {
                             </Row>
 
                             {/* 输入素材 Schema 配置 */}
-                            <div className="mb-6 mt-4">
+                            <div className={channelNestedSectionClass}>
                                 <div className="mb-3 flex items-center gap-2">
                                     <div className="h-1 w-1 rounded-full bg-purple-500" />
                                     <span className="text-sm font-medium text-gray-700">输入素材 Schema</span>
@@ -1104,7 +1108,7 @@ export default function AdminSettingsPage() {
 
                         {/* 图片接口配置（仅 mediaType=image 时显示） */}
                         {channelMediaType === "image" && (
-                        <div className="mb-6">
+                        <div className={channelSectionClass}>
                             <div className="mb-3 flex items-center gap-2">
                                 <div className="h-1 w-1 rounded-full bg-green-500" />
                                 <span className="text-sm font-medium text-gray-700">图片接口配置</span>
@@ -1127,7 +1131,7 @@ export default function AdminSettingsPage() {
 
                         {/* 文本/对话接口配置（仅 mediaType=chat 时显示） */}
                         {channelMediaType === "chat" && (
-                        <div className="mb-6">
+                        <div className={channelSectionClass}>
                             <div className="mb-3 flex items-center gap-2">
                                 <div className="h-1 w-1 rounded-full bg-blue-500" />
                                 <span className="text-sm font-medium text-gray-700">文本/对话接口配置</span>
@@ -1154,7 +1158,7 @@ export default function AdminSettingsPage() {
                         )}
 
                         {/* 备注 */}
-                        <div className="mb-2">
+                        <div className="rounded-xl border border-gray-100 bg-gray-50/50 p-4">
                             <div className="mb-3 flex items-center gap-2">
                                 <div className="h-1 w-1 rounded-full bg-gray-400" />
                                 <span className="text-sm font-medium text-gray-700">备注</span>
@@ -1164,7 +1168,7 @@ export default function AdminSettingsPage() {
                             </Form.Item>
                         </div>
                     </Form>
-                </Drawer>
+                </Modal>
                 <Modal
                     title={
                         <Space size={12}>
