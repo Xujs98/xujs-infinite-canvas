@@ -69,6 +69,7 @@ func DB() (*gorm.DB, error) {
 			&model.RedeemCode{},
 			&model.Prompt{},
 			&model.PromptPreset{},
+			&model.AITextAgent{},
 			&model.Asset{},
 			&model.Setting{},
 			&model.SystemSetting{},

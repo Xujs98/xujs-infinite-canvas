@@ -67,6 +67,7 @@ func New() *gin.Engine {
 	api.POST("/jimeng/query-media", middleware.UserAuth, gin.WrapF(handler.JimengQueryMedia))
 	api.GET("/prompts", middleware.OptionalAuth, gin.WrapF(handler.Prompts))
 	api.GET("/prompt-presets", middleware.OptionalAuth, gin.WrapF(handler.PromptPresets))
+	api.GET("/ai-text-agents", middleware.OptionalAuth, gin.WrapF(handler.AITextAgents))
 	api.GET("/assets", middleware.OptionalAuth, gin.WrapF(handler.Assets))
 	api.GET("/system-settings", gin.WrapF(handler.GetPublicSystemSettings))
 	api.GET("/available-models", gin.WrapF(handler.GetPublicAvailableModels))
@@ -115,6 +116,12 @@ func New() *gin.Engine {
 	admin.POST("/prompt-presets/batch-delete", gin.WrapF(handler.AdminDeletePromptPresets))
 	admin.DELETE("/prompt-presets/:id", func(c *gin.Context) {
 		handler.AdminDeletePromptPreset(c.Writer, c.Request, c.Param("id"))
+	})
+	admin.GET("/ai-text-agents", gin.WrapF(handler.AdminAITextAgents))
+	admin.POST("/ai-text-agents", gin.WrapF(handler.AdminSaveAITextAgent))
+	admin.POST("/ai-text-agents/batch-delete", gin.WrapF(handler.AdminDeleteAITextAgents))
+	admin.DELETE("/ai-text-agents/:id", func(c *gin.Context) {
+		handler.AdminDeleteAITextAgent(c.Writer, c.Request, c.Param("id"))
 	})
 	admin.GET("/assets", gin.WrapF(handler.AdminAssets))
 	admin.POST("/assets", gin.WrapF(handler.AdminSaveAsset))

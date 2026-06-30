@@ -20,6 +20,7 @@ const adminMenus = [
     { key: "/admin/announcements", icon: <NotificationOutlined />, label: "公告管理" },
     { key: "/admin/prompts", icon: <FileTextOutlined />, label: "提示词管理" },
     { key: "/admin/prompt-presets", icon: <FileTextOutlined />, label: "提示词预设" },
+    { key: "/admin/ai-text-agents", icon: <RobotOutlined />, label: "AI文本agent管理" },
     { key: "/admin/assets", icon: <PictureOutlined />, label: "素材库" },
     { key: "/admin/model-classifications", icon: <AppstoreOutlined />, label: "模型管理" },
     { key: "/admin/roles", icon: <SafetyOutlined />, label: "角色管理" },
@@ -61,6 +62,8 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
                     ? "/admin/request-logs"
                     : pathname.startsWith("/admin/prompt-presets")
                     ? "/admin/prompt-presets"
+                    : pathname.startsWith("/admin/ai-text-agents")
+                    ? "/admin/ai-text-agents"
                     : pathname.startsWith("/admin/prompts")
                     ? "/admin/prompts"
                     : pathname.startsWith("/admin/redeem-codes")
