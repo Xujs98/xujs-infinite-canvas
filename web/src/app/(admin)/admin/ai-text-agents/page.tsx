@@ -11,6 +11,38 @@ import { useAdminAITextAgents } from "./use-admin-ai-text-agents";
 
 const defaultInputSources = "[]";
 const defaultJsonFields = "[]";
+const jsonFieldChineseLabels: Record<string, string> = {
+  "$.file_name": "文件名",
+  "$.assets_name": "素材名称",
+  "$.script_name": "剧本名称",
+  "$.materials": "素材",
+  "$.materials.characters": "角色",
+  "$.materials.scenes": "场景",
+  "$.materials.props": "道具",
+  "$.materials.visual_style": "视觉风格",
+  "$.materials.sound_style": "声音风格",
+  "$.script": "剧本",
+  "$.script.title": "标题",
+  "$.script.logline": "一句话梗概",
+  "$.script.synopsis": "剧情概要",
+  "$.script.episode_count": "集数",
+  "$.script.episodes": "分集",
+  "$.storyboards": "分镜",
+  "$.storyboards.name": "分镜名称",
+  "$.storyboards.episode": "集",
+  "$.storyboards.title": "分镜标题",
+  "$.storyboards.duration": "时长",
+  "$.storyboards.aspect_ratio": "画幅",
+  "$.storyboards.seedance_prompt": "Seedance 提示词",
+  "$.storyboards.shots": "镜头",
+  "$.storyboards.shots.time": "时间",
+  "$.storyboards.shots.shot": "景别",
+  "$.storyboards.shots.visual": "画面",
+  "$.storyboards.shots.action": "动作",
+  "$.storyboards.shots.camera": "运镜",
+  "$.storyboards.shots.sound": "声音",
+  "$.storyboards.shots.reference": "参考",
+};
 
 interface AgentInputSourceForm {
   id: string;
@@ -267,6 +299,15 @@ export default function AdminAITextAgentsPage() {
     if (!selectedAgentIds.length) return;
     await deleteAgents(selectedAgentIds);
     setSelectedAgentIds([]);
+  };
+
+  const localizeJsonFieldLabels = () => {
+    const fields: AgentJsonFieldForm[] = form.getFieldValue("jsonFields") || [];
+    form.setFieldValue("jsonFields", fields.map((field) => {
+      const path = normalizeJsonPath(field?.path?.trim() || "");
+      const label = jsonFieldChineseLabels[path];
+      return label ? { ...field, path, label } : field;
+    }));
   };
 
   const columns: ProColumns<AdminAITextAgent>[] = [
@@ -565,7 +606,10 @@ export default function AdminAITextAgentsPage() {
 
                     {fields.length > 0 ? (
                       <div style={{ marginTop: 8 }}>
-                        <Typography.Text type="secondary">展示顺序与中文名称</Typography.Text>
+                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
+                          <Typography.Text type="secondary">展示顺序与中文名称</Typography.Text>
+                          <Button size="small" onClick={localizeJsonFieldLabels}>一键填入中文汉化</Button>
+                        </div>
                         <Space direction="vertical" size={8} style={{ width: "100%", marginTop: 8 }}>
                           {fields.map((field, index) => (
                             <Row key={field.key} gutter={8} align="middle">
