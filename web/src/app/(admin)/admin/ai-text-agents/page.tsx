@@ -173,8 +173,8 @@ export default function AdminAITextAgentsPage() {
   return (
     <div style={{ padding: "24px 28px" }}>
       <div style={{ marginBottom: 20 }}>
-        <Typography.Title level={4} style={{ margin: 0, fontSize: 20, fontWeight: 600 }}>AI文本agent管理</Typography.Title>
-        <Typography.Text type="secondary" style={{ fontSize: 13 }}>管理提供给 app 同步的 AI 文本 Agent 配置</Typography.Text>
+        <Typography.Title level={4} style={{ margin: 0, fontSize: 20, fontWeight: 600 }}>AIagent管理</Typography.Title>
+        <Typography.Text type="secondary" style={{ fontSize: 13 }}>管理提供给 app 同步的 AI Agent 配置，后续可扩展图片、视频 Agent</Typography.Text>
       </div>
 
       <Space direction="vertical" size={16} style={{ width: "100%" }}>
@@ -217,7 +217,7 @@ export default function AdminAITextAgentsPage() {
           rowSelection={{ selectedRowKeys: selectedAgentIds, onChange: (keys) => setSelectedAgentIds(keys.map(String)) }}
           headerTitle={
             <Space>
-              <Typography.Text strong>AI 文本 Agent</Typography.Text>
+              <Typography.Text strong>AI Agent</Typography.Text>
               <Tag>{total} 条</Tag>
             </Space>
           }
@@ -246,7 +246,7 @@ export default function AdminAITextAgentsPage() {
       </Space>
 
       <Modal
-        title={editingAgent?.id ? "编辑 AI 文本 Agent" : "新增 AI 文本 Agent"}
+        title={editingAgent?.id ? "编辑 AI Agent" : "新增 AI Agent"}
         open={Boolean(editingAgent)}
         width={920}
         onCancel={() => setEditingAgent(null)}
@@ -309,8 +309,8 @@ export default function AdminAITextAgentsPage() {
         </Space>
       </Modal>
 
-      <Modal title="删除 AI 文本 Agent" open={Boolean(deletingAgent)} onCancel={() => setDeletingAgent(null)} onOk={() => void handleDelete()} okText="删除" cancelText="取消" okButtonProps={{ danger: true }}>
-        <Typography.Text>确定删除 AI 文本 Agent「{deletingAgent?.name}」吗？</Typography.Text>
+      <Modal title="删除 AI Agent" open={Boolean(deletingAgent)} onCancel={() => setDeletingAgent(null)} onOk={() => void handleDelete()} okText="删除" cancelText="取消" okButtonProps={{ danger: true }}>
+        <Typography.Text>确定删除 AI Agent「{deletingAgent?.name}」吗？</Typography.Text>
       </Modal>
     </div>
   );

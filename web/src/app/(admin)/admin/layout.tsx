@@ -20,7 +20,7 @@ const adminMenus = [
     { key: "/admin/announcements", icon: <NotificationOutlined />, label: "公告管理" },
     { key: "/admin/prompts", icon: <FileTextOutlined />, label: "提示词管理" },
     { key: "/admin/prompt-presets", icon: <FileTextOutlined />, label: "提示词预设" },
-    { key: "/admin/ai-text-agents", icon: <RobotOutlined />, label: "AI文本agent管理" },
+    { key: "/admin/ai-text-agents", icon: <RobotOutlined />, label: "AIagent管理" },
     { key: "/admin/assets", icon: <PictureOutlined />, label: "素材库" },
     { key: "/admin/model-classifications", icon: <AppstoreOutlined />, label: "模型管理" },
     { key: "/admin/roles", icon: <SafetyOutlined />, label: "角色管理" },

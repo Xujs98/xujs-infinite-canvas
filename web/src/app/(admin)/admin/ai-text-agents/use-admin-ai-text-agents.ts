@@ -35,7 +35,7 @@ export function useAdminAITextAgents() {
     mutationFn: (agent: Partial<AdminAITextAgent>) => saveAdminAITextAgent(token, agent),
     onSuccess: async (_, agent) => {
       await queryClient.invalidateQueries({ queryKey: ["admin", "ai-text-agents"] });
-      message.success(agent.id ? "AI 文本 Agent 已保存" : "AI 文本 Agent 已创建");
+      message.success(agent.id ? "AI Agent 已保存" : "AI Agent 已创建");
     },
     onError: (error) => message.error(error instanceof Error ? error.message : "保存失败"),
   });
@@ -44,7 +44,7 @@ export function useAdminAITextAgents() {
     mutationFn: (id: string) => deleteAdminAITextAgent(token, id),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["admin", "ai-text-agents"] });
-      message.success("AI 文本 Agent 已删除");
+      message.success("AI Agent 已删除");
     },
     onError: (error) => message.error(error instanceof Error ? error.message : "删除失败"),
   });
@@ -60,7 +60,7 @@ export function useAdminAITextAgents() {
 
   useEffect(() => {
     if (query.isError) {
-      const errorMessage = query.error instanceof Error ? query.error.message : "读取 AI 文本 Agent 失败";
+      const errorMessage = query.error instanceof Error ? query.error.message : "读取 AI Agent 失败";
       message.error(errorMessage);
       if (errorMessage.includes("未登录") || errorMessage.includes("权限不足") || errorMessage.includes("登录状态无效")) clearSession();
     }
