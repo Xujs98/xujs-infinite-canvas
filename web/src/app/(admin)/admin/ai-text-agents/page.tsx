@@ -68,6 +68,10 @@ function parseJSONList<T>(value: string | undefined, fallback: T[]): T[] {
   }
 }
 
+function normalizeJsonPath(path: string): string {
+  return path.replace(/\[(?:0|\*)\]/g, "");
+}
+
 function createDefaultInputSource(index = 0): AgentInputSourceForm {
   return {
     id: createFormId("agent-source"),
@@ -96,7 +100,7 @@ function normalizeInputSources(value: string | undefined): AgentInputSourceForm[
 
 function normalizeJsonFields(value: string | undefined): AgentJsonFieldForm[] {
   return parseJSONList<Partial<AgentJsonFieldForm>>(value, []).flatMap((field) => {
-    const path = typeof field.path === "string" ? field.path.trim() : "";
+    const path = typeof field.path === "string" ? normalizeJsonPath(field.path.trim()) : "";
     if (!path) return [];
     return [{
       id: typeof field.id === "string" && field.id.trim() ? field.id : createFormId("agent-json-field"),
@@ -123,7 +127,7 @@ function serializeInputSources(sources: AgentInputSourceForm[] | undefined) {
 
 function serializeJsonFields(fields: AgentJsonFieldForm[] | undefined) {
   return JSON.stringify((fields || []).flatMap((field) => {
-    const path = field.path?.trim();
+    const path = normalizeJsonPath(field.path?.trim() || "");
     if (!path) return [];
     return [{
       id: field.id || createFormId("agent-json-field"),
@@ -134,24 +138,69 @@ function serializeJsonFields(fields: AgentJsonFieldForm[] | undefined) {
   }), null, 2);
 }
 
-function flattenJsonPaths(value: unknown, prefix = "$"): Array<{ path: string; label: string }> {
-  if (Array.isArray(value)) {
-    const first = value[0];
-    if (first && typeof first === "object") {
-      return flattenJsonPaths(first, `${prefix}[0]`);
+function appendFlattenedPaths(
+  value: unknown,
+  currentPath: string,
+  results: Array<{ path: string; label: string }>,
+  visited: Set<unknown>,
+  depth: number,
+  maxDepth: number,
+  limit: number,
+) {
+  if (results.length >= limit || depth > maxDepth) {
+    return;
+  }
+
+  if (!value || typeof value !== "object") {
+    if (currentPath) {
+      results.push({ path: currentPath, label: currentPath });
     }
-    return [{ path: prefix, label: prefix }];
+    return;
   }
-  if (value && typeof value === "object") {
-    return Object.entries(value as Record<string, unknown>).flatMap(([key, child]) => {
-      const childPath = prefix === "$" ? `$.${key}` : `${prefix}.${key}`;
-      if (child && typeof child === "object") {
-        return flattenJsonPaths(child, childPath);
-      }
-      return [{ path: childPath, label: key }];
-    });
+
+  if (visited.has(value)) {
+    return;
   }
-  return [{ path: prefix, label: prefix }];
+  visited.add(value);
+
+  if (currentPath) {
+    results.push({ path: currentPath, label: currentPath });
+  }
+
+  if (Array.isArray(value)) {
+    if (value.length === 0) {
+      return;
+    }
+    appendFlattenedPaths(value[0], currentPath || "$", results, visited, depth + 1, maxDepth, limit);
+    return;
+  }
+
+  const entries = Object.entries(value as Record<string, unknown>);
+  if (entries.length === 0) {
+    results.push({ path: currentPath || "$", label: currentPath || "$" });
+    return;
+  }
+
+  entries.forEach(([key, child]) => {
+    if (results.length >= limit) {
+      return;
+    }
+    const nextPath = currentPath ? `${currentPath}.${key}` : `$.${key}`;
+    appendFlattenedPaths(child, nextPath, results, visited, depth + 1, maxDepth, limit);
+  });
+}
+
+function flattenJsonPaths(value: unknown, options: { maxDepth?: number; limit?: number } = {}): Array<{ path: string; label: string }> {
+  const results: Array<{ path: string; label: string }> = [];
+  appendFlattenedPaths(value, "$", results, new Set<unknown>(), 0, options.maxDepth ?? 4, options.limit ?? 48);
+  const deduped = new Map<string, { path: string; label: string }>();
+  results.forEach((item) => {
+    const path = normalizeJsonPath(item.path);
+    if (!deduped.has(path)) {
+      deduped.set(path, { path, label: path });
+    }
+  });
+  return Array.from(deduped.values());
 }
 
 export default function AdminAITextAgentsPage() {

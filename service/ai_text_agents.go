@@ -3,6 +3,7 @@ package service
 import (
 	"encoding/json"
 	"errors"
+	"regexp"
 	"strings"
 	"time"
 
@@ -16,6 +17,7 @@ func ListAITextAgents(q model.Query) (model.AITextAgentList, error) {
 	if err != nil {
 		return model.AITextAgentList{}, err
 	}
+	items = normalizeAITextAgentJSONFields(items)
 	return model.AITextAgentList{Items: items, Total: int(total)}, nil
 }
 
@@ -39,6 +41,7 @@ func SaveAITextAgent(item model.AITextAgent) (model.AITextAgent, error) {
 	if item.JSONFields == "" {
 		item.JSONFields = "[]"
 	}
+	item.JSONFields = normalizeJSONFieldPathList(item.JSONFields)
 	if err := validateJSONArray(item.InputSources, "输入来源配置"); err != nil {
 		return model.AITextAgent{}, err
 	}
@@ -77,4 +80,36 @@ func validateJSONArray(value string, label string) error {
 		return errors.New(label + "必须是 JSON 数组")
 	}
 	return nil
+}
+
+var jsonArrayIndexPattern = regexp.MustCompile(`\[(0|\*)\]`)
+
+func normalizeJSONFieldPath(path string) string {
+	return jsonArrayIndexPattern.ReplaceAllString(path, "")
+}
+
+func normalizeJSONFieldPathList(value string) string {
+	var fields []map[string]any
+	if err := json.Unmarshal([]byte(value), &fields); err != nil {
+		return value
+	}
+	for index := range fields {
+		if path, ok := fields[index]["path"].(string); ok {
+			fields[index]["path"] = normalizeJSONFieldPath(path)
+		}
+	}
+	data, err := json.MarshalIndent(fields, "", "  ")
+	if err != nil {
+		return value
+	}
+	return string(data)
+}
+
+func normalizeAITextAgentJSONFields(items []model.AITextAgent) []model.AITextAgent {
+	for index := range items {
+		if strings.TrimSpace(items[index].JSONFields) != "" {
+			items[index].JSONFields = normalizeJSONFieldPathList(items[index].JSONFields)
+		}
+	}
+	return items
 }
