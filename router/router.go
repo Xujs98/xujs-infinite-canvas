@@ -35,6 +35,7 @@ func New() *gin.Engine {
 	v1.POST("/images/edits", gin.WrapF(handler.AIImagesEdits))
 	v1.POST("/image-tasks/generations", gin.WrapF(handler.CreateImageGenerationTask))
 	v1.POST("/image-tasks/edits", gin.WrapF(handler.CreateImageEditTask))
+	v1.POST("/video-tasks", gin.WrapF(handler.CreateVideoGenerationTask))
 	v1.GET("/generation-tasks/:id", func(c *gin.Context) {
 		handler.GetGenerationTask(c.Writer, c.Request, c.Param("id"))
 	})
