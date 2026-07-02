@@ -47,23 +47,17 @@ func ConsumeCredits(w http.ResponseWriter, r *http.Request) {
 		req.Quantity = 1
 	}
 
-	// 查找模型算力点单价
-	unitCredits, err := service.ModelCost(req.Model)
+	// 查找模型算力点配置并按模型计费方式计算费用。
+	credits, err := service.CalculateModelCredits(req.Model, req.Quantity, req.Seconds, req.MediaType)
 	if err != nil {
 		log.Printf("[credits] ModelCost lookup failed: model=%s err=%v", req.Model, err)
 		Fail(w, "模型配置错误")
 		return
 	}
-	if unitCredits <= 0 {
+	if credits <= 0 {
 		// 无费用模型，直接返回
 		OK(w, ConsumeCreditsResponse{RequiredCredits: 0, Balance: user.Credits})
 		return
-	}
-
-	// 计算总费用
-	credits := unitCredits * req.Quantity
-	if req.MediaType == "video" && req.Seconds > 0 {
-		credits *= req.Seconds
 	}
 
 	// 会员免扣

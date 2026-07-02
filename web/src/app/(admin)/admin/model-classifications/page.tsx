@@ -124,6 +124,7 @@ export default function AdminModelClassificationsPage() {
                 videoRatios: item.videoConfig?.ratios || [],
                 videoDurations: item.videoConfig?.durations?.map(String) || [],
                 videoMaxDuration: item.videoConfig?.maxDuration,
+                videoBillingMode: item.videoConfig?.billingMode || "per_second",
                 videoSupportGenerateAudio: item.videoConfig?.supportGenerateAudio,
                 videoSupportWatermark: item.videoConfig?.supportWatermark,
                 imageQualities: item.imageConfig?.qualities || [],
@@ -158,7 +159,7 @@ export default function AdminModelClassificationsPage() {
             const capability = form.getFieldValue("capability");
             // 只验证当前类型的字段
             const fieldsByType: Record<string, string[]> = {
-                video: ["modelName", "capability", "videoResolutions", "videoRatios", "videoDurations", "videoMaxDuration", "requestFields"],
+                video: ["modelName", "capability", "videoResolutions", "videoRatios", "videoDurations", "videoMaxDuration", "videoBillingMode", "requestFields"],
                 image: ["modelName", "capability", "imageQualities", "imageAspectRatios", "imageMaxCount", "requestFields"],
                 audio: ["modelName", "capability", "audioVoices", "audioFormats", "requestFields"],
                 text: ["modelName", "capability", "requestFields"],
@@ -179,6 +180,7 @@ export default function AdminModelClassificationsPage() {
                     ratios: toArr(values.videoRatios).length ? toArr(values.videoRatios) : ["16:9"],
                     durations: toArr(values.videoDurations).length ? toArr(values.videoDurations) : ["6"],
                     maxDuration: values.videoMaxDuration || 15,
+                    billingMode: values.videoBillingMode === "per_call" ? "per_call" : "per_second",
                     supportGenerateAudio: values.videoSupportGenerateAudio ?? true,
                     supportWatermark: values.videoSupportWatermark ?? false,
                 };
@@ -227,10 +229,10 @@ export default function AdminModelClassificationsPage() {
         if (!modalOpen) return;
         const clearFields: Record<string, string[]> = {
             video: ["imageQualities", "imageAspectRatios", "imageMaxCount", "imageSupportCustomSize", "audioVoices", "audioFormats", "audioSpeedMin", "audioSpeedMax"],
-            image: ["videoResolutions", "videoRatios", "videoDurations", "videoMaxDuration", "videoSupportGenerateAudio", "videoSupportWatermark", "audioVoices", "audioFormats", "audioSpeedMin", "audioSpeedMax"],
-            audio: ["videoResolutions", "videoRatios", "videoDurations", "videoMaxDuration", "videoSupportGenerateAudio", "videoSupportWatermark", "imageQualities", "imageAspectRatios", "imageMaxCount", "imageSupportCustomSize"],
-            text: ["videoResolutions", "videoRatios", "videoDurations", "videoMaxDuration", "videoSupportGenerateAudio", "videoSupportWatermark", "imageQualities", "imageAspectRatios", "imageMaxCount", "imageSupportCustomSize", "audioVoices", "audioFormats", "audioSpeedMin", "audioSpeedMax", "chatSupportsMultimodal", "chatContextWindow", "chatMaxOutputTokens", "chatDescription"],
-            chat: ["videoResolutions", "videoRatios", "videoDurations", "videoMaxDuration", "videoSupportGenerateAudio", "videoSupportWatermark", "imageQualities", "imageAspectRatios", "imageMaxCount", "imageSupportCustomSize", "audioVoices", "audioFormats", "audioSpeedMin", "audioSpeedMax"],
+            image: ["videoResolutions", "videoRatios", "videoDurations", "videoMaxDuration", "videoBillingMode", "videoSupportGenerateAudio", "videoSupportWatermark", "audioVoices", "audioFormats", "audioSpeedMin", "audioSpeedMax"],
+            audio: ["videoResolutions", "videoRatios", "videoDurations", "videoMaxDuration", "videoBillingMode", "videoSupportGenerateAudio", "videoSupportWatermark", "imageQualities", "imageAspectRatios", "imageMaxCount", "imageSupportCustomSize"],
+            text: ["videoResolutions", "videoRatios", "videoDurations", "videoMaxDuration", "videoBillingMode", "videoSupportGenerateAudio", "videoSupportWatermark", "imageQualities", "imageAspectRatios", "imageMaxCount", "imageSupportCustomSize", "audioVoices", "audioFormats", "audioSpeedMin", "audioSpeedMax", "chatSupportsMultimodal", "chatContextWindow", "chatMaxOutputTokens", "chatDescription"],
+            chat: ["videoResolutions", "videoRatios", "videoDurations", "videoMaxDuration", "videoBillingMode", "videoSupportGenerateAudio", "videoSupportWatermark", "imageQualities", "imageAspectRatios", "imageMaxCount", "imageSupportCustomSize", "audioVoices", "audioFormats", "audioSpeedMin", "audioSpeedMax"],
         };
         if (capability && clearFields[capability]) {
             clearFields[capability].forEach((f) => form.setFieldValue(f, undefined));
@@ -254,6 +256,7 @@ export default function AdminModelClassificationsPage() {
                     {item.videoConfig.resolutions?.map((r) => <Tag key={r} color="purple" className="text-xs">{r}</Tag>)}
                     {item.videoConfig.ratios?.map((r) => <Tag key={r} color="purple" className="text-xs">{r}</Tag>)}
                     {item.videoConfig.durations?.map((d) => <Tag key={d} color="purple" className="text-xs">{d}s</Tag>)}
+                    <Tag color="purple" className="text-xs">{item.videoConfig.billingMode === "per_call" ? "按次数计费" : "按秒计费"}</Tag>
                 </div>
             );
         }
@@ -487,6 +490,19 @@ export default function AdminModelClassificationsPage() {
                                     </Form.Item>
                                 </Col>
                             </Row>
+                            <Form.Item
+                                name="videoBillingMode"
+                                label="视频计费方式"
+                                initialValue="per_second"
+                                help="按次数：每次生成按“模型调用扣除算力点 × 数量”；按秒：按“模型调用扣除算力点 × 秒数 × 数量”。"
+                            >
+                                <Select
+                                    options={[
+                                        { label: "按秒计算", value: "per_second" },
+                                        { label: "按次数计算", value: "per_call" },
+                                    ]}
+                                />
+                            </Form.Item>
                             <Row gutter={16}>
                                 <Col span={12}>
                                     <Form.Item name="videoSupportGenerateAudio" label="支持生成音频" valuePropName="checked">

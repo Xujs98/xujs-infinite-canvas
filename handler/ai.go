@@ -157,13 +157,12 @@ func CreateVideoGenerationTask(w http.ResponseWriter, r *http.Request) {
 		Fail(w, "调用失败，请联系管理员")
 		return
 	}
-	credits, err := service.ModelCost(modelName)
+	credits, err := service.CalculateModelCredits(modelName, 1, readAIRequestVideoSeconds(body, contentType), "video")
 	if err != nil {
 		log.Printf("video task read model cost failed: model=%s err=%v", modelName, err)
 		Fail(w, "调用失败，请联系管理员")
 		return
 	}
-	credits *= readAIRequestVideoSeconds(body, contentType)
 
 	finalBody, finalContentType := prepareVideoTaskRequestBody(body, contentType, modelName, channel)
 	upstreamPath := resolveAIProxyPath(channel.BaseURL, modelName, "/videos", channel.VideoConfig)
@@ -218,16 +217,16 @@ func proxyAIRequest(w http.ResponseWriter, r *http.Request, path string) {
 		Fail(w, "调用失败，请联系管理员")
 		return
 	}
-	credits, err := service.ModelCost(modelName)
+	mediaType := "request"
+	if isVideoPath(path, channel.VideoConfig) {
+		mediaType = "video"
+	}
+	credits, err := service.CalculateModelCredits(modelName, readAIRequestCount(body, contentType), readAIRequestVideoSeconds(body, contentType), mediaType)
 	if err != nil {
 		log.Printf("AI proxy read model cost failed: model=%s err=%v", modelName, err)
 		go service.LogCall(user.ID, user.Username, modelName, path, false, err.Error(), 0)
 		Fail(w, "调用失败，请联系管理员")
 		return
-	}
-	credits *= readAIRequestCount(body, contentType)
-	if isVideoPath(path, channel.VideoConfig) {
-		credits *= readAIRequestVideoSeconds(body, contentType)
 	}
 
 	// 合并渠道 ExtraBody 到请求体

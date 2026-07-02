@@ -7,13 +7,12 @@ import (
 	"strconv"
 )
 
-
 // RequestField 定义模型级别的自定义请求字段。
 // 字段名映射到发送给 AI API 的请求体字段；留空则不映射。
 type RequestField struct {
-	FieldName    string `json:"fieldName"`    // 前端统一字段名，如 reference_images
-	RequestKey   string `json:"requestKey"`   // 映射到请求体的字段名，如 images
-	DataType     string `json:"dataType"`     // 数据类型: string, integer, boolean, number, array, object
+	FieldName  string `json:"fieldName"`  // 前端统一字段名，如 reference_images
+	RequestKey string `json:"requestKey"` // 映射到请求体的字段名，如 images
+	DataType   string `json:"dataType"`   // 数据类型: string, integer, boolean, number, array, object
 }
 
 // RequestFields 是 []RequestField 的自定义类型，实现 GORM Value/Scan 以正确序列化为 JSON text。
@@ -72,12 +71,13 @@ type ModelClassification struct {
 
 // VideoModelConfig 视频模型参数配置
 type VideoModelConfig struct {
-	Resolutions          []string   `json:"resolutions"`
-	Ratios               []string   `json:"ratios"`
-	Durations            []string   `json:"durations"` // 支持 "adaptive" 和数字字符串如 "15"
-	MaxDuration          int        `json:"maxDuration"`
-	SupportGenerateAudio bool       `json:"supportGenerateAudio"`
-	SupportWatermark     bool       `json:"supportWatermark"`
+	Resolutions          []string `json:"resolutions"`
+	Ratios               []string `json:"ratios"`
+	Durations            []string `json:"durations"` // 支持 "adaptive" 和数字字符串如 "15"
+	MaxDuration          int      `json:"maxDuration"`
+	BillingMode          string   `json:"billingMode,omitempty"` // per_second | per_call
+	SupportGenerateAudio bool     `json:"supportGenerateAudio"`
+	SupportWatermark     bool     `json:"supportWatermark"`
 }
 
 // UnmarshalJSON 兼容数据库中旧的数字格式 durations: [15] 和新的字符串格式 durations: ["15"]
@@ -142,10 +142,10 @@ func (c *VideoModelConfig) Scan(src interface{}) error {
 
 // ImageModelConfig 图片模型参数配置
 type ImageModelConfig struct {
-	Qualities        []string `json:"qualities"`
-	AspectRatios     []string `json:"aspectRatios"`
-	MaxCount         int      `json:"maxCount"`
-	SupportCustomSize bool   `json:"supportCustomSize"`
+	Qualities         []string `json:"qualities"`
+	AspectRatios      []string `json:"aspectRatios"`
+	MaxCount          int      `json:"maxCount"`
+	SupportCustomSize bool     `json:"supportCustomSize"`
 }
 
 func (c ImageModelConfig) Value() (driver.Value, error) {

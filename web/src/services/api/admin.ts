@@ -540,6 +540,7 @@ export type VideoModelConfig = {
     ratios: string[];
     durations: string[]; // 支持 "adaptive" 和数字字符串如 "15"
     maxDuration: number;
+    billingMode?: "per_second" | "per_call";
     supportGenerateAudio: boolean;
     supportWatermark: boolean;
 };

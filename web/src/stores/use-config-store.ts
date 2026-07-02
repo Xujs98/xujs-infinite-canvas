@@ -229,6 +229,7 @@ export type ModelClassificationDetail = {
         ratios: string[];
         durations: string[]; // 支持 "adaptive" 和数字字符串如 "15"
         maxDuration: number;
+        billingMode?: "per_second" | "per_call";
         supportGenerateAudio: boolean;
         supportWatermark: boolean;
     } | null;
@@ -272,6 +273,14 @@ export function setModelClassificationsCache(details: ModelClassificationDetail[
 
 export function getModelClassificationDetail(modelName: string): ModelClassificationDetail | null {
     return modelClassificationsCache[modelName] || null;
+}
+
+export function getVideoModelBillingMode(modelName: string): "per_second" | "per_call" {
+    const detail = getModelClassificationDetail(modelName);
+    if (detail?.capability === "video" && detail.videoConfig?.billingMode === "per_call") {
+        return "per_call";
+    }
+    return "per_second";
 }
 
 // React Hook：订阅模型分类缓存变化，确保组件在分类加载后重新渲染
