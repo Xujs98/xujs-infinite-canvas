@@ -49,6 +49,7 @@ const creditLogTypeLabels: Record<string, string> = {
     ai_consume: "模型消费",
     ai_refund: "失败返还",
     membership_free: "会员免费",
+    role_free: "角色免费",
     invite_reward: "邀请奖励",
     redeem: "兑换卡密",
     check_in: "签到奖励",
@@ -59,6 +60,7 @@ const tagColorMap: Record<string, string> = {
     ai_consume: "red",
     ai_refund: "green",
     membership_free: "cyan",
+    role_free: "geekblue",
     invite_reward: "purple",
     redeem: "gold",
     check_in: "lime",
@@ -261,6 +263,7 @@ function CreditLogsTab() {
                     <option value="">全部类型</option>
                     <option value="ai_consume">模型消费</option>
                     <option value="ai_refund">失败返还</option>
+                    <option value="role_free">角色免费</option>
                     <option value="redeem">兑换卡密</option>
                     <option value="admin_adjust">后台调整</option>
                     <option value="invite_reward">邀请奖励</option>
