@@ -8,12 +8,12 @@ import { CanvasNodeType, type CanvasNodeData, type ViewportTransform } from "../
 export function Minimap({ nodes, viewport, viewportSize, onViewportChange }: { nodes: CanvasNodeData[]; viewport: ViewportTransform; viewportSize: { width: number; height: number }; onViewportChange: (viewport: ViewportTransform) => void }) {
     const theme = useCanvasTheme();
     const containerRef = useRef<HTMLDivElement>(null);
+    const dragOffsetRef = useRef<{ x: number; y: number } | null>(null);
     const [isDragging, setIsDragging] = useState(false);
     const [compact, setCompact] = useState(false);
     const width = compact ? Math.max(116, Math.min(156, viewportSize.width - 214)) : 240;
     const height = compact ? 96 : 160;
-    const headerHeight = compact ? 24 : 0;
-    const mapHeight = height - headerHeight;
+    const mapHeight = height;
 
     useEffect(() => {
         const query = window.matchMedia("(max-width: 767px)");
@@ -94,11 +94,21 @@ export function Minimap({ nodes, viewport, viewportSize, onViewportChange }: { n
         };
     }, [toMinimap, viewport.k, viewport.x, viewport.y, viewportSize.height, viewportSize.width]);
 
-    const updateViewportFromEvent = (event: React.PointerEvent) => {
-        const rect = containerRef.current?.getBoundingClientRect();
-        if (!rect) return;
+    const viewportHandleRect = useMemo(() => {
+        if (!compact) return viewportRect;
+        const handleSize = 24;
+        const centerX = viewportRect.x + viewportRect.w / 2;
+        const centerY = viewportRect.y + viewportRect.h / 2;
+        return {
+            x: clamp(centerX - handleSize / 2, 0, Math.max(0, width - handleSize)),
+            y: clamp(centerY - handleSize / 2, 0, Math.max(0, mapHeight - handleSize)),
+            w: handleSize,
+            h: handleSize,
+        };
+    }, [compact, mapHeight, viewportRect, width]);
 
-        const world = toWorld(event.clientX - rect.left, event.clientY - rect.top);
+    const updateViewportFromMinimapCenter = (centerX: number, centerY: number) => {
+        const world = toWorld(centerX, centerY);
         onViewportChange({
             x: viewportSize.width / 2 - world.x * viewport.k,
             y: viewportSize.height / 2 - world.y * viewport.k,
@@ -106,28 +116,42 @@ export function Minimap({ nodes, viewport, viewportSize, onViewportChange }: { n
         });
     };
 
-    const centerNode = (node: CanvasNodeData) => {
-        onViewportChange({
-            x: viewportSize.width / 2 - (node.position.x + node.width / 2) * viewport.k,
-            y: viewportSize.height / 2 - (node.position.y + node.height / 2) * viewport.k,
-            k: viewport.k,
-        });
+    const updateViewportFromEvent = (event: React.PointerEvent) => {
+        const rect = containerRef.current?.getBoundingClientRect();
+        if (!rect) return;
+
+        const localX = event.clientX - rect.left;
+        const localY = event.clientY - rect.top;
+        if (compact && dragOffsetRef.current) {
+            const nextX = clamp(localX - dragOffsetRef.current.x + viewportHandleRect.w / 2, 0, width);
+            const nextY = clamp(localY - dragOffsetRef.current.y + viewportHandleRect.h / 2, 0, mapHeight);
+            updateViewportFromMinimapCenter(nextX, nextY);
+            return;
+        }
+        updateViewportFromMinimapCenter(localX, localY);
     };
 
     return (
         <div className="absolute bottom-[calc(max(1rem,env(safe-area-inset-bottom))+4.75rem)] right-3 z-50 overflow-hidden rounded-xl border shadow-2xl backdrop-blur-sm md:bottom-24 md:left-6 md:right-auto" style={{ width, height, background: theme.toolbar.panel, borderColor: theme.toolbar.border }}>
-            {compact ? (
-                <div className="flex h-6 items-center justify-between border-b px-2 text-[11px] font-medium" style={{ borderColor: theme.toolbar.border, color: theme.node.muted }}>
-                    <span>小地图</span>
-                    <span className="font-normal opacity-70">点节点定位</span>
-                </div>
-            ) : null}
             <div
                 ref={containerRef}
-                className="relative w-full cursor-crosshair"
+                className={compact ? "relative w-full cursor-grab touch-none active:cursor-grabbing" : "relative w-full cursor-crosshair"}
                 style={{ height: mapHeight }}
                 onPointerDown={(event) => {
                     event.preventDefault();
+                    if (compact) {
+                        const rect = containerRef.current?.getBoundingClientRect();
+                        if (!rect) return;
+                        const localX = event.clientX - rect.left;
+                        const localY = event.clientY - rect.top;
+                        const insideViewport =
+                            localX >= viewportHandleRect.x &&
+                            localX <= viewportHandleRect.x + viewportHandleRect.w &&
+                            localY >= viewportHandleRect.y &&
+                            localY <= viewportHandleRect.y + viewportHandleRect.h;
+                        if (!insideViewport) return;
+                        dragOffsetRef.current = { x: localX - viewportHandleRect.x, y: localY - viewportHandleRect.y };
+                    }
                     event.currentTarget.setPointerCapture(event.pointerId);
                     setIsDragging(true);
                     updateViewportFromEvent(event);
@@ -135,18 +159,24 @@ export function Minimap({ nodes, viewport, viewportSize, onViewportChange }: { n
                 onPointerMove={(event) => {
                     if (isDragging) updateViewportFromEvent(event);
                 }}
-                onPointerUp={() => setIsDragging(false)}
-                onPointerLeave={() => setIsDragging(false)}
+                onPointerUp={() => {
+                    dragOffsetRef.current = null;
+                    setIsDragging(false);
+                }}
+                onPointerLeave={() => {
+                    dragOffsetRef.current = null;
+                    setIsDragging(false);
+                }}
             >
                 {nodes.map((node) => {
                     const pos = toMinimap(node.position.x, node.position.y);
                     const color = node.type === CanvasNodeType.Image ? "#10b981" : node.type === CanvasNodeType.Video ? "#f97316" : node.type === CanvasNodeType.Audio ? "#a855f7" : node.type === CanvasNodeType.Config ? "#60a5fa" : theme.node.muted;
-                    const markerWidth = Math.max(node.width * scale, compact ? 8 : 2);
-                    const markerHeight = Math.max(node.height * scale, compact ? 8 : 2);
+                    const markerWidth = Math.max(node.width * scale, compact ? 6 : 2);
+                    const markerHeight = Math.max(node.height * scale, compact ? 6 : 2);
                     return (
                         <div
                             key={node.id}
-                            className="absolute rounded-[3px]"
+                            className="pointer-events-none absolute rounded-[3px]"
                             style={{
                                 left: pos.x,
                                 top: pos.y,
@@ -154,20 +184,29 @@ export function Minimap({ nodes, viewport, viewportSize, onViewportChange }: { n
                                 height: markerHeight,
                                 backgroundColor: color,
                                 border: compact ? `1px solid ${theme.toolbar.panel}` : undefined,
-                                boxShadow: compact ? "0 1px 4px rgba(0,0,0,.18)" : undefined,
-                                opacity: compact ? 0.95 : 0.8,
-                            }}
-                            onPointerDown={(event) => {
-                                if (!compact) return;
-                                event.preventDefault();
-                                event.stopPropagation();
-                                centerNode(node);
+                                boxShadow: compact ? "0 1px 4px rgba(0,0,0,.16)" : undefined,
+                                opacity: compact ? 0.92 : 0.8,
                             }}
                         />
                     );
                 })}
-                <div className="pointer-events-none absolute border" style={{ left: viewportRect.x, top: viewportRect.y, width: viewportRect.w, height: viewportRect.h, borderColor: theme.node.activeStroke, background: `${theme.node.activeStroke}18` }} />
+                <div
+                    className={compact ? "absolute rounded-md border shadow-md" : "pointer-events-none absolute border"}
+                    style={{
+                        left: viewportHandleRect.x,
+                        top: viewportHandleRect.y,
+                        width: viewportHandleRect.w,
+                        height: viewportHandleRect.h,
+                        borderColor: theme.node.activeStroke,
+                        background: compact ? `${theme.node.activeStroke}30` : `${theme.node.activeStroke}18`,
+                        boxShadow: compact ? `0 0 0 1px ${theme.toolbar.panel}, 0 8px 18px rgba(0,0,0,.18)` : undefined,
+                    }}
+                />
             </div>
         </div>
     );
+}
+
+function clamp(value: number, min: number, max: number) {
+    return Math.max(min, Math.min(max, value));
 }
