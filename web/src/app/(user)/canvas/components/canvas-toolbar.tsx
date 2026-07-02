@@ -96,7 +96,7 @@ export function CanvasToolbar({
     const tip = hovered ? toolLabel(hovered) : "";
 
     return (
-        <div className="pointer-events-none absolute bottom-[max(1rem,env(safe-area-inset-bottom))] left-3 right-3 z-50 flex justify-center md:left-[300px] md:right-4">
+        <div className={`pointer-events-none absolute bottom-[max(1rem,env(safe-area-inset-bottom))] left-3 right-3 flex justify-center md:left-[300px] md:right-4 ${appearanceOpen && isMobile ? "z-[2000]" : "z-50"}`}>
             {tip ? <DockTip label={tip} x={tipX} theme={theme} /> : null}
             <div ref={wrapRef} className="thin-scrollbar glass pointer-events-auto flex h-14 max-w-full touch-pan-x items-center gap-1 overflow-x-auto rounded-xl border px-2 shadow-lg [scrollbar-width:none] [&>*]:shrink-0 [&::-webkit-scrollbar]:hidden" style={dockStyle}>
                 <ToolbarButton id="tool-hand" label="移动/选择" active={!selectedCount} hovered={hovered} activeStyle={activeStyle} hoverStyle={hoverStyle} wrapRef={wrapRef} onTipX={setTipX} onHover={setHovered} onClick={onDeselect}>
