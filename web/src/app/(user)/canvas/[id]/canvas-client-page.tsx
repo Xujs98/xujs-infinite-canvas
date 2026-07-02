@@ -2234,13 +2234,22 @@ function InfiniteCanvasPage() {
             );
             const effectivePrompt = generationContext.prompt.trim();
             const markSourceStatus = sourceNode?.type !== CanvasNodeType.Image && !editingTextNode;
+            const deferRemoteMediaPersistence = generationConfig.channelMode === "remote" && (mode === "image" || mode === "video");
             const statusPrompt = sourceNode?.type === CanvasNodeType.Config ? effectivePrompt : prompt;
             if (!effectivePrompt && (mode === "text" || mode === "audio")) {
                 setRunningNodeId(null);
                 return;
             }
             let pendingChildIds: string[] = [];
-            if (markSourceStatus) setNodes((prev) => prev.map((node) => (node.id === nodeId ? { ...node, metadata: { ...node.metadata, prompt: statusPrompt, status: NODE_STATUS_LOADING, errorDetails: undefined } } : node)));
+            if (markSourceStatus)
+                setNodes((prev) => {
+                    const next = prev.map((node) => (node.id === nodeId ? { ...node, metadata: { ...node.metadata, prompt: statusPrompt, status: NODE_STATUS_LOADING, errorDetails: undefined } } : node));
+                    if (deferRemoteMediaPersistence) {
+                        skipNextHistoryCommitRef.current = true;
+                        skipNextProjectAutosaveRef.current = true;
+                    }
+                    return next;
+                });
 
             try {
                 if (mode === "image") {
@@ -2334,7 +2343,14 @@ function InfiniteCanvasPage() {
                         ...childNodes,
                     ];
                     const nextImageConnections = [...connectionsRef.current, ...batchConnections];
-                    persistCanvasNow(nextImageNodes, nextImageConnections);
+                    if (generationConfig.channelMode === "remote") {
+                        nodesRef.current = nextImageNodes;
+                        connectionsRef.current = nextImageConnections;
+                        skipNextHistoryCommitRef.current = true;
+                        skipNextProjectAutosaveRef.current = true;
+                    } else {
+                        persistCanvasNow(nextImageNodes, nextImageConnections);
+                    }
                     setNodes(nextImageNodes);
                     setConnections(nextImageConnections);
                     setSelectedNodeIds(new Set([nodeId]));
@@ -2359,7 +2375,7 @@ function InfiniteCanvasPage() {
                                                           ...node,
                                                           metadata: {
                                                               ...node.metadata,
-                                                              generationTaskKind: "image",
+                                                              generationTaskKind: "image" as const,
                                                               generationTaskId: task.id,
                                                               generationTaskModel: generationConfig.model,
                                                               generationTaskCanvasId: projectId,
@@ -2367,7 +2383,7 @@ function InfiniteCanvasPage() {
                                                       }
                                                     : node,
                                             );
-                                            persistCanvasNow(next);
+                                            persistCanvasNow(next, nextImageConnections);
                                             return next;
                                         },
                                     );
@@ -2446,7 +2462,14 @@ function InfiniteCanvasPage() {
                     pendingChildIds = [videoId];
                     const nextVideoNodes = isEmptyVideoNode ? nodesRef.current.map((node) => (node.id === nodeId ? { ...node, ...videoNode } : node)) : [...nodesRef.current.map((node) => (node.id === nodeId ? { ...node, metadata: { ...node.metadata, status: NODE_STATUS_SUCCESS } } : node)), videoNode];
                     const nextVideoConnections = isEmptyVideoNode ? connectionsRef.current : [...connectionsRef.current, { id: nanoid(), fromNodeId: nodeId, toNodeId: videoId }];
-                    persistCanvasNow(nextVideoNodes, nextVideoConnections);
+                    if (generationConfig.channelMode === "remote") {
+                        nodesRef.current = nextVideoNodes;
+                        connectionsRef.current = nextVideoConnections;
+                        skipNextHistoryCommitRef.current = true;
+                        skipNextProjectAutosaveRef.current = true;
+                    } else {
+                        persistCanvasNow(nextVideoNodes, nextVideoConnections);
+                    }
                     setNodes(nextVideoNodes);
                     setConnections(nextVideoConnections);
                     if (generationConfig.model === "grok-imagine-video-1.5-preview" && generationContext.referenceImages.length === 0) {
@@ -2475,7 +2498,7 @@ function InfiniteCanvasPage() {
                                       }
                                     : node,
                             );
-                            persistCanvasNow(next);
+                            persistCanvasNow(next, nextVideoConnections);
                             return next;
                         },
                     );
@@ -3774,6 +3797,9 @@ function resetInterruptedGeneration(nodes: CanvasNodeData[]) {
             };
         }
         if (node.type === CanvasNodeType.Image && node.metadata.generationTaskKind === "image" && node.metadata.generationTaskId) {
+            return { ...node, metadata: { ...node.metadata, errorDetails: undefined } };
+        }
+        if (node.type === CanvasNodeType.Image && node.metadata.isBatchRoot && node.metadata.batchChildIds?.length) {
             return { ...node, metadata: { ...node.metadata, errorDetails: undefined } };
         }
         if (node.type === CanvasNodeType.Video && node.metadata.generationTaskId && node.metadata.generationTaskProvider) {
