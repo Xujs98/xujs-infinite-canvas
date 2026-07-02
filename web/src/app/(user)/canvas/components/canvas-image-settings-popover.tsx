@@ -2,13 +2,14 @@
 
 import { useEffect, useRef, useState, type RefObject } from "react";
 import { createPortal } from "react-dom";
-import { Check, Settings2, X } from "lucide-react";
+import { Settings2 } from "lucide-react";
 import { Button } from "antd";
 
 import { ImageSettingsPanel, imageQualityLabel, imageSizeLabel } from "@/components/image-settings-panel";
 import type { CanvasTheme } from "@/lib/canvas-theme";
 import { useCanvasTheme } from "@/hooks/use-canvas-theme";
 import type { AiConfig } from "@/stores/use-config-store";
+import { CanvasMobileSettingsPortal } from "./canvas-mobile-settings-portal";
 
 type CanvasImageSettingsPopoverProps = {
     config: AiConfig;
@@ -66,15 +67,6 @@ export function CanvasImageSettingsPopover({ config, onConfigChange, onOpenChang
         };
     }, [mobileFullscreen, onOpenChange, open]);
 
-    useEffect(() => {
-        if (!open || !mobileFullscreen) return;
-        const previousOverflow = document.body.style.overflow;
-        document.body.style.overflow = "hidden";
-        return () => {
-            document.body.style.overflow = previousOverflow;
-        };
-    }, [mobileFullscreen, open]);
-
     const panel = open ? (
         mobileFullscreen ? (
             <MobileImageSettingsPortal panelRef={panelRef} theme={theme} config={config} onConfigChange={onConfigChange} onClose={() => updateOpen(false)} />
@@ -110,44 +102,10 @@ function MobileImageSettingsPortal({
     onConfigChange: (key: keyof AiConfig, value: string) => void;
     onClose: () => void;
 }) {
-    return createPortal(
-        <div
-            ref={panelRef}
-            className="canvas-image-settings-popover fixed inset-0 z-[1600] flex flex-col"
-            style={{ background: theme.canvas.background, color: theme.node.text }}
-            onPointerDown={(event) => event.stopPropagation()}
-            onMouseDown={(event) => event.stopPropagation()}
-            onClick={(event) => event.stopPropagation()}
-        >
-            <div className="flex h-[calc(56px+env(safe-area-inset-top))] shrink-0 items-end justify-between border-b px-4 pb-3" style={{ borderColor: theme.toolbar.border, background: theme.toolbar.panel }}>
-                <div className="min-w-0">
-                    <div className="text-lg font-semibold">图像设置</div>
-                    <div className="mt-0.5 text-xs" style={{ color: theme.node.muted }}>
-                        配置完成后点击确定返回画布
-                    </div>
-                </div>
-                <button type="button" className="grid size-11 shrink-0 place-items-center rounded-full" style={{ background: theme.node.fill, color: theme.node.text }} onClick={onClose} aria-label="关闭图像设置">
-                    <X className="size-5" />
-                </button>
-            </div>
-
-            <div className="thin-scrollbar min-h-0 flex-1 overflow-y-auto px-4 py-5">
-                <ImageSettingsPanel
-                    config={config}
-                    onConfigChange={(key, value) => onConfigChange(key, value)}
-                    theme={theme}
-                    showTitle={false}
-                    className="mobile-image-settings-panel mx-auto w-full max-w-[560px] space-y-6 pb-28"
-                />
-            </div>
-
-            <div className="shrink-0 border-t px-4 pb-[calc(1rem+env(safe-area-inset-bottom))] pt-3" style={{ borderColor: theme.toolbar.border, background: theme.toolbar.panel }}>
-                <Button type="primary" size="large" block className="!h-12 !rounded-xl !font-semibold" icon={<Check className="size-4" />} onClick={onClose}>
-                    确定
-                </Button>
-            </div>
-        </div>,
-        document.body,
+    return (
+        <CanvasMobileSettingsPortal panelRef={panelRef} theme={theme} title="图像设置" closeLabel="关闭图像设置" onClose={onClose}>
+            <ImageSettingsPanel config={config} onConfigChange={(key, value) => onConfigChange(key, value)} theme={theme} showTitle={false} className="mobile-image-settings-panel mx-auto w-full max-w-[560px] space-y-6 pb-28" />
+        </CanvasMobileSettingsPortal>
     );
 }
 
