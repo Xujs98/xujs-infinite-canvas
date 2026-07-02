@@ -218,6 +218,39 @@
         font-size: 16px;
     }
 
+    @media (max-width: 767px), (pointer: coarse) {
+        .canvas-connection-handle {
+            width: 64px;
+            height: 64px;
+        }
+
+        .canvas-connection-handle.-left-6 {
+            left: -32px;
+        }
+
+        .canvas-connection-handle.-right-6 {
+            right: -32px;
+        }
+
+        .canvas-connection-handle-dot {
+            width: 20px;
+            height: 20px;
+            animation: canvas-connection-handle-pulse 1.6s ease-in-out infinite;
+        }
+    }
+
+    @keyframes canvas-connection-handle-pulse {
+        0%,
+        100% {
+            transform: scale(0.92);
+            filter: brightness(1);
+        }
+        50% {
+            transform: scale(1.22);
+            filter: brightness(1.18);
+        }
+    }
+
     .prompt-filter-tag.ant-tag-checkable {
         margin: 0;
         border: 1px solid transparent;

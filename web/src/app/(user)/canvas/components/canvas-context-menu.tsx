@@ -9,9 +9,11 @@ import type { ContextMenuState } from "../types";
 
 export function CanvasNodeContextMenu({ menu, onClose, onDuplicate, onDelete }: { menu: ContextMenuState; onClose: () => void; onDuplicate: () => void; onDelete: () => void }) {
     const theme = useCanvasTheme();
-    const menuWidth = 176;
+    const isConnectionMenu = menu.type === "connection";
+    const menuWidth = isConnectionMenu ? 68 : 176;
+    const menuHeight = isConnectionMenu ? 68 : 112;
     const menuX = typeof window === "undefined" ? menu.x : Math.min(menu.x, window.innerWidth - menuWidth - 12);
-    const menuY = typeof window === "undefined" ? menu.y : Math.min(menu.y, window.innerHeight - 112);
+    const menuY = typeof window === "undefined" ? menu.y : Math.min(menu.y, window.innerHeight - menuHeight - 12);
 
     useEffect(() => {
         const close = (event: PointerEvent) => {
@@ -25,12 +27,25 @@ export function CanvasNodeContextMenu({ menu, onClose, onDuplicate, onDelete }: 
 
     return (
         <div
-            className="fixed z-[80] min-w-44 overflow-hidden rounded-xl border py-1 shadow-2xl"
+            className={`fixed z-[80] overflow-hidden rounded-xl border shadow-2xl ${isConnectionMenu ? "p-2" : "min-w-44 py-1"}`}
             style={{ left: Math.max(12, menuX), top: Math.max(12, menuY), background: theme.toolbar.panel, borderColor: theme.toolbar.border, color: theme.node.text }}
             onPointerDown={(event) => event.stopPropagation()}
         >
-            {menu.type === "node" ? <MenuButton icon={<Plus className="size-4" />} label="复制" onClick={onDuplicate} /> : null}
-            <MenuButton icon={<Trash2 className="size-4" />} label="删除" onClick={onDelete} danger />
+            {isConnectionMenu ? (
+                <button
+                    type="button"
+                    aria-label="删除连接线"
+                    className="flex size-12 items-center justify-center rounded-full text-red-400 transition hover:bg-red-500/10 active:scale-95"
+                    onClick={onDelete}
+                >
+                    <Trash2 className="size-5" />
+                </button>
+            ) : (
+                <>
+                    <MenuButton icon={<Plus className="size-4" />} label="复制" onClick={onDuplicate} />
+                    <MenuButton icon={<Trash2 className="size-4" />} label="删除" onClick={onDelete} danger />
+                </>
+            )}
         </div>
     );
 }
