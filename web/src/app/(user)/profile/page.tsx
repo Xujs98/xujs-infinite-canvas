@@ -1,26 +1,39 @@
 "use client";
 
 import { CalendarOutlined, CheckCircleFilled, ClockCircleOutlined, CopyOutlined, CrownOutlined, GiftOutlined, ProfileOutlined, SafetyOutlined, UserOutlined, WalletOutlined } from "@ant-design/icons";
-import { App, Button, Input, Pagination, Space, Table, Tag, Typography } from "antd";
+import { App, Button, Input, Pagination, Table, Tag, Typography } from "antd";
 import dayjs from "dayjs";
-import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { bindAffCode, dailyCheckIn, fetchCheckInMonth, fetchUserCreditLogs, redeemCode, updateProfile, type CheckIn, type CreditLog } from "@/services/api/auth";
 import { useConfigStore } from "@/stores/use-config-store";
 import { useUserStore } from "@/stores/use-user-store";
 
+function useProfileMobile() {
+    const [isMobile, setIsMobile] = useState(false);
+
+    useEffect(() => {
+        const query = window.matchMedia("(max-width: 767px), (pointer: coarse)");
+        const update = () => setIsMobile(query.matches);
+        update();
+        query.addEventListener("change", update);
+        return () => query.removeEventListener("change", update);
+    }, []);
+
+    return isMobile;
+}
+
 function InfoRow({ label, value, copyable }: { label: string; value: string; copyable?: boolean }) {
     const { message } = App.useApp();
     return (
-        <div className="flex flex-col gap-1">
+        <div className="min-w-0 rounded-lg bg-stone-50/80 p-3 sm:bg-transparent sm:p-0 dark:bg-stone-800/40 sm:dark:bg-transparent">
             <span className="text-xs text-stone-400 dark:text-stone-500">{label}</span>
-            <div className="flex items-center gap-2">
-                <span className="text-sm text-stone-700 dark:text-stone-200">{value || "-"}</span>
+            <div className="mt-1 flex min-w-0 items-center gap-2">
+                <span className="min-w-0 truncate text-sm text-stone-700 dark:text-stone-200">{value || "-"}</span>
                 {copyable && value && (
                     <button
                         type="button"
-                        className="text-stone-400 transition-colors hover:text-stone-600 dark:text-stone-500 dark:hover:text-stone-300"
+                        className="shrink-0 text-stone-400 transition-colors hover:text-stone-600 dark:text-stone-500 dark:hover:text-stone-300"
                         onClick={() => {
                             navigator.clipboard.writeText(value).then(() => message.success("已复制"));
                         }}
@@ -35,11 +48,11 @@ function InfoRow({ label, value, copyable }: { label: string; value: string; cop
 
 function StatCard({ icon, label, value }: { icon: React.ReactNode; label: string; value: string | number }) {
     return (
-        <div className="rounded-lg border border-stone-200 bg-stone-50 p-4 dark:border-stone-800 dark:bg-stone-800/50">
+        <div className="min-w-0 rounded-lg border border-stone-200 bg-stone-50 p-3 sm:p-4 dark:border-stone-800 dark:bg-stone-800/50">
             <div className="flex items-center gap-2 text-xs text-stone-500 dark:text-stone-400">
                 {icon} {label}
             </div>
-            <div className="mt-2 text-xl font-semibold text-stone-800 dark:text-stone-100">{value}</div>
+            <div className="mt-2 break-words text-lg font-semibold leading-tight text-stone-800 sm:text-xl dark:text-stone-100">{value}</div>
         </div>
     );
 }
@@ -125,7 +138,7 @@ function ProfileTab() {
     return (
         <>
             {/* 统计卡片 */}
-            <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-3">
+            <div className="mt-5 grid grid-cols-2 gap-3 sm:mt-6 sm:grid-cols-3">
                 <StatCard icon={<WalletOutlined />} label="算力点余额" value={`⚡ ${user.credits}`} />
                 <StatCard
                     icon={<CrownOutlined />}
@@ -136,7 +149,7 @@ function ProfileTab() {
             </div>
 
             {/* 详细信息 */}
-            <div className="mt-6 grid grid-cols-1 gap-5 border-t border-stone-200 pt-6 dark:border-stone-800 sm:grid-cols-2">
+            <div className="mt-5 grid grid-cols-1 gap-3 border-t border-stone-200 pt-5 sm:mt-6 sm:grid-cols-2 sm:gap-5 sm:pt-6 dark:border-stone-800">
                 <InfoRow label="用户 ID" value={user.id} copyable />
                 <InfoRow label="邀请码" value={user.affCode} copyable />
                 <InfoRow label="邀请链接" value={inviteLink} copyable />
@@ -153,17 +166,18 @@ function ProfileTab() {
                     <div className="mb-3 text-sm font-medium text-stone-700 dark:text-stone-200">
                         <span className="mr-1 text-red-500">*</span>补填邀请人邀请码
                     </div>
-                    <Space.Compact className="w-full">
+                    <div className="flex flex-col gap-2 sm:flex-row">
                         <Input
                             placeholder="注册时忘记填写可在这里补填"
                             value={affCodeInput}
                             onChange={(e) => setAffCodeInput(e.target.value)}
                             onPressEnter={() => void handleBindAffCode()}
+                            className="sm:flex-1"
                         />
                         <Button type="primary" loading={binding} onClick={() => void handleBindAffCode()}>
                             绑定邀请码
                         </Button>
-                    </Space.Compact>
+                    </div>
                 </div>
             )}
 
@@ -172,17 +186,18 @@ function ProfileTab() {
                 <div className="mb-3 text-sm font-medium text-stone-700 dark:text-stone-200">
                     <GiftOutlined className="mr-1" />兑换码
                 </div>
-                <Space.Compact className="w-full">
+                <div className="flex flex-col gap-2 sm:flex-row">
                     <Input
                         placeholder="输入兑换码充值算力点"
                         value={redeemInput}
                         onChange={(e) => setRedeemInput(e.target.value)}
                         onPressEnter={() => void handleRedeem()}
+                        className="sm:flex-1"
                     />
                     <Button type="primary" loading={redeeming} onClick={() => void handleRedeem()}>
                         立即兑换
                     </Button>
-                </Space.Compact>
+                </div>
             </div>
         </>
     );
@@ -191,6 +206,7 @@ function ProfileTab() {
 // 算力点明细 Tab
 function CreditLogsTab() {
     const token = useUserStore((state) => state.token);
+    const isMobile = useProfileMobile();
     const [logs, setLogs] = useState<CreditLog[]>([]);
     const [total, setTotal] = useState(0);
     const [page, setPage] = useState(1);
@@ -253,12 +269,12 @@ function CreditLogsTab() {
 
     return (
         <div className="mt-6">
-            <div className="mb-4 flex items-center justify-between">
-                <span className="text-sm text-stone-500 dark:text-stone-400">查看模型消费、失败返还、兑换码和后台调整记录。</span>
+            <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <span className="text-sm leading-5 text-stone-500 dark:text-stone-400">查看模型消费、失败返还、兑换码和后台调整记录。</span>
                 <select
                     value={typeFilter}
                     onChange={(e) => { setTypeFilter(e.target.value); setPage(1); }}
-                    className="rounded border border-stone-200 bg-white px-3 py-1.5 text-sm dark:border-stone-700 dark:bg-stone-800"
+                    className="h-10 rounded-lg border border-stone-200 bg-white px-3 text-sm dark:border-stone-700 dark:bg-stone-800"
                 >
                     <option value="">全部类型</option>
                     <option value="ai_consume">模型消费</option>
@@ -270,21 +286,49 @@ function CreditLogsTab() {
                     <option value="check_in">签到奖励</option>
                 </select>
             </div>
-            <Table
-                dataSource={logs}
-                columns={columns}
-                rowKey="id"
-                loading={loading}
-                pagination={false}
-                size="small"
-            />
-            <div className="mt-4 flex justify-end">
+            <div className="hidden sm:block">
+                <Table
+                    dataSource={logs}
+                    columns={columns}
+                    rowKey="id"
+                    loading={loading}
+                    pagination={false}
+                    size="small"
+                />
+            </div>
+            <div className="space-y-3 sm:hidden">
+                {loading ? (
+                    <div className="rounded-xl border border-stone-200 p-4 text-center text-sm text-stone-500 dark:border-stone-700 dark:text-stone-400">加载中...</div>
+                ) : logs.length ? (
+                    logs.map((item) => (
+                        <div key={item.id} className="rounded-xl border border-stone-200 bg-white p-4 shadow-sm dark:border-stone-800 dark:bg-stone-900/70">
+                            <div className="flex items-start justify-between gap-3">
+                                <Tag color={tagColorMap[item.type]}>{creditLogTypeLabels[item.type] || item.type}</Tag>
+                                <span className={`shrink-0 text-base font-semibold ${item.amount >= 0 ? "text-green-500" : "text-red-500"}`}>
+                                    {item.amount >= 0 ? "+" : ""}{item.amount} 点
+                                </span>
+                            </div>
+                            <div className="mt-3 grid grid-cols-2 gap-2 text-xs text-stone-500 dark:text-stone-400">
+                                <span>余额</span>
+                                <span className="text-right text-stone-700 dark:text-stone-200">{item.balance} 点</span>
+                                <span>时间</span>
+                                <span className="text-right text-stone-700 dark:text-stone-200">{item.createdAt ? dayjs(item.createdAt).format("MM-DD HH:mm") : "-"}</span>
+                            </div>
+                            <div className="mt-3 rounded-lg bg-stone-50 px-3 py-2 text-sm text-stone-500 dark:bg-stone-800/60 dark:text-stone-400">{item.remark || "-"}</div>
+                        </div>
+                    ))
+                ) : (
+                    <div className="rounded-xl border border-stone-200 p-4 text-center text-sm text-stone-500 dark:border-stone-700 dark:text-stone-400">暂无记录</div>
+                )}
+            </div>
+            <div className="mt-4 flex justify-center sm:justify-end">
                 <Pagination
                     current={page}
                     pageSize={pageSize}
                     total={total}
-                    showSizeChanger
-                    showQuickJumper
+                    showSizeChanger={!isMobile}
+                    showQuickJumper={!isMobile}
+                    responsive
                     showTotal={(t) => `共 ${t} 条`}
                     onChange={(p, ps) => { setPage(p); setPageSize(ps); }}
                 />
@@ -384,7 +428,7 @@ function CheckInTab() {
     return (
         <div className="mt-6">
             {/* 标题和签到按钮 */}
-            <div className="mb-4 flex items-center justify-between">
+            <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                     <div className="flex items-center gap-2 text-lg font-medium text-stone-800 dark:text-stone-100">
                         <CalendarOutlined /> 每日签到
@@ -396,6 +440,7 @@ function CheckInTab() {
                     loading={loading}
                     disabled={todayChecked}
                     onClick={() => void handleCheckIn()}
+                    className="w-full sm:w-auto"
                 >
                     {todayChecked ? "今日已签到" : "立即签到"}
                 </Button>
@@ -409,7 +454,7 @@ function CheckInTab() {
             </div>
 
             {/* 日历 */}
-            <div className="rounded-lg border border-stone-200 p-4 dark:border-stone-700">
+            <div className="rounded-lg border border-stone-200 p-3 sm:p-4 dark:border-stone-700">
                 {/* 月份导航 */}
                 <div className="mb-4 flex items-center justify-between">
                     <Button
@@ -445,7 +490,7 @@ function CheckInTab() {
                     {calendarDays.map((item, index) => (
                         <div
                             key={index}
-                            className={`relative flex flex-col items-center justify-center rounded-lg p-2 text-sm ${
+                            className={`relative flex min-h-12 flex-col items-center justify-center rounded-lg p-1.5 text-xs sm:p-2 sm:text-sm ${
                                 !item.isCurrentMonth
                                     ? "text-stone-300 dark:text-stone-600"
                                     : item.checkIn
@@ -538,7 +583,7 @@ function SecurityTab() {
             {/* 修改昵称 */}
             <div className="rounded-lg border border-stone-200 p-4 dark:border-stone-700">
                 <div className="mb-3 text-sm font-medium text-stone-700 dark:text-stone-300">修改昵称</div>
-                <div className="flex gap-2">
+                <div className="flex flex-col gap-2 sm:flex-row">
                     <Input
                         value={displayName}
                         onChange={(e) => setDisplayName(limitDisplayName(e.target.value))}
@@ -546,7 +591,7 @@ function SecurityTab() {
                         placeholder="请输入新昵称"
                         className="flex-1"
                     />
-                    <Button type="primary" onClick={handleUpdateDisplayName} loading={loading}>
+                    <Button type="primary" onClick={handleUpdateDisplayName} loading={loading} className="sm:w-auto">
                         保存
                     </Button>
                 </div>
@@ -572,7 +617,7 @@ function SecurityTab() {
                         onChange={(e) => setConfirmPassword(e.target.value)}
                         placeholder="确认新密码"
                     />
-                    <Button type="primary" onClick={handleChangePassword} loading={loading}>
+                    <Button type="primary" onClick={handleChangePassword} loading={loading} className="w-full sm:w-auto">
                         修改密码
                     </Button>
                 </div>
@@ -612,9 +657,9 @@ export default function ProfilePage() {
     }
 
     return (
-        <main className="mx-auto max-w-4xl overflow-y-auto px-6 py-8">
+        <main className="mx-auto min-h-full max-w-4xl overflow-y-auto px-3 py-4 sm:px-6 sm:py-8">
             {/* 导航标签栏 */}
-            <div className="relative mb-4 flex gap-1 rounded-lg border border-stone-200 bg-stone-50 p-1 dark:border-stone-700 dark:bg-stone-800/50">
+            <div className="thin-scrollbar relative mb-3 flex gap-1 overflow-x-auto rounded-xl border border-stone-200 bg-stone-50 p-1 dark:border-stone-700 dark:bg-stone-800/50 sm:mb-4 sm:overflow-visible">
                 {/* 滑动指示器 */}
                 <div
                     className="absolute top-1 bottom-1 rounded-md bg-white shadow-sm transition-all duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] dark:bg-stone-700"
@@ -625,7 +670,7 @@ export default function ProfilePage() {
                         key={tab.key}
                         ref={(el) => { tabsRef.current[tab.key] = el; }}
                         onClick={() => setActiveTab(tab.key)}
-                        className={`relative z-10 flex flex-1 items-center justify-center gap-2 rounded-md px-4 py-2.5 text-sm font-medium transition-colors ${
+                        className={`relative z-10 flex min-w-max flex-none items-center justify-center gap-2 rounded-md px-3 py-2.5 text-sm font-medium transition-colors sm:flex-1 sm:px-4 ${
                             activeTab === tab.key
                                 ? "text-blue-600 dark:text-blue-400"
                                 : "text-stone-600 hover:text-stone-800 dark:text-stone-400 dark:hover:text-stone-200"
@@ -637,18 +682,18 @@ export default function ProfilePage() {
                 ))}
             </div>
 
-            <div className="rounded-xl border border-stone-200 bg-white p-6 dark:border-stone-800 dark:bg-stone-900/50">
+            <div className="rounded-xl border border-stone-200 bg-white p-4 dark:border-stone-800 dark:bg-stone-900/50 sm:p-6">
                 {/* 用户信息头部 */}
-                <div className="flex items-center gap-4">
-                    <div className="flex size-14 items-center justify-center rounded-full bg-stone-200 text-xl text-stone-500 dark:bg-stone-700 dark:text-stone-300">
+                <div className="flex items-center gap-3 sm:gap-4">
+                    <div className="flex size-12 shrink-0 items-center justify-center rounded-full bg-stone-200 text-xl text-stone-500 dark:bg-stone-700 dark:text-stone-300 sm:size-14">
                         {user.avatarUrl ? (
-                            <img src={user.avatarUrl} alt="" className="size-14 rounded-full object-cover" />
+                            <img src={user.avatarUrl} alt="" className="size-12 rounded-full object-cover sm:size-14" />
                         ) : (
                             <UserOutlined />
                         )}
                     </div>
-                    <div>
-                        <div className="text-lg font-medium text-stone-800 dark:text-stone-100">{user.displayName || user.username}</div>
+                    <div className="min-w-0">
+                        <div className="truncate text-lg font-medium text-stone-800 dark:text-stone-100">{user.displayName || user.username}</div>
                         <div className="text-sm text-stone-400 dark:text-stone-500">@{user.username}</div>
                     </div>
                 </div>
