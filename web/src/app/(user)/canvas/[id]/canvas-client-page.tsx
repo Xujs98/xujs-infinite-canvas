@@ -2135,7 +2135,7 @@ function InfiniteCanvasPage() {
                     }
                     if (state.status === "failed") throw new Error(state.error);
                     if (state.status === "pending" && state.progress !== undefined) {
-                        setNodes((prev) => prev.map((node) => (node.id === videoId ? { ...node, metadata: { ...node.metadata, status: NODE_STATUS_LOADING, progress: state.progress } } : node)));
+                        setNodes((prev) => prev.map((node) => (node.id === videoId && !node.metadata?.content ? { ...node, metadata: { ...node.metadata, status: NODE_STATUS_LOADING, progress: state.progress } } : node)));
                     }
                     if (maxTimeoutMs > 0 && Date.now() - startedAt >= maxTimeoutMs) throw new Error("视频生成超时，请稍后重试");
                     if (attempt >= 240) throw new Error("视频生成超时，请稍后重试");
@@ -2548,11 +2548,13 @@ function InfiniteCanvasPage() {
                 }
                 if (payload.type !== "generation-task-updated") return;
                 if (payload.canvasId && payload.canvasId !== projectId) return;
+                if (!payload.nodeId && !payload.taskId) return;
                 setNodes((prev) =>
                     prev.map((node) => {
                         if (payload.nodeId && node.id !== payload.nodeId) return node;
                         if (payload.taskId && node.metadata?.generationTaskId !== payload.taskId) return node;
                         if (payload.status === "running" || payload.status === "pending") {
+                            if (node.metadata?.content) return { ...node, metadata: { ...node.metadata, status: NODE_STATUS_SUCCESS, progress: undefined } };
                             return { ...node, metadata: { ...node.metadata, status: NODE_STATUS_LOADING, progress: payload.progress } };
                         }
                         if (payload.status === "failed") {
@@ -3627,6 +3629,21 @@ function buildGenerationConfig(config: AiConfig, node: CanvasNodeData | undefine
 function resetInterruptedGeneration(nodes: CanvasNodeData[]) {
     return nodes.map((node) => {
         if (node.metadata?.status !== "loading") return node;
+        if ((node.type === CanvasNodeType.Image || node.type === CanvasNodeType.Video || node.type === CanvasNodeType.Audio) && node.metadata.content) {
+            return {
+                ...node,
+                metadata: {
+                    ...node.metadata,
+                    status: "success" as const,
+                    progress: undefined,
+                    errorDetails: undefined,
+                    generationTaskId: undefined,
+                    generationTaskProvider: undefined,
+                    generationTaskModel: undefined,
+                    generationTaskCanvasId: undefined,
+                },
+            };
+        }
         if (node.type === CanvasNodeType.Image && node.metadata.generationTaskKind === "image" && node.metadata.generationTaskId) {
             return { ...node, metadata: { ...node.metadata, errorDetails: undefined } };
         }
