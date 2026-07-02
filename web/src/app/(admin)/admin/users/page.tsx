@@ -3,8 +3,8 @@
 import { DeleteOutlined, EditOutlined, PlusOutlined, ReloadOutlined, SearchOutlined } from "@ant-design/icons";
 import { ProTable, type ProColumns } from "@ant-design/pro-components";
 import { Avatar, Button, Card, Col, DatePicker, Divider, Flex, Form, Input, InputNumber, Modal, Row, Select, Space, Tag, Tooltip, Typography } from "antd";
-import dayjs from "dayjs";
-import { useEffect, useState } from "react";
+import dayjs, { type Dayjs } from "dayjs";
+import { useEffect, useMemo, useState } from "react";
 
 import type { AdminUser } from "@/services/api/admin";
 import { useQuery } from "@tanstack/react-query";
@@ -12,7 +12,7 @@ import { useAdminUsers } from "./use-admin-users";
 import { fetchAllRoles, type AdminRole } from "@/services/api/role";
 import { useUserStore } from "@/stores/use-user-store";
 
-type UserFormValues = Partial<AdminUser> & { password?: string };
+type UserFormValues = Omit<Partial<AdminUser>, "membershipExpiresAt"> & { password?: string; membershipExpiresAt?: Dayjs | string };
 
 // roleOptions fetched dynamically from server
 
@@ -28,7 +28,15 @@ export default function AdminUsersPage() {
         queryFn: () => fetchAllRoles(),
         staleTime: 60000,
     });
-    const roleOptions = (rolesData || []).map((r: AdminRole) => ({ label: r.label, value: r.name }));
+    const roles = rolesData || [];
+    const roleOptions = roles.map((r: AdminRole) => ({ label: r.label, value: r.name }));
+    const roleLabelMap = useMemo(() => {
+        const map = new Map<string, string>();
+        for (const roleItem of roles) {
+            map.set(roleItem.name, roleItem.label || roleItem.name);
+        }
+        return map;
+    }, [roles]);
     const { users, keyword, role, status, page, pageSize, total, isLoading, searchUsers, changeRole, changeStatus, changePage, changePageSize, resetFilters, refreshUsers, saveUser: saveAdminUser, adjustCredits, deleteUser, batchDeleteUsers, batchUpdateStatus } = useAdminUsers();
     const [form] = Form.useForm<UserFormValues>();
     const [keywordText, setKeywordText] = useState(keyword);
@@ -43,12 +51,10 @@ export default function AdminUsersPage() {
 
     useEffect(() => {
         if (editingUser) {
-            const isMember = editingUser.membershipExpiresAt ? dayjs(editingUser.membershipExpiresAt).isAfter(dayjs()) : false;
             form.setFieldsValue({
-                role: "user",
                 status: "active",
                 ...editingUser,
-                role: editingUser.role === "admin" ? "admin" : isMember ? "member" : "user",
+                role: editingUser.role || "user",
                 password: "",
                 membershipExpiresAt: editingUser.membershipExpiresAt ? dayjs(editingUser.membershipExpiresAt) : undefined,
             });
@@ -59,8 +65,9 @@ export default function AdminUsersPage() {
         const value = await form.validateFields();
         const userValue = { ...value };
         delete userValue.credits;
+        delete userValue.membershipExpiresAt;
         const role = value.role;
-        const membershipExpiresAt = value.membershipExpiresAt ? value.membershipExpiresAt.toISOString() : "";
+        const membershipExpiresAt = dayjs.isDayjs(value.membershipExpiresAt) ? value.membershipExpiresAt.toISOString() : value.membershipExpiresAt || "";
         await saveAdminUser({ ...editingUser, ...userValue, role, membershipExpiresAt, password: value.password || undefined });
         setEditingUser(null);
     };
@@ -100,9 +107,12 @@ export default function AdminUsersPage() {
             dataIndex: "role",
             width: 100,
             render: (_, item) => {
-                const isMembership = item.membershipExpiresAt && dayjs(item.membershipExpiresAt).isAfter(dayjs());
-                if (item.role === "admin") return <Tag color="gold">管理员</Tag>;
-                return <Tag color={isMembership ? "blue" : "default"}>{isMembership ? "会员" : "用户"}</Tag>;
+                const colorMap: Record<string, string> = {
+                    admin: "gold",
+                    member: "blue",
+                    user: "default",
+                };
+                return <Tag color={colorMap[item.role] || "geekblue"}>{roleLabelMap.get(item.role) || item.role || "-"}</Tag>;
             },
         },
         {
