@@ -312,6 +312,7 @@ function InfiniteCanvasPage() {
     const [pendingConnectionCreate, setPendingConnectionCreate] = useState<PendingConnectionCreate | null>(null);
     const [mouseWorld, setMouseWorld] = useState<Position>({ x: 0, y: 0 });
     const [selectionBox, setSelectionBox] = useState<SelectionBox | null>(null);
+    const [mobileSelectMode, setMobileSelectMode] = useState(false);
     const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
     const [scriptPanelOpen, setScriptPanelOpen] = useState(false);
     const [runningNodeId, setRunningNodeId] = useState<string | null>(null);
@@ -1034,7 +1035,7 @@ function InfiniteCanvasPage() {
             if (pendingConnectionCreateRef.current) cancelPendingConnectionCreate();
             if (event.button !== 0) return;
 
-            if (!event.ctrlKey && !event.metaKey) {
+            if (!mobileSelectMode && !event.ctrlKey && !event.metaKey) {
                 setSelectionBox(null);
                 setSelectedNodeIds(new Set());
                 setSelectedConnectionId(null);
@@ -1058,7 +1059,7 @@ function InfiniteCanvasPage() {
 
             setSelectedConnectionId(null);
         },
-        [cancelPendingConnectionCreate, screenToCanvas],
+        [cancelPendingConnectionCreate, mobileSelectMode, screenToCanvas],
     );
 
     const handleNodeMouseDown = useCallback((event: ReactMouseEvent | ReactPointerEvent, nodeId: string) => {
@@ -1099,12 +1100,19 @@ function InfiniteCanvasPage() {
             } else {
                 nextSelected.add(nodeId);
             }
+        } else if (mobileSelectMode && event.nativeEvent instanceof PointerEvent && event.nativeEvent.pointerType === "touch") {
+            if (nextSelected.has(nodeId)) nextSelected.delete(nodeId);
+            else nextSelected.add(nodeId);
         } else if (!nextSelected.has(nodeId)) {
             nextSelected.clear();
             nextSelected.add(nodeId);
         }
 
         setSelectedNodeIds(nextSelected);
+        if (mobileSelectMode && event.nativeEvent instanceof PointerEvent && event.nativeEvent.pointerType === "touch") {
+            setDialogNodeId(null);
+            return;
+        }
         const dragIds = new Set(nextSelected);
         currentNodes.forEach((node) => {
             if (nextSelected.has(node.id)) node.metadata?.batchChildIds?.forEach((childId) => dragIds.add(childId));
@@ -1119,7 +1127,7 @@ function InfiniteCanvasPage() {
         historyPausedRef.current = true;
         nodeDraggingRef.current = true;
         setIsNodeDragging(true);
-    }, [keepNodeToolbar]);
+    }, [keepNodeToolbar, mobileSelectMode]);
 
     const finishNodeDrag = useCallback((clientX?: number, clientY?: number) => {
         if (rafRef.current) {
@@ -2860,6 +2868,7 @@ function InfiniteCanvasPage() {
                     containerRef={containerRef}
                     viewport={viewport}
                     backgroundMode={backgroundMode}
+                    selectionMode={mobileSelectMode}
                     onViewportChange={(next) => {
                         setViewport(next);
                         setContextMenu(null);
@@ -3042,6 +3051,7 @@ function InfiniteCanvasPage() {
 
                 <CanvasToolbar
                     selectedCount={selectedNodeIds.size}
+                    selectionMode={mobileSelectMode}
                     canUndo={historyState.canUndo}
                     canRedo={historyState.canRedo}
                     backgroundMode={backgroundMode}
@@ -3057,6 +3067,7 @@ function InfiniteCanvasPage() {
                     onDelete={() => deleteNodes(new Set(selectedNodeIds))}
                     onClear={() => setClearConfirmOpen(true)}
                     onDeselect={deselectCanvas}
+                    onSelectionModeChange={setMobileSelectMode}
                     onBackgroundModeChange={setBackgroundMode}
                     onShowImageInfoChange={setShowImageInfo}
                     onOpenScriptAssistant={() => setScriptPanelOpen(true)}

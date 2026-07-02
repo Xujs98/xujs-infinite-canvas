@@ -10,6 +10,7 @@ type InfiniteCanvasProps = {
     containerRef: React.RefObject<HTMLDivElement | null>;
     viewport: ViewportTransform;
     backgroundMode?: CanvasBackgroundMode;
+    selectionMode?: boolean;
     onViewportChange: (viewport: ViewportTransform) => void;
     onCanvasMouseDown?: (event: React.PointerEvent<HTMLDivElement>) => void;
     onCanvasDeselect?: () => void;
@@ -18,7 +19,7 @@ type InfiniteCanvasProps = {
     children: React.ReactNode;
 };
 
-export function InfiniteCanvas({ containerRef, viewport, backgroundMode = "lines", onViewportChange, onCanvasMouseDown, onCanvasDeselect, onContextMenu, onDrop, children }: InfiniteCanvasProps) {
+export function InfiniteCanvas({ containerRef, viewport, backgroundMode = "lines", selectionMode = false, onViewportChange, onCanvasMouseDown, onCanvasDeselect, onContextMenu, onDrop, children }: InfiniteCanvasProps) {
     const theme = useCanvasTheme();
     const panState = useRef({
         isPanning: false,
@@ -126,7 +127,7 @@ export function InfiniteCanvas({ containerRef, viewport, backgroundMode = "lines
             }
         }
 
-        if (event.button === 0 && (event.ctrlKey || event.metaKey) && isBackgroundClick) {
+        if (event.button === 0 && isBackgroundClick && (selectionMode || event.ctrlKey || event.metaKey)) {
             event.preventDefault();
             event.currentTarget.setPointerCapture(event.pointerId);
             onCanvasMouseDown?.(event);

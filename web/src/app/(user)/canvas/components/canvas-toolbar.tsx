@@ -1,7 +1,7 @@
 import type { CSSProperties, MouseEvent as ReactMouseEvent, ReactNode, RefObject } from "react";
 import { useEffect, useRef, useState } from "react";
 import { Button, Segmented, Switch } from "antd";
-import { CircleDot, Sparkles, Eraser, FolderOpen, Grid2x2, Hand, Image as ImageIcon, Info, Library, Moon, Music2, Palette, Redo2, Settings2, Square, Sun, Trash2, Type, Undo2, Upload, Video, Clapperboard, X } from "lucide-react";
+import { CircleDot, Sparkles, Eraser, FolderOpen, Grid2x2, Hand, Image as ImageIcon, Info, Library, Moon, MousePointer2, Music2, Palette, Redo2, Settings2, Square, Sun, Trash2, Type, Undo2, Upload, Video, Clapperboard, X } from "lucide-react";
 
 import { canvasThemes, type CanvasBackgroundMode, type CanvasColorTheme, type CanvasTheme, type ThemePalette, themePaletteLabels, themePalettePreviews } from "@/lib/canvas-theme";
 import { useCanvasTheme } from "@/hooks/use-canvas-theme";
@@ -12,6 +12,7 @@ const allPalettes: ThemePalette[] = ["stone", "blue", "emerald", "rose", "amber"
 
 export function CanvasToolbar({
     selectedCount,
+    selectionMode,
     canUndo,
     canRedo,
     backgroundMode,
@@ -27,6 +28,7 @@ export function CanvasToolbar({
     onDelete,
     onClear,
     onDeselect,
+    onSelectionModeChange,
     onBackgroundModeChange,
     onShowImageInfoChange,
     onOpenAssetLibrary,
@@ -35,6 +37,7 @@ export function CanvasToolbar({
     onOpenTimeline,
 }: {
     selectedCount: number;
+    selectionMode: boolean;
     canUndo: boolean;
     canRedo: boolean;
     backgroundMode: CanvasBackgroundMode;
@@ -50,6 +53,7 @@ export function CanvasToolbar({
     onDelete: () => void;
     onClear: () => void;
     onDeselect: () => void;
+    onSelectionModeChange: (enabled: boolean) => void;
     onBackgroundModeChange: (mode: CanvasBackgroundMode) => void;
     onShowImageInfoChange: (show: boolean) => void;
     onOpenAssetLibrary: () => void;
@@ -142,6 +146,11 @@ export function CanvasToolbar({
                 <ToolbarButton id="tool-assets" label="我的素材" hovered={hovered} hoverStyle={hoverStyle} wrapRef={wrapRef} onTipX={setTipX} onHover={setHovered} onClick={onOpenMyAssets}>
                     <FolderOpen className="size-4.5" />
                 </ToolbarButton>
+                <div className="md:hidden">
+                    <ToolbarButton id="tool-select" label="选择" active={selectionMode} hovered={hovered} activeStyle={activeStyle} hoverStyle={hoverStyle} wrapRef={wrapRef} onTipX={setTipX} onHover={setHovered} onClick={() => onSelectionModeChange(!selectionMode)}>
+                        <MousePointer2 className="size-4.5" />
+                    </ToolbarButton>
+                </div>
                 <ToolbarButton
                     id="tool-style"
                     label="画布外观"
@@ -373,6 +382,7 @@ function toolLabel(id: string) {
     if (id === "tool-upload") return "上传素材";
     if (id === "tool-library") return "素材库";
     if (id === "tool-assets") return "我的素材";
+    if (id === "tool-select") return "选择";
     if (id === "tool-style") return "画布外观";
     if (id === "tool-delete") return "删除选中";
     if (id === "tool-clear") return "清空画布";
