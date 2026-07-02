@@ -24,14 +24,14 @@ export function Minimap({ nodes, viewport, viewportSize, onViewportChange }: { n
     }, []);
 
     const { worldBounds, scale, offset } = useMemo(() => {
-        if (!nodes.length) {
-            return { worldBounds: { x: -500, y: -500, w: 1000, h: 1000 }, scale: 0.16, offset: { x: 40, y: 0 } };
-        }
-
-        let minX = Infinity;
-        let minY = Infinity;
-        let maxX = -Infinity;
-        let maxY = -Infinity;
+        const visibleX = -viewport.x / viewport.k;
+        const visibleY = -viewport.y / viewport.k;
+        const visibleW = viewportSize.width / viewport.k;
+        const visibleH = viewportSize.height / viewport.k;
+        let minX = visibleX;
+        let minY = visibleY;
+        let maxX = visibleX + visibleW;
+        let maxY = visibleY + visibleH;
 
         nodes.forEach((node) => {
             minX = Math.min(minX, node.position.x);
@@ -40,10 +40,11 @@ export function Minimap({ nodes, viewport, viewportSize, onViewportChange }: { n
             maxY = Math.max(maxY, node.position.y + node.height);
         });
 
-        minX -= 500;
-        minY -= 500;
-        maxX += 500;
-        maxY += 500;
+        const padding = Math.max(500, visibleW * 0.2, visibleH * 0.2);
+        minX -= padding;
+        minY -= padding;
+        maxX += padding;
+        maxY += padding;
 
         const boundsWidth = maxX - minX;
         const boundsHeight = maxY - minY;
@@ -56,7 +57,7 @@ export function Minimap({ nodes, viewport, viewportSize, onViewportChange }: { n
             scale: nextScale,
             offset: { x: (width - mapContentW) / 2, y: (mapHeight - mapContentH) / 2 },
         };
-    }, [mapHeight, nodes, width]);
+    }, [mapHeight, nodes, viewport.k, viewport.x, viewport.y, viewportSize.height, viewportSize.width, width]);
 
     const toMinimap = useCallback(
         (worldX: number, worldY: number) => {
@@ -100,8 +101,8 @@ export function Minimap({ nodes, viewport, viewportSize, onViewportChange }: { n
         const centerX = viewportRect.x + viewportRect.w / 2;
         const centerY = viewportRect.y + viewportRect.h / 2;
         return {
-            x: clamp(centerX - handleSize / 2, 0, Math.max(0, width - handleSize)),
-            y: clamp(centerY - handleSize / 2, 0, Math.max(0, mapHeight - handleSize)),
+            x: centerX - handleSize / 2,
+            y: centerY - handleSize / 2,
             w: handleSize,
             h: handleSize,
         };
