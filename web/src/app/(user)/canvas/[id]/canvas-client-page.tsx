@@ -2595,39 +2595,61 @@ function InfiniteCanvasPage() {
                 if (payload.canvasId && payload.canvasId !== projectId) return;
                 if (!payload.nodeId && !payload.taskId) return;
                 setNodes((prev) =>
-                    prev.map((node) => {
-                        if (payload.nodeId && node.id !== payload.nodeId) return node;
-                        if (payload.taskId && node.metadata?.generationTaskId !== payload.taskId) return node;
-                        if (payload.status === "running" || payload.status === "pending") {
-                            if ((node.type === CanvasNodeType.Image || node.type === CanvasNodeType.Video || node.type === CanvasNodeType.Audio) && node.metadata?.content) return { ...node, metadata: { ...node.metadata, status: NODE_STATUS_SUCCESS, progress: undefined } };
-                            return { ...node, metadata: { ...node.metadata, status: NODE_STATUS_LOADING, progress: payload.progress } };
-                        }
-                        if (payload.status === "failed") {
-                            return { ...node, metadata: { ...node.metadata, status: NODE_STATUS_ERROR, errorDetails: payload.error || "生成失败", generationTaskId: undefined, generationTaskProvider: undefined, generationTaskModel: undefined, generationTaskCanvasId: undefined } };
-                        }
-                        if ((payload.status === "success" || payload.status === "completed") && payload.resultUrl) {
-                            return {
-                                ...node,
-                                metadata: {
-                                    ...node.metadata,
-                                    content: payload.resultUrl,
-                                    status: NODE_STATUS_SUCCESS,
-                                    errorDetails: undefined,
-                                    progress: undefined,
-                                    mimeType: payload.mimeType || node.metadata?.mimeType,
-                                    naturalWidth: payload.width || node.metadata?.naturalWidth,
-                                    naturalHeight: payload.height || node.metadata?.naturalHeight,
-                                    bytes: payload.bytes || node.metadata?.bytes,
-                                    durationMs: payload.durationMs || node.metadata?.durationMs,
-                                    generationTaskId: undefined,
-                                    generationTaskProvider: undefined,
-                                    generationTaskModel: undefined,
-                                    generationTaskCanvasId: undefined,
-                                },
-                            };
-                        }
-                        return node;
-                    }),
+                    {
+                        const next = prev.map((node) => {
+                            if (payload.nodeId && node.id !== payload.nodeId) return node;
+                            if (payload.taskId && node.metadata?.generationTaskId !== payload.taskId) return node;
+                            if (payload.status === "running" || payload.status === "pending") {
+                                if ((node.type === CanvasNodeType.Image || node.type === CanvasNodeType.Video || node.type === CanvasNodeType.Audio) && node.metadata?.content) return { ...node, metadata: { ...node.metadata, status: NODE_STATUS_SUCCESS, progress: undefined } };
+                                return { ...node, metadata: { ...node.metadata, status: NODE_STATUS_LOADING, progress: payload.progress } };
+                            }
+                            if (payload.status === "failed") {
+                                return { ...node, metadata: { ...node.metadata, status: NODE_STATUS_ERROR, errorDetails: payload.error || "生成失败", generationTaskId: undefined, generationTaskProvider: undefined, generationTaskModel: undefined, generationTaskCanvasId: undefined } };
+                            }
+                            if ((payload.status === "success" || payload.status === "completed") && node.type === CanvasNodeType.Image && payload.resultImages?.length) {
+                                return {
+                                    ...node,
+                                    metadata: {
+                                        ...node.metadata,
+                                        content: payload.resultImages[0],
+                                        status: NODE_STATUS_SUCCESS,
+                                        errorDetails: undefined,
+                                        progress: undefined,
+                                        mimeType: node.metadata?.mimeType || "image/png",
+                                        generationTaskKind: undefined,
+                                        generationTaskId: undefined,
+                                        generationTaskProvider: undefined,
+                                        generationTaskModel: undefined,
+                                        generationTaskCanvasId: undefined,
+                                    },
+                                };
+                            }
+                            if ((payload.status === "success" || payload.status === "completed") && payload.resultUrl) {
+                                return {
+                                    ...node,
+                                    metadata: {
+                                        ...node.metadata,
+                                        content: payload.resultUrl,
+                                        status: NODE_STATUS_SUCCESS,
+                                        errorDetails: undefined,
+                                        progress: undefined,
+                                        mimeType: payload.mimeType || node.metadata?.mimeType,
+                                        naturalWidth: payload.width || node.metadata?.naturalWidth,
+                                        naturalHeight: payload.height || node.metadata?.naturalHeight,
+                                        bytes: payload.bytes || node.metadata?.bytes,
+                                        durationMs: payload.durationMs || node.metadata?.durationMs,
+                                        generationTaskId: undefined,
+                                        generationTaskProvider: undefined,
+                                        generationTaskModel: undefined,
+                                        generationTaskCanvasId: undefined,
+                                    },
+                                };
+                            }
+                            return node;
+                        });
+                        persistCanvasNow(next);
+                        return next;
+                    },
                 );
             };
         };
@@ -2638,7 +2660,7 @@ function InfiniteCanvasPage() {
             if (reconnectTimer) window.clearTimeout(reconnectTimer);
             socket?.close();
         };
-    }, [projectId, token]);
+    }, [persistCanvasNow, projectId, token]);
 
     const handleRetryNode = useCallback(
         async (node: CanvasNodeData) => {
