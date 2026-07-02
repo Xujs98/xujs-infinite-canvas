@@ -1,7 +1,7 @@
 import type { CSSProperties, MouseEvent as ReactMouseEvent, ReactNode, RefObject } from "react";
 import { useEffect, useRef, useState } from "react";
 import { Button, Segmented, Switch } from "antd";
-import { CircleDot, Sparkles, Eraser, FolderOpen, Grid2x2, Hand, Image as ImageIcon, Info, Library, Moon, Music2, Palette, Redo2, Settings2, Square, Sun, Trash2, Type, Undo2, Upload, Video, Clapperboard } from "lucide-react";
+import { CircleDot, Sparkles, Eraser, FolderOpen, Grid2x2, Hand, Image as ImageIcon, Info, Library, Moon, Music2, Palette, Redo2, Settings2, Square, Sun, Trash2, Type, Undo2, Upload, Video, Clapperboard, X } from "lucide-react";
 
 import { canvasThemes, type CanvasBackgroundMode, type CanvasColorTheme, type CanvasTheme, type ThemePalette, themePaletteLabels, themePalettePreviews } from "@/lib/canvas-theme";
 import { useCanvasTheme } from "@/hooks/use-canvas-theme";
@@ -66,8 +66,17 @@ export function CanvasToolbar({
     const [hovered, setHovered] = useState<string | null>(null);
     const [tipX, setTipX] = useState(0);
     const [appearanceOpen, setAppearanceOpen] = useState(false);
+    const [isMobile, setIsMobile] = useState(false);
     const [panelX, setPanelX] = useState(0);
     const panelRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        const query = window.matchMedia("(max-width: 767px)");
+        const update = () => setIsMobile(query.matches);
+        update();
+        query.addEventListener("change", update);
+        return () => query.removeEventListener("change", update);
+    }, []);
 
     // 点击工具栏和面板外部时关闭画布外观面板
     useEffect(() => {
@@ -167,10 +176,24 @@ export function CanvasToolbar({
             {appearanceOpen ? (
                 <div
                     ref={panelRef}
-                    className="pointer-events-auto glass absolute bottom-[72px] z-30 w-[min(264px,calc(100vw-2rem))] -translate-x-1/2 rounded-xl border p-2.5 shadow-xl"
-                    style={{ left: panelX || "50%", background: theme.toolbar.panel, borderColor: theme.toolbar.border, color: theme.toolbar.item }}
+                    className={
+                        isMobile
+                            ? "pointer-events-auto fixed inset-0 z-[90] overflow-y-auto border-0 p-4 pt-[max(1rem,env(safe-area-inset-top))] shadow-none"
+                            : "pointer-events-auto glass absolute bottom-[72px] z-30 w-[min(264px,calc(100vw-2rem))] -translate-x-1/2 rounded-xl border p-2.5 shadow-xl"
+                    }
+                    style={{
+                        ...(isMobile ? {} : { left: panelX || "50%" }),
+                        background: isMobile ? theme.canvas.background : theme.toolbar.panel,
+                        borderColor: theme.toolbar.border,
+                        color: theme.toolbar.item,
+                    }}
                 >
-                    <div className="px-1 pb-2 text-sm font-medium opacity-65">画布外观</div>
+                    <div className={isMobile ? "mb-4 flex items-center justify-between border-b pb-3" : "px-1 pb-2 text-sm font-medium opacity-65"} style={isMobile ? { borderColor: theme.toolbar.border } : undefined}>
+                        <span className={isMobile ? "text-base font-semibold" : undefined}>画布外观</span>
+                        {isMobile ? (
+                            <Button type="text" aria-label="关闭" className="!h-9 !w-9 !min-w-9 !rounded-full !p-0" style={{ color: theme.toolbar.item }} icon={<X className="size-5" />} onClick={() => setAppearanceOpen(false)} />
+                        ) : null}
+                    </div>
                     <div className="px-1 pb-1.5 text-[11px] font-medium opacity-50">主题模式</div>
                     <div className="grid grid-cols-2 gap-1 rounded-lg p-1" style={{ background: theme.toolbar.itemHover }}>
                         <CanvasThemeButton colorTheme={colorTheme} targetTheme="light" onThemeChange={setTheme}>
