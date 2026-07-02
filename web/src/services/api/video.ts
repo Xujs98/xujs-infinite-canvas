@@ -29,6 +29,8 @@ export type VideoGenerationTask = { id: string; provider: "openai" | "seedance";
 export type VideoGenerationTaskContext = { canvasId?: string; nodeId?: string };
 export type VideoGenerationTaskState = { status: "pending"; progress?: number } | { status: "completed"; result: VideoGenerationResult } | { status: "failed"; error: string };
 
+const VIDEO_CREATE_TIMEOUT_MS = 5 * 60 * 1000;
+
 function aiApiUrl(config: AiConfig, path: string) {
     return config.channelMode === "remote" ? `/api/v1${path}` : buildApiUrl(config.baseUrl, path);
 }
@@ -126,7 +128,7 @@ async function createOpenAIVideoTask(config: AiConfig, model: string, prompt: st
             reference_images: imageDataList,
         };
         try {
-            const created = unwrapVideoResponse((await axios.post<ApiVideoResponse>(remoteVideoCreateUrl(config, "/videos"), payload, { headers: aiHeaders(config, "application/json"), params: videoTaskQueryParams(config, { id: "", provider: "openai", model }, context), timeout: 70000 })).data);
+            const created = unwrapVideoResponse((await axios.post<ApiVideoResponse>(remoteVideoCreateUrl(config, "/videos"), payload, { headers: aiHeaders(config, "application/json"), params: videoTaskQueryParams(config, { id: "", provider: "openai", model }, context), timeout: VIDEO_CREATE_TIMEOUT_MS })).data);
             if (!created.id) throw new Error("视频接口没有返回任务 ID");
             return { id: created.id, provider: "openai", model };
         } catch (error) {
@@ -143,7 +145,7 @@ async function createOpenAIVideoTask(config: AiConfig, model: string, prompt: st
     const files = await Promise.all(references.slice(0, 7).map(async (image) => dataUrlToFile({ ...image, dataUrl: await imageToDataUrl(image) })));
     files.forEach((file) => body.append("input_reference[]", file));
     try {
-        const created = unwrapVideoResponse((await axios.post<ApiVideoResponse>(remoteVideoCreateUrl(config, "/videos"), body, { headers: aiHeaders(config), params: videoTaskQueryParams(config, { id: "", provider: "openai", model }, context), timeout: 70000 })).data);
+        const created = unwrapVideoResponse((await axios.post<ApiVideoResponse>(remoteVideoCreateUrl(config, "/videos"), body, { headers: aiHeaders(config), params: videoTaskQueryParams(config, { id: "", provider: "openai", model }, context), timeout: VIDEO_CREATE_TIMEOUT_MS })).data);
         if (!created.id) throw new Error("视频接口没有返回任务 ID");
         return { id: created.id, provider: "openai", model };
     } catch (error) {
@@ -198,7 +200,7 @@ async function createSeedanceTask(config: AiConfig, model: string, prompt: strin
     };
 
     try {
-        const created = unwrapSeedanceTask((await axios.post<ApiEnvelope<SeedanceTask>>(config.channelMode === "remote" ? "/api/v1/video-tasks" : seedanceApiUrl(config), payload, { headers: aiHeaders(config, "application/json"), params: videoTaskQueryParams(config, { id: "", provider: "seedance", model }, context), timeout: 70000 })).data);
+        const created = unwrapSeedanceTask((await axios.post<ApiEnvelope<SeedanceTask>>(config.channelMode === "remote" ? "/api/v1/video-tasks" : seedanceApiUrl(config), payload, { headers: aiHeaders(config, "application/json"), params: videoTaskQueryParams(config, { id: "", provider: "seedance", model }, context), timeout: VIDEO_CREATE_TIMEOUT_MS })).data);
         if (!created.id) throw new Error("Seedance 接口没有返回任务 ID");
         return { id: created.id, provider: "seedance", model };
     } catch (error) {
