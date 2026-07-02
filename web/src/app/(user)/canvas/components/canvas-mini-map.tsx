@@ -8,7 +8,7 @@ import { CanvasNodeType, type CanvasNodeData, type ViewportTransform } from "../
 export function Minimap({ nodes, viewport, viewportSize, onViewportChange }: { nodes: CanvasNodeData[]; viewport: ViewportTransform; viewportSize: { width: number; height: number }; onViewportChange: (viewport: ViewportTransform) => void }) {
     const theme = useCanvasTheme();
     const containerRef = useRef<HTMLDivElement>(null);
-    const dragOffsetRef = useRef<{ x: number; y: number } | null>(null);
+    const dragStartRef = useRef<{ clientX: number; clientY: number; viewport: ViewportTransform } | null>(null);
     const [isDragging, setIsDragging] = useState(false);
     const [compact, setCompact] = useState(false);
     const width = compact ? Math.max(116, Math.min(156, viewportSize.width - 214)) : 240;
@@ -112,10 +112,15 @@ export function Minimap({ nodes, viewport, viewportSize, onViewportChange }: { n
 
         const localX = event.clientX - rect.left;
         const localY = event.clientY - rect.top;
-        if (compact && dragOffsetRef.current) {
-            const nextX = clamp(localX - dragOffsetRef.current.x + dragRect.w / 2, 0, width);
-            const nextY = clamp(localY - dragOffsetRef.current.y + dragRect.h / 2, 0, mapHeight);
-            updateViewportFromMinimapCenter(nextX, nextY);
+        if (compact && dragStartRef.current) {
+            const start = dragStartRef.current;
+            const dx = (event.clientX - start.clientX) / scale;
+            const dy = (event.clientY - start.clientY) / scale;
+            onViewportChange({
+                x: start.viewport.x - dx * start.viewport.k,
+                y: start.viewport.y - dy * start.viewport.k,
+                k: start.viewport.k,
+            });
             return;
         }
         updateViewportFromMinimapCenter(localX, localY);
@@ -148,7 +153,7 @@ export function Minimap({ nodes, viewport, viewportSize, onViewportChange }: { n
                             localY >= dragRect.y &&
                             localY <= dragRect.y + dragRect.h;
                         if (!insideViewport) return;
-                        dragOffsetRef.current = { x: localX - dragRect.x, y: localY - dragRect.y };
+                        dragStartRef.current = { clientX: event.clientX, clientY: event.clientY, viewport };
                     }
                     event.currentTarget.setPointerCapture(event.pointerId);
                     setIsDragging(true);
@@ -158,11 +163,11 @@ export function Minimap({ nodes, viewport, viewportSize, onViewportChange }: { n
                     if (isDragging) updateViewportFromEvent(event);
                 }}
                 onPointerUp={() => {
-                    dragOffsetRef.current = null;
+                    dragStartRef.current = null;
                     setIsDragging(false);
                 }}
                 onPointerLeave={() => {
-                    dragOffsetRef.current = null;
+                    dragStartRef.current = null;
                     setIsDragging(false);
                 }}
             >
