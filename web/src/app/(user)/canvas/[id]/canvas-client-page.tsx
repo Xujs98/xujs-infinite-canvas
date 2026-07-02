@@ -360,6 +360,8 @@ function InfiniteCanvasPage() {
     const generateNodeRef = useRef<((nodeId: string, mode: CanvasNodeGenerationMode, prompt: string) => Promise<void>) | null>(null);
     const activeImageTaskIdsRef = useRef(new Set<string>());
     const activeVideoTaskIdsRef = useRef(new Set<string>());
+    const skipNextHistoryCommitRef = useRef(false);
+    const skipNextProjectAutosaveRef = useRef(false);
     const connectingParamsRef = useRef(connectingParams);
     const connectionTargetNodeIdRef = useRef(connectionTargetNodeId);
     const selectionBoxRef = useRef(selectionBox);
@@ -424,6 +426,11 @@ function InfiniteCanvasPage() {
 
     useEffect(() => {
         if (!projectLoaded || applyingHistoryRef.current || historyPausedRef.current) return;
+        if (skipNextHistoryCommitRef.current) {
+            skipNextHistoryCommitRef.current = false;
+            lastHistoryRef.current = createHistoryEntry();
+            return;
+        }
         const next = createHistoryEntry();
         const previous = lastHistoryRef.current;
         if (previous?.nodes === next.nodes && previous.connections === next.connections && previous.chatSessions === next.chatSessions && previous.activeChatId === next.activeChatId && previous.backgroundMode === next.backgroundMode && previous.showImageInfo === next.showImageInfo) return;
@@ -450,6 +457,10 @@ function InfiniteCanvasPage() {
 
     useEffect(() => {
         if (!projectLoaded || historyPausedRef.current) return;
+        if (skipNextProjectAutosaveRef.current) {
+            skipNextProjectAutosaveRef.current = false;
+            return;
+        }
         updateProject(projectId, { nodes, connections, chatSessions, activeChatId, backgroundMode, showImageInfo });
     }, [activeChatId, backgroundMode, chatSessions, connections, nodes, projectId, projectLoaded, showImageInfo, updateProject]);
 
@@ -457,6 +468,7 @@ function InfiniteCanvasPage() {
         (nextNodes: CanvasNodeData[], nextConnections: CanvasConnection[] = connectionsRef.current) => {
             nodesRef.current = nextNodes;
             connectionsRef.current = nextConnections;
+            skipNextProjectAutosaveRef.current = true;
             updateProject(projectId, { nodes: nextNodes, connections: nextConnections, chatSessions, activeChatId, backgroundMode, showImageInfo });
         },
         [activeChatId, backgroundMode, chatSessions, projectId, showImageInfo, updateProject],
@@ -2154,7 +2166,19 @@ function InfiniteCanvasPage() {
                     }
                     if (state.status === "failed") throw new Error(state.error);
                     if (state.status === "pending" && state.progress !== undefined) {
-                        setNodes((prev) => prev.map((node) => (node.id === videoId && !node.metadata?.content ? { ...node, metadata: { ...node.metadata, status: NODE_STATUS_LOADING, progress: state.progress } } : node)));
+                        setNodes((prev) => {
+                            let changed = false;
+                            const next = prev.map((node) => {
+                                if (node.id !== videoId || node.metadata?.content) return node;
+                                if (node.metadata?.status === NODE_STATUS_LOADING && node.metadata.progress === state.progress) return node;
+                                changed = true;
+                                return { ...node, metadata: { ...node.metadata, status: NODE_STATUS_LOADING, progress: state.progress } };
+                            });
+                            if (!changed) return prev;
+                            skipNextHistoryCommitRef.current = true;
+                            skipNextProjectAutosaveRef.current = true;
+                            return next;
+                        });
                     }
                     if (maxTimeoutMs > 0 && Date.now() - startedAt >= maxTimeoutMs) throw new Error("视频生成超时，请稍后重试");
                     if (attempt >= 240) throw new Error("视频生成超时，请稍后重试");
@@ -2549,9 +2573,27 @@ function InfiniteCanvasPage() {
         generateNodeRef.current = handleGenerateNode;
     }, [handleGenerateNode]);
 
+    const resumableGenerationTaskKey = useMemo(
+        () =>
+            nodes
+                .map((node) => {
+                    if (node.type === CanvasNodeType.Image && node.metadata?.status === NODE_STATUS_LOADING && node.metadata.generationTaskKind === "image" && node.metadata.generationTaskId) {
+                        return `${node.id}:image:${node.metadata.generationTaskId}:${node.metadata.batchRootId || node.id}`;
+                    }
+                    if (node.type === CanvasNodeType.Video && node.metadata?.status === NODE_STATUS_LOADING && node.metadata.generationTaskId && node.metadata.generationTaskProvider) {
+                        return `${node.id}:video:${node.metadata.generationTaskProvider}:${node.metadata.generationTaskId}:${node.metadata.generationTaskModel || node.metadata.model || ""}`;
+                    }
+                    return "";
+                })
+                .filter(Boolean)
+                .sort()
+                .join("|"),
+        [nodes],
+    );
+
     useEffect(() => {
-        if (!projectLoaded) return;
-        nodes.forEach((node) => {
+        if (!projectLoaded || !resumableGenerationTaskKey) return;
+        nodesRef.current.forEach((node) => {
             if (node.type === CanvasNodeType.Image && node.metadata?.status === NODE_STATUS_LOADING && node.metadata.generationTaskKind === "image" && node.metadata.generationTaskId) {
                 const config = buildGenerationConfig(effectiveConfig, node, "image");
                 const prompt = (node.metadata.prompt || "").trim();
@@ -2568,7 +2610,7 @@ function InfiniteCanvasPage() {
             const prompt = (node.metadata.prompt || "").trim();
             void pollCanvasVideoTask(node.id, task, config, prompt);
         });
-    }, [effectiveConfig, nodes, pollCanvasImageTask, pollCanvasVideoTask, projectLoaded]);
+    }, [effectiveConfig, pollCanvasImageTask, pollCanvasVideoTask, projectLoaded, resumableGenerationTaskKey]);
 
     useEffect(() => {
         if (!token || !projectId) return;
@@ -2594,19 +2636,31 @@ function InfiniteCanvasPage() {
                 if (payload.type !== "generation-task-updated") return;
                 if (payload.canvasId && payload.canvasId !== projectId) return;
                 if (!payload.nodeId && !payload.taskId) return;
+                const shouldPersistTaskUpdate = payload.status === "success" || payload.status === "completed" || payload.status === "failed";
                 setNodes((prev) =>
                     {
+                        let changed = false;
                         const next = prev.map((node) => {
                             if (payload.nodeId && node.id !== payload.nodeId) return node;
                             if (payload.taskId && node.metadata?.generationTaskId !== payload.taskId) return node;
                             if (payload.status === "running" || payload.status === "pending") {
-                                if ((node.type === CanvasNodeType.Image || node.type === CanvasNodeType.Video || node.type === CanvasNodeType.Audio) && node.metadata?.content) return { ...node, metadata: { ...node.metadata, status: NODE_STATUS_SUCCESS, progress: undefined } };
+                                if ((node.type === CanvasNodeType.Image || node.type === CanvasNodeType.Video || node.type === CanvasNodeType.Audio) && node.metadata?.content) {
+                                    if (node.metadata.status === NODE_STATUS_SUCCESS && node.metadata.progress === undefined) return node;
+                                    changed = true;
+                                    return { ...node, metadata: { ...node.metadata, status: NODE_STATUS_SUCCESS, progress: undefined } };
+                                }
+                                if (node.metadata?.status === NODE_STATUS_LOADING && node.metadata.progress === payload.progress) return node;
+                                changed = true;
                                 return { ...node, metadata: { ...node.metadata, status: NODE_STATUS_LOADING, progress: payload.progress } };
                             }
                             if (payload.status === "failed") {
+                                if (node.metadata?.status === NODE_STATUS_ERROR && !node.metadata.generationTaskId && node.metadata.errorDetails === (payload.error || "生成失败")) return node;
+                                changed = true;
                                 return { ...node, metadata: { ...node.metadata, status: NODE_STATUS_ERROR, errorDetails: payload.error || "生成失败", generationTaskId: undefined, generationTaskProvider: undefined, generationTaskModel: undefined, generationTaskCanvasId: undefined } };
                             }
                             if ((payload.status === "success" || payload.status === "completed") && node.type === CanvasNodeType.Image && payload.resultImages?.length) {
+                                if (node.metadata?.content === payload.resultImages[0] && node.metadata.status === NODE_STATUS_SUCCESS && !node.metadata.generationTaskId) return node;
+                                changed = true;
                                 return {
                                     ...node,
                                     metadata: {
@@ -2625,6 +2679,8 @@ function InfiniteCanvasPage() {
                                 };
                             }
                             if ((payload.status === "success" || payload.status === "completed") && payload.resultUrl) {
+                                if (node.metadata?.content === payload.resultUrl && node.metadata.status === NODE_STATUS_SUCCESS && !node.metadata.generationTaskId) return node;
+                                changed = true;
                                 return {
                                     ...node,
                                     metadata: {
@@ -2647,7 +2703,13 @@ function InfiniteCanvasPage() {
                             }
                             return node;
                         });
-                        persistCanvasNow(next);
+                        if (!changed) return prev;
+                        if (shouldPersistTaskUpdate) {
+                            persistCanvasNow(next);
+                        } else {
+                            skipNextHistoryCommitRef.current = true;
+                            skipNextProjectAutosaveRef.current = true;
+                        }
                         return next;
                     },
                 );
