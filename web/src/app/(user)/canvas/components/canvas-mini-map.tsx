@@ -10,8 +10,8 @@ export function Minimap({ nodes, viewport, viewportSize, onViewportChange }: { n
     const containerRef = useRef<HTMLDivElement>(null);
     const [isDragging, setIsDragging] = useState(false);
     const [compact, setCompact] = useState(false);
-    const width = compact ? 168 : 240;
-    const height = compact ? 112 : 160;
+    const width = compact ? 172 : 240;
+    const height = compact ? 124 : 160;
 
     useEffect(() => {
         const query = window.matchMedia("(max-width: 767px)");
@@ -105,10 +105,17 @@ export function Minimap({ nodes, viewport, viewportSize, onViewportChange }: { n
     };
 
     return (
-        <div className="absolute bottom-[calc(max(1rem,env(safe-area-inset-bottom))+4.5rem)] right-3 z-50 overflow-hidden rounded-lg border shadow-2xl backdrop-blur-sm md:bottom-24 md:left-6 md:right-auto" style={{ width, height, background: theme.toolbar.panel, borderColor: theme.toolbar.border }}>
+        <div className="absolute bottom-[calc(max(1rem,env(safe-area-inset-bottom))+8.75rem)] right-3 z-50 overflow-hidden rounded-xl border shadow-2xl backdrop-blur-sm md:bottom-24 md:left-6 md:right-auto" style={{ width, height, background: theme.toolbar.panel, borderColor: theme.toolbar.border }}>
+            {compact ? (
+                <div className="flex h-7 items-center justify-between border-b px-2 text-[11px] font-medium" style={{ borderColor: theme.toolbar.border, color: theme.node.muted }}>
+                    <span>小地图</span>
+                    <span className="font-normal opacity-70">拖动定位</span>
+                </div>
+            ) : null}
             <div
                 ref={containerRef}
-                className="relative h-full w-full cursor-crosshair"
+                className="relative w-full cursor-crosshair"
+                style={{ height: compact ? height - 28 : height }}
                 onPointerDown={(event) => {
                     event.preventDefault();
                     event.currentTarget.setPointerCapture(event.pointerId);
