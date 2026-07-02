@@ -43,6 +43,8 @@ export function CanvasNodePromptPanel({ node, isRunning, onPromptChange, onConfi
     const textareaRef = useRef<HTMLTextAreaElement>(null);
 
     useEffect(() => {
+        const mobileQuery = window.matchMedia("(max-width: 767px), (pointer: coarse)");
+        if (mobileQuery.matches) return;
         textareaRef.current?.focus();
     }, []);
 
