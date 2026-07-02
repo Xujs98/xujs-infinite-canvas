@@ -28,14 +28,24 @@ export function InfiniteCanvas({ containerRef, viewport, backgroundMode = "lines
         initialY: 0,
         hasMoved: false,
     });
+    const activeTouchPointersRef = useRef(new Map<number, { x: number; y: number }>());
+    const pinchStateRef = useRef<{
+        active: boolean;
+        startDistance: number;
+        startScale: number;
+        worldX: number;
+        worldY: number;
+    } | null>(null);
+    const viewportRef = useRef(viewport);
     const scaleRef = useRef(viewport.k);
     const frameRef = useRef<number | null>(null);
     const nextViewportRef = useRef<ViewportTransform | null>(null);
     const [isSpacePressed, setIsSpacePressed] = useState(false);
 
     useEffect(() => {
+        viewportRef.current = viewport;
         scaleRef.current = viewport.k;
-    }, [viewport.k]);
+    }, [viewport]);
 
     useEffect(
         () => () => {
@@ -91,6 +101,31 @@ export function InfiniteCanvas({ containerRef, viewport, backgroundMode = "lines
         if (target?.closest("[data-connection-create-menu]")) return;
         const isBackgroundClick = !target?.closest("[data-node-id],[data-connection-id]");
 
+        if (event.pointerType === "touch") {
+            activeTouchPointersRef.current.set(event.pointerId, { x: event.clientX, y: event.clientY });
+            if (activeTouchPointersRef.current.size >= 2) {
+                event.preventDefault();
+                event.currentTarget.setPointerCapture(event.pointerId);
+                const rect = containerRef.current?.getBoundingClientRect();
+                const points = Array.from(activeTouchPointersRef.current.values()).slice(0, 2);
+                if (rect && points.length === 2) {
+                    const centerX = (points[0].x + points[1].x) / 2 - rect.left;
+                    const centerY = (points[0].y + points[1].y) / 2 - rect.top;
+                    const currentViewport = viewportRef.current;
+                    pinchStateRef.current = {
+                        active: true,
+                        startDistance: getPointerDistance(points[0], points[1]),
+                        startScale: currentViewport.k,
+                        worldX: (centerX - currentViewport.x) / currentViewport.k,
+                        worldY: (centerY - currentViewport.y) / currentViewport.k,
+                    };
+                    panState.current.isPanning = false;
+                    document.body.style.cursor = "default";
+                }
+                return;
+            }
+        }
+
         if (event.button === 0 && (event.ctrlKey || event.metaKey) && isBackgroundClick) {
             event.preventDefault();
             event.currentTarget.setPointerCapture(event.pointerId);
@@ -120,6 +155,32 @@ export function InfiniteCanvas({ containerRef, viewport, backgroundMode = "lines
 
     useEffect(() => {
         const handlePointerMove = (event: PointerEvent) => {
+            if (event.pointerType === "touch" && activeTouchPointersRef.current.has(event.pointerId)) {
+                activeTouchPointersRef.current.set(event.pointerId, { x: event.clientX, y: event.clientY });
+            }
+
+            if (pinchStateRef.current?.active && activeTouchPointersRef.current.size >= 2) {
+                event.preventDefault();
+                const rect = containerRef.current?.getBoundingClientRect();
+                const points = Array.from(activeTouchPointersRef.current.values()).slice(0, 2);
+                const pinch = pinchStateRef.current;
+                if (!rect || points.length !== 2 || pinch.startDistance <= 0) return;
+                const centerX = (points[0].x + points[1].x) / 2 - rect.left;
+                const centerY = (points[0].y + points[1].y) / 2 - rect.top;
+                const nextScale = Math.min(Math.max(pinch.startScale * (getPointerDistance(points[0], points[1]) / pinch.startDistance), 0.05), 5);
+                nextViewportRef.current = {
+                    x: centerX - pinch.worldX * nextScale,
+                    y: centerY - pinch.worldY * nextScale,
+                    k: nextScale,
+                };
+                if (frameRef.current) return;
+                frameRef.current = requestAnimationFrame(() => {
+                    frameRef.current = null;
+                    if (nextViewportRef.current) onViewportChange(nextViewportRef.current);
+                });
+                return;
+            }
+
             if (!panState.current.isPanning) return;
 
             const dx = event.clientX - panState.current.startX;
@@ -140,7 +201,14 @@ export function InfiniteCanvas({ containerRef, viewport, backgroundMode = "lines
             });
         };
 
-        const handlePointerUp = () => {
+        const handlePointerUp = (event: PointerEvent) => {
+            if (event.pointerType === "touch") {
+                activeTouchPointersRef.current.delete(event.pointerId);
+                if (activeTouchPointersRef.current.size < 2) {
+                    pinchStateRef.current = null;
+                }
+            }
+
             if (!panState.current.isPanning) return;
 
             if (!panState.current.hasMoved) {
@@ -150,13 +218,24 @@ export function InfiniteCanvas({ containerRef, viewport, backgroundMode = "lines
             document.body.style.cursor = "default";
         };
 
+        const handlePointerCancel = (event: PointerEvent) => {
+            if (event.pointerType === "touch") {
+                activeTouchPointersRef.current.delete(event.pointerId);
+                if (activeTouchPointersRef.current.size < 2) pinchStateRef.current = null;
+            }
+            panState.current.isPanning = false;
+            document.body.style.cursor = "default";
+        };
+
         window.addEventListener("pointermove", handlePointerMove);
         window.addEventListener("pointerup", handlePointerUp);
+        window.addEventListener("pointercancel", handlePointerCancel);
         return () => {
             window.removeEventListener("pointermove", handlePointerMove);
             window.removeEventListener("pointerup", handlePointerUp);
+            window.removeEventListener("pointercancel", handlePointerCancel);
         };
-    }, [onCanvasDeselect, onViewportChange]);
+    }, [containerRef, onCanvasDeselect, onViewportChange]);
 
     useEffect(() => {
         const container = containerRef.current;
@@ -185,7 +264,7 @@ export function InfiniteCanvas({ containerRef, viewport, backgroundMode = "lines
     return (
         <div
             ref={containerRef}
-            className="relative h-full w-full cursor-grab select-none overflow-hidden"
+            className="relative h-full w-full touch-none cursor-grab select-none overflow-hidden"
             style={{ background: theme.canvas.background }}
             onPointerDown={handlePointerDown}
             onWheel={handleWheel}
@@ -204,6 +283,10 @@ export function InfiniteCanvas({ containerRef, viewport, backgroundMode = "lines
             </div>
         </div>
     );
+}
+
+function getPointerDistance(a: { x: number; y: number }, b: { x: number; y: number }) {
+    return Math.hypot(a.x - b.x, a.y - b.y);
 }
 
 function CanvasGrid({ viewport, mode }: { viewport: ViewportTransform; mode: CanvasBackgroundMode }) {

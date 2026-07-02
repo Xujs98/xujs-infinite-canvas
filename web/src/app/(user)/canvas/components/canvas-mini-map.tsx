@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { useCanvasTheme } from "@/hooks/use-canvas-theme";
 import { CanvasNodeType, type CanvasNodeData, type ViewportTransform } from "../types";
@@ -9,8 +9,17 @@ export function Minimap({ nodes, viewport, viewportSize, onViewportChange }: { n
     const theme = useCanvasTheme();
     const containerRef = useRef<HTMLDivElement>(null);
     const [isDragging, setIsDragging] = useState(false);
-    const width = 240;
-    const height = 160;
+    const [compact, setCompact] = useState(false);
+    const width = compact ? 168 : 240;
+    const height = compact ? 112 : 160;
+
+    useEffect(() => {
+        const query = window.matchMedia("(max-width: 767px)");
+        const update = () => setCompact(query.matches);
+        update();
+        query.addEventListener("change", update);
+        return () => query.removeEventListener("change", update);
+    }, []);
 
     const { worldBounds, scale, offset } = useMemo(() => {
         if (!nodes.length) {
@@ -96,7 +105,7 @@ export function Minimap({ nodes, viewport, viewportSize, onViewportChange }: { n
     };
 
     return (
-        <div className="absolute bottom-24 left-6 z-50 overflow-hidden rounded-lg border shadow-2xl backdrop-blur-sm" style={{ width, height, background: theme.toolbar.panel, borderColor: theme.toolbar.border }}>
+        <div className="absolute bottom-[calc(max(1rem,env(safe-area-inset-bottom))+4.5rem)] right-3 z-50 overflow-hidden rounded-lg border shadow-2xl backdrop-blur-sm md:bottom-24 md:left-6 md:right-auto" style={{ width, height, background: theme.toolbar.panel, borderColor: theme.toolbar.border }}>
             <div
                 ref={containerRef}
                 className="relative h-full w-full cursor-crosshair"

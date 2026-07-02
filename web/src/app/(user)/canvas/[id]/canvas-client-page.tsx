@@ -2864,8 +2864,8 @@ function CanvasTopBar({
 
     return (
         <>
-            <div className="pointer-events-none absolute left-0 right-0 top-0 z-50 flex h-16 items-center justify-between px-4">
-                <div className="pointer-events-auto flex min-w-0 items-center gap-3">
+            <div className="pointer-events-none absolute left-0 right-0 top-0 z-50 flex min-h-14 items-center justify-between gap-2 px-2 pt-[env(safe-area-inset-top)] sm:h-16 sm:px-4">
+                <div className="pointer-events-auto flex min-w-0 items-center gap-2 sm:gap-3">
                     <Dropdown
                         trigger={["click"]}
                         menu={{
@@ -2884,7 +2884,7 @@ function CanvasTopBar({
                             ],
                         }}
                     >
-                        <button type="button" className="grid size-9 place-items-center rounded-full transition hover:bg-black/5 dark:hover:bg-white/10" style={{ color: theme.node.text }} aria-label="打开画布菜单">
+                        <button type="button" className="grid size-10 place-items-center rounded-full transition hover:bg-black/5 dark:hover:bg-white/10 sm:size-9" style={{ color: theme.node.text }} aria-label="打开画布菜单">
                             <Menu className="size-5" />
                         </button>
                     </Dropdown>
@@ -2900,13 +2900,13 @@ function CanvasTopBar({
                                     if (event.key === "Enter") onFinishTitleEditing();
                                     if (event.key === "Escape") onCancelTitleEditing();
                                 }}
-                                className="max-w-[280px] bg-transparent p-0 text-left text-lg font-semibold tracking-normal outline-none"
+                                className="max-w-[42vw] bg-transparent p-0 text-left text-base font-semibold tracking-normal outline-none sm:max-w-[280px] sm:text-lg"
                                 style={{ color: theme.node.text }}
                             />
                         ) : (
                             <button
                                 type="button"
-                                className="max-w-[280px] truncate border-b border-dashed border-transparent text-left text-lg font-semibold tracking-normal transition hover:border-current"
+                                className="max-w-[42vw] truncate border-b border-dashed border-transparent text-left text-base font-semibold tracking-normal transition hover:border-current sm:max-w-[280px] sm:text-lg"
                                 onDoubleClick={onStartTitleEditing}
                                 title="双击修改画布名称"
                             >
@@ -2916,7 +2916,7 @@ function CanvasTopBar({
                     </div>
                 </div>
 
-                <div className="pointer-events-auto flex items-center gap-1.5">
+                <div className="pointer-events-auto flex min-w-0 items-center gap-1 sm:gap-1.5">
                     <UserStatusActions
                         variant="canvas"
                         accountOpen={accountOpen}
@@ -2928,11 +2928,11 @@ function CanvasTopBar({
                             setAccountOpen(false);
                         }}
                     />
-                    <span className="h-6 w-px" style={{ background: theme.toolbar.border }} />
+                    <span className="hidden h-6 w-px sm:block" style={{ background: theme.toolbar.border }} />
                     {agentVisible ? (
                         <Button
                             type="text"
-                            className="!h-10 !rounded-xl !px-3 !font-medium"
+                            className="!h-10 !rounded-xl !px-2 !font-medium sm:!px-3 max-[520px]:[&_.ant-btn-icon+span]:hidden"
                             style={{ background: localAgentOpen ? theme.toolbar.activeBg : theme.toolbar.panel, color: theme.node.text, boxShadow: "0 10px 30px rgba(28,25,23,.10)" }}
                             icon={<Bot className="size-4" />}
                             onClick={onToggleLocalAgent}
@@ -2944,7 +2944,7 @@ function CanvasTopBar({
                         <>
                             <Button
                                 type="text"
-                                className="!h-10 !rounded-xl !px-3 !font-medium"
+                                className="!h-10 !rounded-xl !px-2 !font-medium sm:!px-3 max-[520px]:[&_.ant-btn-icon+span]:hidden"
                                 style={{ background: theme.toolbar.panel, color: theme.node.text, boxShadow: "0 10px 30px rgba(28,25,23,.10)" }}
                                 icon={<MessageSquare className="size-4" />}
                                 onClick={onExpandAssistant}

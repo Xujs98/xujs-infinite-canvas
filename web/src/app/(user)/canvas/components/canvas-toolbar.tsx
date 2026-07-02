@@ -87,9 +87,9 @@ export function CanvasToolbar({
     const tip = hovered ? toolLabel(hovered) : "";
 
     return (
-        <div className="pointer-events-none absolute bottom-5 z-50 flex justify-center" style={{ left: 300, right: 16 }}>
+        <div className="pointer-events-none absolute bottom-[max(1rem,env(safe-area-inset-bottom))] left-3 right-3 z-50 flex justify-center md:left-[300px] md:right-4">
             {tip ? <DockTip label={tip} x={tipX} theme={theme} /> : null}
-            <div ref={wrapRef} className="thin-scrollbar glass pointer-events-auto flex h-14 max-w-full items-center gap-1 overflow-x-auto rounded-xl border px-2 shadow-lg [&>*]:shrink-0" style={dockStyle}>
+            <div ref={wrapRef} className="thin-scrollbar glass pointer-events-auto flex h-14 max-w-full touch-pan-x items-center gap-1 overflow-x-auto rounded-xl border px-2 shadow-lg [scrollbar-width:none] [&>*]:shrink-0 [&::-webkit-scrollbar]:hidden" style={dockStyle}>
                 <ToolbarButton id="tool-hand" label="移动/选择" active={!selectedCount} hovered={hovered} activeStyle={activeStyle} hoverStyle={hoverStyle} wrapRef={wrapRef} onTipX={setTipX} onHover={setHovered} onClick={onDeselect}>
                     <Hand className="size-4.5" />
                 </ToolbarButton>
@@ -167,7 +167,7 @@ export function CanvasToolbar({
             {appearanceOpen ? (
                 <div
                     ref={panelRef}
-                    className="pointer-events-auto glass absolute bottom-[72px] z-30 w-[264px] -translate-x-1/2 rounded-xl border p-2.5 shadow-xl"
+                    className="pointer-events-auto glass absolute bottom-[72px] z-30 w-[min(264px,calc(100vw-2rem))] -translate-x-1/2 rounded-xl border p-2.5 shadow-xl"
                     style={{ left: panelX || "50%", background: theme.toolbar.panel, borderColor: theme.toolbar.border, color: theme.toolbar.item }}
                 >
                     <div className="px-1 pb-2 text-sm font-medium opacity-65">画布外观</div>
@@ -291,7 +291,7 @@ function ToolbarButton({
         <Button
             type="text"
             aria-label={label}
-            className="!h-8 !w-8 !min-w-8 !p-0"
+            className="!h-10 !w-10 !min-w-10 !p-0 md:!h-8 md:!w-8 md:!min-w-8"
             disabled={disabled}
             style={active ? activeStyle : hovered === id && !disabled ? hoverStyle : { color: danger ? "#f87171" : theme.toolbar.item, opacity: disabled ? 0.35 : 1 }}
             icon={children}
