@@ -2,6 +2,7 @@ package handler
 
 import (
 	"bytes"
+	"context"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -12,6 +13,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/basketikun/infinite-canvas/model"
 	"github.com/basketikun/infinite-canvas/repository"
@@ -306,6 +308,11 @@ func copyAIResponse(w http.ResponseWriter, request *http.Request, onFailure func
 			generationTask = v
 		}
 	}
+	if timeout := aiProxyRequestTimeout(path, videoConfig, isPolling); timeout > 0 {
+		ctx, cancel := context.WithTimeout(request.Context(), timeout)
+		defer cancel()
+		request = request.WithContext(ctx)
+	}
 	response, err := http.DefaultClient.Do(request)
 	if err != nil {
 		log.Printf("AI proxy request failed: url=%s err=%v", request.URL.String(), err)
@@ -435,6 +442,19 @@ func copyAIResponse(w http.ResponseWriter, request *http.Request, onFailure func
 	}
 	w.WriteHeader(response.StatusCode)
 	_, _ = w.Write(respBody)
+}
+
+func aiProxyRequestTimeout(path string, videoConfig *model.ChannelVideoConfig, isPolling bool) time.Duration {
+	if !isVideoPath(path, videoConfig) {
+		return 0
+	}
+	if strings.HasSuffix(path, "/content") {
+		return 2 * time.Minute
+	}
+	if isPolling {
+		return 30 * time.Second
+	}
+	return 60 * time.Second
 }
 
 func readAIRequest(r *http.Request) ([]byte, string, string, error) {
