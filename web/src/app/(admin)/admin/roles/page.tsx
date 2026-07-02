@@ -61,6 +61,14 @@ export default function AdminRolesPage() {
         fetchChannelModels();
     }, [fetchItems, fetchChannelModels]);
 
+    useEffect(() => {
+        const handleRolesChanged = () => {
+            void fetchItems();
+        };
+        window.addEventListener("roles-changed", handleRolesChanged);
+        return () => window.removeEventListener("roles-changed", handleRolesChanged);
+    }, [fetchItems]);
+
     const handleSave = async () => {
         const values = await form.validateFields();
         try {

@@ -9,7 +9,6 @@ import (
 	"github.com/basketikun/infinite-canvas/ws"
 )
 
-
 func broadcastRolesChanged() {
 	roles, err := service.GetAllRoles()
 	if err != nil {
@@ -116,4 +115,5 @@ func BatchDeleteRoles(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	OK(w, true)
+	broadcastRolesChanged()
 }

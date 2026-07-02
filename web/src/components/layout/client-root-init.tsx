@@ -22,9 +22,23 @@ type AppSocketMessage =
           data?: ModelClassificationDetail[];
       }
     | {
+          type: "roles-changed";
+          data?: AdminRole[];
+      }
+    | {
           type: string;
           [key: string]: unknown;
       };
+
+function applyRolesToCurrentUser(roles: AdminRole[]) {
+    const userRole = useUserStore.getState().user?.role;
+    if (!userRole || userRole === "guest") {
+        useConfigStore.setState({ roleAllowedModels: [] });
+        return;
+    }
+    const matched = roles.find((role) => role.name === userRole);
+    useConfigStore.setState({ roleAllowedModels: matched?.allowedModels || [] });
+}
 
 export function ClientRootInit({ children }: { children: ReactNode }) {
     const { message } = App.useApp();
@@ -65,11 +79,7 @@ export function ClientRootInit({ children }: { children: ReactNode }) {
         void (async () => {
             try {
                 const roles = await loadRoles();
-                const userRole = useUserStore.getState().user?.role;
-                if (userRole && roles.length) {
-                    const matched = roles.find((r: AdminRole) => r.name === userRole);
-                    useConfigStore.setState({ roleAllowedModels: matched?.allowedModels || [] });
-                }
+                applyRolesToCurrentUser(roles);
             } catch {
                 // ignore
             }
@@ -97,18 +107,35 @@ export function ClientRootInit({ children }: { children: ReactNode }) {
                 } catch {
                     return;
                 }
-                if (payload.type !== "model-classifications-changed") return;
-                if (Array.isArray(payload.data)) {
+                if (payload.type === "model-classifications-changed" && Array.isArray(payload.data)) {
                     const map: Record<string, string> = {};
                     for (const item of payload.data) {
                         if (item.modelName) map[item.modelName] = item.capability;
                     }
                     setModelClassificationsMap(map);
                     setModelClassificationsCache(payload.data);
-                } else {
-                    void loadModelClassifications();
+                    void loadPublicSettings();
+                    return;
                 }
-                void loadPublicSettings();
+                if (payload.type === "model-classifications-changed") {
+                    void loadModelClassifications();
+                    void loadPublicSettings();
+                    return;
+                }
+                if (payload.type === "roles-changed" && Array.isArray(payload.data)) {
+                    applyRolesToCurrentUser(payload.data);
+                    window.dispatchEvent(new CustomEvent("roles-changed", { detail: payload.data }));
+                    void loadPublicSettings();
+                    return;
+                }
+                if (payload.type === "roles-changed") {
+                    void (async () => {
+                        const roles = await loadRoles();
+                        applyRolesToCurrentUser(roles);
+                        window.dispatchEvent(new CustomEvent("roles-changed", { detail: roles }));
+                    })();
+                    void loadPublicSettings();
+                }
             };
         };
 
@@ -133,8 +160,7 @@ export function ClientRootInit({ children }: { children: ReactNode }) {
         }
         void (async () => {
             const roles = await loadRoles();
-            const matched = roles.find((r: AdminRole) => r.name === user.role);
-            useConfigStore.setState({ roleAllowedModels: matched?.allowedModels || [] });
+            applyRolesToCurrentUser(roles);
         })();
     }, [user, loadRoles]);
 
