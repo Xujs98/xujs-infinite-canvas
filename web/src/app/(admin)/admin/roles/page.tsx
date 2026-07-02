@@ -1,11 +1,11 @@
 "use client";
 
-import { DeleteOutlined, EditOutlined, GiftOutlined, LockOutlined, PlusOutlined, SafetyOutlined, SearchOutlined } from "@ant-design/icons";
+import { DeleteOutlined, EditOutlined, GiftOutlined, LockOutlined, PlusOutlined, SafetyOutlined, SearchOutlined, UserOutlined } from "@ant-design/icons";
 import { App, Button, Card, Col, Form, Input, Modal, Row, Select, Space, Table, Tag, Tooltip, Typography } from "antd";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { useUserStore } from "@/stores/use-user-store";
-import { fetchAllChannelModels } from "@/services/api/admin";
+import { fetchAllChannelModels, fetchAdminUsers, type AdminUser } from "@/services/api/admin";
 import { type AdminRole, fetchAdminRoles, createAdminRole, updateAdminRole, deleteAdminRole, batchDeleteAdminRoles } from "@/services/api/role";
 
 const builtinRoleColors: Record<string, string> = {
@@ -26,6 +26,10 @@ export default function AdminRolesPage() {
     const [modalOpen, setModalOpen] = useState(false);
     const [editingItem, setEditingItem] = useState<AdminRole | null>(null);
     const [deletingItem, setDeletingItem] = useState<AdminRole | null>(null);
+    const [viewingRole, setViewingRole] = useState<AdminRole | null>(null);
+    const [roleUsers, setRoleUsers] = useState<AdminUser[]>([]);
+    const [roleUsersTotal, setRoleUsersTotal] = useState(0);
+    const [roleUsersLoading, setRoleUsersLoading] = useState(false);
     const [selectedIds, setSelectedIds] = useState<string[]>([]);
     const [isBatchDeleteOpen, setIsBatchDeleteOpen] = useState(false);
     const [form] = Form.useForm();
@@ -129,6 +133,22 @@ export default function AdminRolesPage() {
         setModalOpen(true);
     };
 
+    const openRoleUsers = async (item: AdminRole) => {
+        setViewingRole(item);
+        setRoleUsers([]);
+        setRoleUsersTotal(0);
+        setRoleUsersLoading(true);
+        try {
+            const res = await fetchAdminUsers(token, { role: item.name, page: 1, pageSize: 100 });
+            setRoleUsers(res.items || []);
+            setRoleUsersTotal(res.total || 0);
+        } catch (err) {
+            if (err instanceof Error) message.error(err.message);
+        } finally {
+            setRoleUsersLoading(false);
+        }
+    };
+
     const columns = [
         {
             title: "角色",
@@ -202,6 +222,9 @@ export default function AdminRolesPage() {
             align: "right" as const,
             render: (_: unknown, item: AdminRole) => (
                 <Space size={4}>
+                    <Tooltip title="查看用户">
+                        <Button type="text" size="small" icon={<UserOutlined />} onClick={() => void openRoleUsers(item)} />
+                    </Tooltip>
                     <Tooltip title="编辑">
                         <Button type="text" size="small" icon={<EditOutlined />} onClick={() => openEdit(item)} disabled={item.isBuiltin && item.name === "admin"} />
                     </Tooltip>
@@ -373,6 +396,62 @@ export default function AdminRolesPage() {
                 cancelText="取消"
             >
                 确定删除角色「{deletingItem?.label}」吗？
+            </Modal>
+
+            {/* 角色用户 */}
+            <Modal
+                title={viewingRole ? `角色用户：${viewingRole.label}` : "角色用户"}
+                open={Boolean(viewingRole)}
+                width={820}
+                onCancel={() => setViewingRole(null)}
+                footer={[
+                    <Button key="close" onClick={() => setViewingRole(null)}>
+                        关闭
+                    </Button>,
+                ]}
+            >
+                <div className="mb-3 flex items-center justify-between">
+                    <Typography.Text type="secondary">
+                        角色标识：{viewingRole?.name || "-"}
+                    </Typography.Text>
+                    <Tag color="blue">共 {roleUsersTotal} 人</Tag>
+                </div>
+                <Table<AdminUser>
+                    rowKey="id"
+                    loading={roleUsersLoading}
+                    dataSource={roleUsers}
+                    pagination={false}
+                    size="small"
+                    columns={[
+                        {
+                            title: "用户",
+                            dataIndex: "username",
+                            render: (_, user) => <Typography.Text copyable>{user.username}</Typography.Text>,
+                        },
+                        {
+                            title: "昵称",
+                            dataIndex: "displayName",
+                            render: (_, user) => user.displayName || "-",
+                        },
+                        {
+                            title: "状态",
+                            dataIndex: "status",
+                            width: 90,
+                            render: (_, user) => <Tag color={user.status === "ban" ? "red" : "green"}>{user.status === "ban" ? "禁用" : "正常"}</Tag>,
+                        },
+                        {
+                            title: "算力点",
+                            dataIndex: "credits",
+                            width: 90,
+                        },
+                        {
+                            title: "最近登录",
+                            dataIndex: "lastLoginAt",
+                            width: 170,
+                            render: (_, user) => user.lastLoginAt || "-",
+                        },
+                    ]}
+                />
             </Modal>
 
             {/* 批量删除确认 */}
