@@ -1463,6 +1463,9 @@ func emitVideoGenerationTaskUpdate(userID string, task canvasGenerationTaskConte
 		progress = value
 	}
 	update := service.GenerationTaskUpdate{Status: taskStatus}
+	if upstreamTaskID := extractFieldPath(raw, "", "id", "task_id", "data.id", "data.task_id"); upstreamTaskID != "" {
+		update.UpstreamTaskID = upstreamTaskID
+	}
 	if progress >= 0 {
 		update.Progress = &progress
 	}
@@ -1472,7 +1475,7 @@ func emitVideoGenerationTaskUpdate(userID string, task canvasGenerationTaskConte
 	if errorMsg, ok := payload["error"].(string); ok {
 		update.ErrorMsg = errorMsg
 	}
-	service.UpdateGenerationTaskByUpstreamID(task.TaskID, update)
+	service.UpdateGenerationTaskByIDOrUpstreamID(task.TaskID, update)
 }
 
 func registerVideoGenerationTask(userID, username, modelName, path, respText string, task canvasGenerationTaskContext) {

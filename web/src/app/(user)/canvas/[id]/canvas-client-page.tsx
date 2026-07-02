@@ -2498,7 +2498,7 @@ function InfiniteCanvasPage() {
                 setRunningNodeId(null);
             }
         },
-        [effectiveConfig, openConfigDialog, pollCanvasImageTask, projectId],
+        [effectiveConfig, isAiConfigReady, message, openConfigDialog, pollCanvasImageTask, pollCanvasVideoTask, projectId],
     );
     useEffect(() => {
         generateNodeRef.current = handleGenerateNode;
@@ -2554,7 +2554,7 @@ function InfiniteCanvasPage() {
                         if (payload.nodeId && node.id !== payload.nodeId) return node;
                         if (payload.taskId && node.metadata?.generationTaskId !== payload.taskId) return node;
                         if (payload.status === "running" || payload.status === "pending") {
-                            if (node.metadata?.content) return { ...node, metadata: { ...node.metadata, status: NODE_STATUS_SUCCESS, progress: undefined } };
+                            if ((node.type === CanvasNodeType.Image || node.type === CanvasNodeType.Video || node.type === CanvasNodeType.Audio) && node.metadata?.content) return { ...node, metadata: { ...node.metadata, status: NODE_STATUS_SUCCESS, progress: undefined } };
                             return { ...node, metadata: { ...node.metadata, status: NODE_STATUS_LOADING, progress: payload.progress } };
                         }
                         if (payload.status === "failed") {

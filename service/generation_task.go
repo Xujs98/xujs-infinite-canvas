@@ -111,6 +111,16 @@ func UpdateGenerationTaskByUpstreamID(upstreamTaskID string, update GenerationTa
 	return UpdateGenerationTask(id, update)
 }
 
+func UpdateGenerationTaskByIDOrUpstreamID(taskID string, update GenerationTaskUpdate) (model.GenerationTask, bool) {
+	if taskID == "" {
+		return model.GenerationTask{}, false
+	}
+	if task, ok := UpdateGenerationTask(taskID, update); ok {
+		return task, true
+	}
+	return UpdateGenerationTaskByUpstreamID(taskID, update)
+}
+
 func GetGenerationTask(id string) (model.GenerationTask, bool) {
 	generationTasks.RLock()
 	defer generationTasks.RUnlock()
