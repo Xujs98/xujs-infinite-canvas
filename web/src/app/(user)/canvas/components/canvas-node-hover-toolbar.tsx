@@ -86,6 +86,7 @@ export function CanvasNodeHoverToolbar({
     const [draftLabelMode, setDraftLabelMode] = useState<ToolbarLabelMode>("side");
     const [draftAnimationMode, setDraftAnimationMode] = useState<ToolbarAnimationMode>("slide");
     const [imageToolSettingsOpen, setImageToolSettingsOpen] = useState(false);
+    const [coarsePointer, setCoarsePointer] = useState(false);
     const { message } = App.useApp();
     const copyText = useCopyText();
     const theme = useCanvasTheme();
@@ -113,6 +114,14 @@ export function CanvasNodeHoverToolbar({
         } catch {
             window.localStorage.removeItem(IMAGE_QUICK_TOOLS_STORAGE_KEY);
         }
+    }, []);
+
+    useEffect(() => {
+        const query = window.matchMedia("(pointer: coarse), (max-width: 767px)");
+        const update = () => setCoarsePointer(query.matches);
+        update();
+        query.addEventListener("change", update);
+        return () => query.removeEventListener("change", update);
     }, []);
 
     useEffect(() => {
@@ -145,6 +154,7 @@ export function CanvasNodeHoverToolbar({
 
     if (!node) return null;
 
+    const nodeId = node.id;
     const nodeCenterX = viewport.x + (node.position.x + node.width / 2) * viewport.k;
     const top = viewport.y + node.position.y * viewport.k - 14;
 
@@ -188,7 +198,7 @@ export function CanvasNodeHoverToolbar({
     const imageTools = buildImageToolbarTools(node, { onUpload, onToggleFreeResize, onMaskEdit, onCrop, onSplit, onUpscale, onSuperResolve, onAngle, onViewImage, onCopyPrompt: copyImagePrompt, onReversePrompt });
 
     function openImageToolSettings() {
-        onKeep(node.id);
+        onKeep(nodeId);
         setDraftImageToolIds(quickImageToolIds);
         setDraftLabelMode(labelMode);
         setDraftAnimationMode(animationMode);
@@ -216,7 +226,7 @@ export function CanvasNodeHoverToolbar({
         ...(hasImage ? imageTools.map((tool) => ({ id: tool.id, title: tool.title, label: tool.label, icon: tool.icon, active: tool.active, onClick: tool.onClick })) : []),
         ...(hasImage || isText ? [{ id: "jimeng", title: "用即梦生成", label: "即梦", icon: <Sparkles className="size-4" />, onClick: () => onJimeng(node) }] : []),
     ];
-    const toolbarTools = hasImage ? [...baseToolbarTools, ...nodeToolbarTools].filter((tool) => quickImageToolIdSet.has(tool.id as ImageQuickToolId)) : [...baseToolbarTools, ...nodeToolbarTools];
+    const toolbarTools = hasImage && !coarsePointer ? [...baseToolbarTools, ...nodeToolbarTools].filter((tool) => quickImageToolIdSet.has(tool.id as ImageQuickToolId)) : [...baseToolbarTools, ...nodeToolbarTools];
     const selectableImageToolbarTools = [...baseToolbarTools, ...nodeToolbarTools].filter((tool) => tool.id !== "retry") as ImageToolbarSettingsTool[];
 
     const closeImageToolSettings = () => {
@@ -261,7 +271,7 @@ export function CanvasNodeHoverToolbar({
             >
                 <div
                     ref={toolbarRefCb}
-                    className="glass flex h-12 items-center overflow-hidden rounded-[18px] border text-[15px]"
+                    className="glass flex h-14 items-center overflow-hidden rounded-[18px] border text-[15px] md:h-12"
                     style={{
                         maxWidth: "calc(100vw - 24px)",
                         transform: "translate(-50%, -100%)",
@@ -407,9 +417,9 @@ function ToolbarAction({ title, label, icon, onClick, labelMode, active = false,
     const isBelow = labelMode === "below" && hasText;
     return (
         <Tooltip title={title} placement="top" mouseEnterDelay={0.2} color="#ffffff" styles={{ body: { color: "#242529", boxShadow: "0 8px 24px rgba(15,23,42,.16)", fontSize: 13, fontWeight: 500 } }}>
-            <button type="button" className={`group relative flex items-center whitespace-nowrap px-1.5 ${isBelow ? "h-14 flex-col justify-center gap-0.5" : "h-12"} ${danger ? "text-[#ef4444]" : ""}`} onClick={onClick} aria-label={title}>
+            <button type="button" className={`group relative flex items-center whitespace-nowrap px-1.5 ${isBelow ? "h-14 flex-col justify-center gap-0.5" : "h-14 md:h-12"} ${danger ? "text-[#ef4444]" : ""}`} onClick={onClick} aria-label={title}>
                 <span
-                    className={`flex items-center ${isBelow ? "h-7 justify-center px-1.5" : `h-9 ${hasText ? "gap-2 px-2.5" : "justify-center px-2"}`} rounded-lg transition`}
+                    className={`flex items-center ${isBelow ? "h-8 justify-center px-2 md:h-7 md:px-1.5" : `h-11 md:h-9 ${hasText ? "gap-2 px-3 md:px-2.5" : "justify-center px-3 md:px-2"}`} rounded-lg transition`}
                     style={{
                         color: active ? toolbarTheme.activeText : undefined,
                         background: active ? toolbarTheme.activeBg : undefined,

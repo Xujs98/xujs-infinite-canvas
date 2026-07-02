@@ -232,6 +232,8 @@ function InfiniteCanvasPage() {
     const didInitialCenterRef = useRef(false);
     const rafRef = useRef<number | null>(null);
     const toolbarHideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const longPressTriggeredRef = useRef(false);
     const nodeDraggingRef = useRef(false);
     const dragRef = useRef<{
         isDraggingNode: boolean;
@@ -1018,12 +1020,33 @@ function InfiniteCanvasPage() {
         [cancelPendingConnectionCreate, screenToCanvas],
     );
 
-    const handleNodeMouseDown = useCallback((event: ReactMouseEvent, nodeId: string) => {
+    const handleNodeMouseDown = useCallback((event: ReactMouseEvent | ReactPointerEvent, nodeId: string) => {
         event.stopPropagation();
         setContextMenu(null);
         setHoveredNodeId(null);
-        setToolbarNodeId(null);
+        keepNodeToolbar(nodeId);
         setSelectedConnectionId(null);
+        longPressTriggeredRef.current = false;
+        if (longPressTimerRef.current) {
+            clearTimeout(longPressTimerRef.current);
+            longPressTimerRef.current = null;
+        }
+        if (event.nativeEvent instanceof PointerEvent && event.nativeEvent.pointerType === "touch") {
+            const menuX = event.clientX;
+            const menuY = event.clientY;
+            longPressTimerRef.current = setTimeout(() => {
+                longPressTriggeredRef.current = true;
+                dragRef.current.isDraggingNode = false;
+                dragRef.current.hasMoved = false;
+                dragRef.current.initialSelectedNodes = [];
+                historyPausedRef.current = false;
+                nodeDraggingRef.current = false;
+                setIsNodeDragging(false);
+                keepNodeToolbar(nodeId);
+                setContextMenu({ type: "node", x: menuX, y: menuY, nodeId });
+                longPressTimerRef.current = null;
+            }, 520);
+        }
 
         const currentSelected = selectedNodeIdsRef.current;
         const currentNodes = nodesRef.current;
@@ -1055,7 +1078,7 @@ function InfiniteCanvasPage() {
         historyPausedRef.current = true;
         nodeDraggingRef.current = true;
         setIsNodeDragging(true);
-    }, []);
+    }, [keepNodeToolbar]);
 
     const finishNodeDrag = useCallback((clientX?: number, clientY?: number) => {
         if (rafRef.current) {
@@ -1089,38 +1112,49 @@ function InfiniteCanvasPage() {
         dragRef.current.initialSelectedNodes = [];
         if (wasClick && clickedNodeId) {
             const clickedNode = nodesRef.current.find((node) => node.id === clickedNodeId);
+            keepNodeToolbar(clickedNodeId);
             if (clickedNode?.type === CanvasNodeType.Text) {
                 setDialogNodeId((current) => (current === clickedNodeId ? current : null));
             } else {
                 setDialogNodeId(clickedNodeId);
             }
         }
+    }, [keepNodeToolbar]);
+
+    const moveDraggedNode = useCallback((clientX: number, clientY: number) => {
+        const currentViewport = viewportRef.current;
+
+        if (dragRef.current.isDraggingNode) {
+            const dx = (clientX - dragRef.current.startX) / currentViewport.k;
+            const dy = (clientY - dragRef.current.startY) / currentViewport.k;
+            const initialPositions = dragRef.current.initialSelectedNodes;
+            if (Math.abs(clientX - dragRef.current.startX) > 3 || Math.abs(clientY - dragRef.current.startY) > 3) {
+                dragRef.current.hasMoved = true;
+                if (longPressTimerRef.current) {
+                    clearTimeout(longPressTimerRef.current);
+                    longPressTimerRef.current = null;
+                }
+            }
+
+            if (rafRef.current) cancelAnimationFrame(rafRef.current);
+            rafRef.current = requestAnimationFrame(() => {
+                setNodes((prev) =>
+                    prev.map((node) => {
+                        const initial = initialPositions.find((item) => item.id === node.id);
+                        return initial ? { ...node, position: { x: initial.x + dx, y: initial.y + dy } } : node;
+                    }),
+                );
+                rafRef.current = null;
+            });
+            return true;
+        }
+
+        return false;
     }, []);
 
     const handleGlobalMouseMove = useCallback(
         (event: MouseEvent) => {
-            const currentViewport = viewportRef.current;
-
-            if (dragRef.current.isDraggingNode) {
-                const dx = (event.clientX - dragRef.current.startX) / currentViewport.k;
-                const dy = (event.clientY - dragRef.current.startY) / currentViewport.k;
-                const initialPositions = dragRef.current.initialSelectedNodes;
-                if (Math.abs(event.clientX - dragRef.current.startX) > 3 || Math.abs(event.clientY - dragRef.current.startY) > 3) {
-                    dragRef.current.hasMoved = true;
-                }
-
-                if (rafRef.current) cancelAnimationFrame(rafRef.current);
-                rafRef.current = requestAnimationFrame(() => {
-                    setNodes((prev) =>
-                        prev.map((node) => {
-                            const initial = initialPositions.find((item) => item.id === node.id);
-                            return initial ? { ...node, position: { x: initial.x + dx, y: initial.y + dy } } : node;
-                        }),
-                    );
-                    rafRef.current = null;
-                });
-                return;
-            }
+            if (moveDraggedNode(event.clientX, event.clientY)) return;
 
             if (connectingParamsRef.current && !pendingConnectionCreateRef.current) {
                 const dropTarget = getConnectionDropTarget(event.clientX, event.clientY, connectingParamsRef.current);
@@ -1129,11 +1163,13 @@ function InfiniteCanvasPage() {
                 setMouseWorld(screenToCanvas(event.clientX, event.clientY));
             }
         },
-        [finishNodeDrag, getConnectionDropTarget, screenToCanvas],
+        [finishNodeDrag, getConnectionDropTarget, moveDraggedNode, screenToCanvas],
     );
 
     const handleGlobalPointerMove = useCallback(
         (event: PointerEvent) => {
+            if (event.pointerType !== "mouse" && moveDraggedNode(event.clientX, event.clientY)) return;
+
             const currentSelection = selectionBoxRef.current;
             if (!currentSelection) return;
 
@@ -1163,11 +1199,19 @@ function InfiniteCanvasPage() {
             setSelectionBox(nextSelectionBox);
             setSelectedNodeIds(nextSelected);
         },
-        [screenToCanvas],
+        [moveDraggedNode, screenToCanvas],
     );
 
     const handleGlobalMouseUp = useCallback(
         (event: MouseEvent) => {
+            if (longPressTimerRef.current) {
+                clearTimeout(longPressTimerRef.current);
+                longPressTimerRef.current = null;
+            }
+            if (longPressTriggeredRef.current) {
+                longPressTriggeredRef.current = false;
+                return;
+            }
             finishNodeDrag(event.clientX, event.clientY);
 
             selectionBoxRef.current = null;
@@ -1193,8 +1237,24 @@ function InfiniteCanvasPage() {
     );
 
     useEffect(() => {
-        const handlePointerUp = (event: PointerEvent) => finishNodeDrag(event.clientX, event.clientY);
-        const cancelNodeDrag = () => finishNodeDrag();
+        const handlePointerUp = (event: PointerEvent) => {
+            if (longPressTimerRef.current) {
+                clearTimeout(longPressTimerRef.current);
+                longPressTimerRef.current = null;
+            }
+            if (longPressTriggeredRef.current) {
+                longPressTriggeredRef.current = false;
+                return;
+            }
+            finishNodeDrag(event.clientX, event.clientY);
+        };
+        const cancelNodeDrag = () => {
+            if (longPressTimerRef.current) {
+                clearTimeout(longPressTimerRef.current);
+                longPressTimerRef.current = null;
+            }
+            finishNodeDrag();
+        };
         window.addEventListener("mousemove", handleGlobalMouseMove);
         window.addEventListener("mouseup", handleGlobalMouseUp);
         window.addEventListener("pointerup", handlePointerUp);

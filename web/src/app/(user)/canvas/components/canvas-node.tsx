@@ -36,7 +36,7 @@ type CanvasNodeProps = {
     batchOpening?: boolean;
     batchRecovering?: boolean;
     batchMotion?: { x: number; y: number; index: number };
-    onMouseDown: (event: React.MouseEvent, nodeId: string) => void;
+    onMouseDown: (event: React.MouseEvent | React.PointerEvent, nodeId: string) => void;
     onHoverStart: (nodeId: string) => void;
     onHoverEnd: (nodeId: string) => void;
     onConnectStart: (event: React.MouseEvent, nodeId: string, handleType: "source" | "target") => void;
@@ -266,6 +266,11 @@ export const CanvasNode = React.memo(function CanvasNode({
                     boxShadow: isActive ? `0 0 0 1px ${selectionBlue}55` : isRelated && !isBatchChild ? `0 0 0 1px ${theme.node.muted}55, 0 18px 48px rgba(0,0,0,.14)` : undefined,
                 }}
                 onMouseDown={(event) => onMouseDown(event, data.id)}
+                onPointerDown={(event) => {
+                    if (event.pointerType !== "touch") return;
+                    event.preventDefault();
+                    onMouseDown(event, data.id);
+                }}
                 onDoubleClick={(event) => {
                     if (isBatchRoot) {
                         event.stopPropagation();
