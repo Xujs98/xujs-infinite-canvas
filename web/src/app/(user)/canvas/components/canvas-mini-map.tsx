@@ -95,18 +95,7 @@ export function Minimap({ nodes, viewport, viewportSize, onViewportChange }: { n
         };
     }, [toMinimap, viewport.k, viewport.x, viewport.y, viewportSize.height, viewportSize.width]);
 
-    const viewportHandleRect = useMemo(() => {
-        if (!compact) return viewportRect;
-        const handleSize = 34;
-        const centerX = viewportRect.x + viewportRect.w / 2;
-        const centerY = viewportRect.y + viewportRect.h / 2;
-        return {
-            x: centerX - handleSize / 2,
-            y: centerY - handleSize / 2,
-            w: handleSize,
-            h: handleSize,
-        };
-    }, [compact, mapHeight, viewportRect, width]);
+    const dragRect = viewportRect;
 
     const updateViewportFromMinimapCenter = (centerX: number, centerY: number) => {
         const world = toWorld(centerX, centerY);
@@ -124,8 +113,8 @@ export function Minimap({ nodes, viewport, viewportSize, onViewportChange }: { n
         const localX = event.clientX - rect.left;
         const localY = event.clientY - rect.top;
         if (compact && dragOffsetRef.current) {
-            const nextX = clamp(localX - dragOffsetRef.current.x + viewportHandleRect.w / 2, 0, width);
-            const nextY = clamp(localY - dragOffsetRef.current.y + viewportHandleRect.h / 2, 0, mapHeight);
+            const nextX = clamp(localX - dragOffsetRef.current.x + dragRect.w / 2, 0, width);
+            const nextY = clamp(localY - dragOffsetRef.current.y + dragRect.h / 2, 0, mapHeight);
             updateViewportFromMinimapCenter(nextX, nextY);
             return;
         }
@@ -154,12 +143,12 @@ export function Minimap({ nodes, viewport, viewportSize, onViewportChange }: { n
                         const localX = event.clientX - rect.left;
                         const localY = event.clientY - rect.top;
                         const insideViewport =
-                            localX >= viewportHandleRect.x &&
-                            localX <= viewportHandleRect.x + viewportHandleRect.w &&
-                            localY >= viewportHandleRect.y &&
-                            localY <= viewportHandleRect.y + viewportHandleRect.h;
+                            localX >= dragRect.x &&
+                            localX <= dragRect.x + dragRect.w &&
+                            localY >= dragRect.y &&
+                            localY <= dragRect.y + dragRect.h;
                         if (!insideViewport) return;
-                        dragOffsetRef.current = { x: localX - viewportHandleRect.x, y: localY - viewportHandleRect.y };
+                        dragOffsetRef.current = { x: localX - dragRect.x, y: localY - dragRect.y };
                     }
                     event.currentTarget.setPointerCapture(event.pointerId);
                     setIsDragging(true);
@@ -206,29 +195,17 @@ export function Minimap({ nodes, viewport, viewportSize, onViewportChange }: { n
                         />
                     );
                 })}
-                {compact ? (
-                    <div
-                        className="pointer-events-none absolute rounded-lg border"
-                        style={{
-                            left: viewportRect.x,
-                            top: viewportRect.y,
-                            width: viewportRect.w,
-                            height: viewportRect.h,
-                            borderColor: `${theme.node.activeStroke}88`,
-                            background: `${theme.node.activeStroke}0f`,
-                        }}
-                    />
-                ) : null}
                 <div
-                    className={compact ? "absolute rounded-md border shadow-md" : "pointer-events-none absolute border"}
+                    className={compact ? "absolute rounded-lg border shadow-md" : "pointer-events-none absolute border"}
                     style={{
-                        left: viewportHandleRect.x,
-                        top: viewportHandleRect.y,
-                        width: viewportHandleRect.w,
-                        height: viewportHandleRect.h,
+                        left: viewportRect.x,
+                        top: viewportRect.y,
+                        width: viewportRect.w,
+                        height: viewportRect.h,
                         borderColor: theme.node.activeStroke,
-                        background: compact ? `${theme.node.activeStroke}30` : `${theme.node.activeStroke}18`,
+                        background: `${theme.node.activeStroke}18`,
                         boxShadow: compact ? `0 0 0 1px ${theme.toolbar.panel}, 0 8px 18px rgba(0,0,0,.18)` : undefined,
+                        cursor: compact ? "grab" : undefined,
                     }}
                 />
             </div>
