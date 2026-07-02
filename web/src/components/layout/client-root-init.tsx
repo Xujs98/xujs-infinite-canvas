@@ -5,9 +5,26 @@ import { useEffect, useRef } from "react";
 import { usePathname } from "next/navigation";
 import { App } from "antd";
 
-import { getModelClassificationDetail, useModelClassificationsVersion, useConfigStore } from "@/stores/use-config-store";
+import {
+    getModelClassificationDetail,
+    setModelClassificationsCache,
+    setModelClassificationsMap,
+    useModelClassificationsVersion,
+    useConfigStore,
+    type ModelClassificationDetail,
+} from "@/stores/use-config-store";
 import { useUserStore } from "@/stores/use-user-store";
 import type { AdminRole } from "@/services/api/role";
+
+type AppSocketMessage =
+    | {
+          type: "model-classifications-changed";
+          data?: ModelClassificationDetail[];
+      }
+    | {
+          type: string;
+          [key: string]: unknown;
+      };
 
 export function ClientRootInit({ children }: { children: ReactNode }) {
     const { message } = App.useApp();
@@ -21,6 +38,7 @@ export function ClientRootInit({ children }: { children: ReactNode }) {
     const updateConfig = useConfigStore((state) => state.updateConfig);
     const openConfigDialog = useConfigStore((state) => state.openConfigDialog);
     const loadRoles = useConfigStore((state) => state.loadRoles);
+    const token = useUserStore((state) => state.token);
     const isLoginPage = pathname === "/login" || pathname === "/admin/login";
 
     // 监听分类变化，自动适配视频秒数
@@ -57,6 +75,50 @@ export function ClientRootInit({ children }: { children: ReactNode }) {
             }
         })();
     }, [loadPublicSettings, loadPublicSystemSettings, loadModelClassifications, loadRoles]);
+
+    useEffect(() => {
+        let socket: WebSocket | undefined;
+        let reconnectTimer: number | undefined;
+        let closed = false;
+
+        const connect = () => {
+            if (closed) return;
+            const proto = window.location.protocol === "https:" ? "wss" : "ws";
+            const wsHost = window.location.port === "3000" ? `${window.location.hostname}:8080` : window.location.host;
+            const tokenParam = token ? `?token=${encodeURIComponent(token)}` : "";
+            socket = new WebSocket(`${proto}://${wsHost}/api/ws${tokenParam}`);
+            socket.onclose = () => {
+                if (!closed) reconnectTimer = window.setTimeout(connect, 3000);
+            };
+            socket.onmessage = (event) => {
+                let payload: AppSocketMessage;
+                try {
+                    payload = JSON.parse(event.data) as AppSocketMessage;
+                } catch {
+                    return;
+                }
+                if (payload.type !== "model-classifications-changed") return;
+                if (Array.isArray(payload.data)) {
+                    const map: Record<string, string> = {};
+                    for (const item of payload.data) {
+                        if (item.modelName) map[item.modelName] = item.capability;
+                    }
+                    setModelClassificationsMap(map);
+                    setModelClassificationsCache(payload.data);
+                } else {
+                    void loadModelClassifications();
+                }
+                void loadPublicSettings();
+            };
+        };
+
+        connect();
+        return () => {
+            closed = true;
+            if (reconnectTimer) window.clearTimeout(reconnectTimer);
+            socket?.close();
+        };
+    }, [loadModelClassifications, loadPublicSettings, token]);
 
     useEffect(() => {
         if (!isLoginPage) void hydrateUser();

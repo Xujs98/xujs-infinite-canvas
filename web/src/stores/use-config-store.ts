@@ -125,7 +125,7 @@ type ConfigStore = {
     setConfigDialogOpen: (isOpen: boolean) => void;
     clearPromptContinue: () => void;
     roleAllowedModels: string[];
-    loadRoles: () => Promise<void>;
+    loadRoles: () => Promise<AdminRole[]>;
 };
 
 function resolveEffectiveConfig(config: AiConfig, modelChannel: AdminPublicSettings["modelChannel"] | null, roleAllowedModels: string[] = []) {
