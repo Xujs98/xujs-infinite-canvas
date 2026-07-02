@@ -96,7 +96,7 @@ export function Minimap({ nodes, viewport, viewportSize, onViewportChange }: { n
 
     const viewportHandleRect = useMemo(() => {
         if (!compact) return viewportRect;
-        const handleSize = 24;
+        const handleSize = 34;
         const centerX = viewportRect.x + viewportRect.w / 2;
         const centerY = viewportRect.y + viewportRect.h / 2;
         return {
@@ -129,6 +129,14 @@ export function Minimap({ nodes, viewport, viewportSize, onViewportChange }: { n
             return;
         }
         updateViewportFromMinimapCenter(localX, localY);
+    };
+
+    const centerNode = (node: CanvasNodeData) => {
+        onViewportChange({
+            x: viewportSize.width / 2 - (node.position.x + node.width / 2) * viewport.k,
+            y: viewportSize.height / 2 - (node.position.y + node.height / 2) * viewport.k,
+            k: viewport.k,
+        });
     };
 
     return (
@@ -176,7 +184,7 @@ export function Minimap({ nodes, viewport, viewportSize, onViewportChange }: { n
                     return (
                         <div
                             key={node.id}
-                            className="pointer-events-none absolute rounded-[3px]"
+                            className={compact ? "absolute rounded-[3px]" : "pointer-events-none absolute rounded-[3px]"}
                             style={{
                                 left: pos.x,
                                 top: pos.y,
@@ -186,6 +194,13 @@ export function Minimap({ nodes, viewport, viewportSize, onViewportChange }: { n
                                 border: compact ? `1px solid ${theme.toolbar.panel}` : undefined,
                                 boxShadow: compact ? "0 1px 4px rgba(0,0,0,.16)" : undefined,
                                 opacity: compact ? 0.92 : 0.8,
+                                cursor: compact ? "pointer" : undefined,
+                            }}
+                            onPointerDown={(event) => {
+                                if (!compact) return;
+                                event.preventDefault();
+                                event.stopPropagation();
+                                centerNode(node);
                             }}
                         />
                     );
