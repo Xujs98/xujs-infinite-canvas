@@ -28,10 +28,10 @@ export function Minimap({ nodes, viewport, viewportSize, onViewportChange }: { n
         const visibleY = -viewport.y / viewport.k;
         const visibleW = viewportSize.width / viewport.k;
         const visibleH = viewportSize.height / viewport.k;
-        let minX = visibleX;
-        let minY = visibleY;
-        let maxX = visibleX + visibleW;
-        let maxY = visibleY + visibleH;
+        let minX = nodes.length ? Infinity : visibleX;
+        let minY = nodes.length ? Infinity : visibleY;
+        let maxX = nodes.length ? -Infinity : visibleX + visibleW;
+        let maxY = nodes.length ? -Infinity : visibleY + visibleH;
 
         nodes.forEach((node) => {
             minX = Math.min(minX, node.position.x);
@@ -40,7 +40,7 @@ export function Minimap({ nodes, viewport, viewportSize, onViewportChange }: { n
             maxY = Math.max(maxY, node.position.y + node.height);
         });
 
-        const padding = Math.max(500, visibleW * 0.2, visibleH * 0.2);
+        const padding = Math.max(500, visibleW * 0.35, visibleH * 0.35);
         minX -= padding;
         minY -= padding;
         maxX += padding;
@@ -206,6 +206,19 @@ export function Minimap({ nodes, viewport, viewportSize, onViewportChange }: { n
                         />
                     );
                 })}
+                {compact ? (
+                    <div
+                        className="pointer-events-none absolute rounded-lg border"
+                        style={{
+                            left: viewportRect.x,
+                            top: viewportRect.y,
+                            width: viewportRect.w,
+                            height: viewportRect.h,
+                            borderColor: `${theme.node.activeStroke}88`,
+                            background: `${theme.node.activeStroke}0f`,
+                        }}
+                    />
+                ) : null}
                 <div
                     className={compact ? "absolute rounded-md border shadow-md" : "pointer-events-none absolute border"}
                     style={{
