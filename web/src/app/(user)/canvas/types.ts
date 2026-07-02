@@ -58,6 +58,7 @@ export type CanvasNodeMetadata = {
     bytes?: number;
     durationMs?: number;
     progress?: number;
+    generationTaskKind?: "image" | "video";
     generationTaskId?: string;
     generationTaskProvider?: "openai" | "seedance";
     generationTaskModel?: string;

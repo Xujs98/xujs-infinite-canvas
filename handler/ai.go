@@ -233,6 +233,12 @@ func proxyAIRequest(w http.ResponseWriter, r *http.Request, path string) {
 		request.Header.Set(k, v)
 	}
 	extraArgs := []any{channel.VideoConfig, channel.BaseURL, requestLogID(logID)}
+	if isVideoPath(path, channel.VideoConfig) {
+		extraArgs = append(extraArgs, canvasGenerationTaskContext{
+			CanvasID: r.URL.Query().Get("canvasId"),
+			NodeID:   r.URL.Query().Get("nodeId"),
+		})
+	}
 	// 会员有效期内免扣算力点。
 	if service.IsMembershipActive(user.MembershipExpiresAt) {
 		service.LogMembershipFreeUsage(user.ID, modelName, credits, path)
@@ -362,6 +368,9 @@ func copyAIResponse(w http.ResponseWriter, request *http.Request, onFailure func
 		// 内容请求始终记录；轮询请求仅在任务完成(SUCCESS/SUBMITTED)或失败(FAILURE)时记录
 		taskDone := isVideoTaskDone(respText) || isVideoTaskCompleted(respText)
 		taskFailed := isVideoTaskFailed(respText)
+		if !isPolling && !isContentRequest {
+			registerVideoGenerationTask(userID, username, modelName, path, respText, generationTask)
+		}
 		if isPolling && generationTask.TaskID != "" {
 			emitVideoGenerationTaskUpdate(userID, generationTask, respText, taskDone, taskFailed, videoConfig)
 		}
@@ -1443,6 +1452,51 @@ func emitVideoGenerationTaskUpdate(userID string, task canvasGenerationTaskConte
 		payload["error"] = errorMsg
 	}
 	ws.DefaultHub.SendToUser(userID, payload)
+	taskStatus := model.GenerationTaskStatusRunning
+	if payload["status"] == "completed" {
+		taskStatus = model.GenerationTaskStatusSucceeded
+	} else if payload["status"] == "failed" {
+		taskStatus = model.GenerationTaskStatusFailed
+	}
+	progress := -1
+	if value, ok := payload["progress"].(int); ok {
+		progress = value
+	}
+	update := service.GenerationTaskUpdate{Status: taskStatus}
+	if progress >= 0 {
+		update.Progress = &progress
+	}
+	if resultURL, ok := payload["resultUrl"].(string); ok {
+		update.ResultURL = resultURL
+	}
+	if errorMsg, ok := payload["error"].(string); ok {
+		update.ErrorMsg = errorMsg
+	}
+	service.UpdateGenerationTaskByUpstreamID(task.TaskID, update)
+}
+
+func registerVideoGenerationTask(userID, username, modelName, path, respText string, task canvasGenerationTaskContext) {
+	if userID == "" {
+		return
+	}
+	var raw map[string]any
+	if err := json.Unmarshal([]byte(respText), &raw); err != nil {
+		return
+	}
+	upstreamTaskID := extractFieldPath(raw, "", "id", "task_id", "data.id", "data.task_id")
+	if upstreamTaskID == "" {
+		return
+	}
+	service.CreateGenerationTask(service.GenerationTaskCreate{
+		UpstreamTaskID: upstreamTaskID,
+		Type:           model.GenerationTaskTypeVideo,
+		UserID:         userID,
+		Username:       username,
+		Model:          modelName,
+		Path:           path,
+		CanvasID:       task.CanvasID,
+		NodeID:         task.NodeID,
+	})
 }
 
 func extractProgressNumber(raw map[string]any) int {

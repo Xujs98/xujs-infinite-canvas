@@ -33,6 +33,11 @@ func New() *gin.Engine {
 	v1 := api.Group("/v1", middleware.UserAuth)
 	v1.POST("/images/generations", gin.WrapF(handler.AIImagesGenerations))
 	v1.POST("/images/edits", gin.WrapF(handler.AIImagesEdits))
+	v1.POST("/image-tasks/generations", gin.WrapF(handler.CreateImageGenerationTask))
+	v1.POST("/image-tasks/edits", gin.WrapF(handler.CreateImageEditTask))
+	v1.GET("/generation-tasks/:id", func(c *gin.Context) {
+		handler.GetGenerationTask(c.Writer, c.Request, c.Param("id"))
+	})
 	v1.POST("/chat/completions", gin.WrapF(handler.AIChatCompletions))
 	v1.POST("/audio/speech", gin.WrapF(handler.AIAudioSpeech))
 	v1.POST("/videos", gin.WrapF(handler.AIVideos))
@@ -150,6 +155,7 @@ func New() *gin.Engine {
 	admin.POST("/call-logs/batch-delete", gin.WrapF(handler.AdminBatchDeleteCallLogs))
 	admin.GET("/request-logs", gin.WrapF(handler.AdminRequestLogs))
 	admin.POST("/request-logs/batch-delete", gin.WrapF(handler.AdminBatchDeleteRequestLogs))
+	admin.GET("/tasks", gin.WrapF(handler.AdminGenerationTasks))
 	admin.GET("/model-classifications", gin.WrapF(handler.ListModelClassifications))
 	admin.POST("/model-classifications", gin.WrapF(handler.CreateModelClassification))
 	admin.PUT("/model-classifications/:id", func(c *gin.Context) {

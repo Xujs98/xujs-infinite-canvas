@@ -85,16 +85,16 @@ export async function requestVideoGeneration(config: AiConfig, prompt: string, r
     }
 }
 
-export async function createVideoGenerationTask(config: AiConfig, prompt: string, references: ReferenceImage[] = [], videoReferences: ReferenceVideo[] = [], audioReferences: ReferenceAudio[] = []): Promise<VideoGenerationTask> {
+export async function createVideoGenerationTask(config: AiConfig, prompt: string, references: ReferenceImage[] = [], videoReferences: ReferenceVideo[] = [], audioReferences: ReferenceAudio[] = [], context?: VideoGenerationTaskContext): Promise<VideoGenerationTask> {
     const model = (config.model || config.videoModel).trim();
     assertVideoConfig(config, model);
     if (isSeedanceVideoConfig({ ...config, model })) {
-        return createSeedanceTask(config, model, prompt, references, videoReferences, audioReferences);
+        return createSeedanceTask(config, model, prompt, references, videoReferences, audioReferences, context);
     }
     if (videoReferences.length || audioReferences.length) {
         throw new Error("当前视频接口不支持参考视频或参考音频，请切换到 Seedance 2.0 / 火山 Agent Plan 模型，或移除参考素材");
     }
-    return createOpenAIVideoTask(config, model, prompt, references);
+    return createOpenAIVideoTask(config, model, prompt, references, context);
 }
 
 export async function pollVideoGenerationTask(config: AiConfig, task: VideoGenerationTask, context?: VideoGenerationTaskContext): Promise<VideoGenerationTaskState> {
@@ -108,7 +108,7 @@ export async function storeGeneratedVideo(result: VideoGenerationResult): Promis
     throw new Error("视频接口没有返回可播放的视频");
 }
 
-async function createOpenAIVideoTask(config: AiConfig, model: string, prompt: string, references: ReferenceImage[]): Promise<VideoGenerationTask> {
+async function createOpenAIVideoTask(config: AiConfig, model: string, prompt: string, references: ReferenceImage[], context?: VideoGenerationTaskContext): Promise<VideoGenerationTask> {
     const isGrokImageToVideo = model === "grok-imagine-video-1.5-preview";
     console.log("[Video] createOpenAIVideoTask", { model, isGrokImageToVideo, referencesCount: references.length, references: references.map(r => ({ id: r.id, name: r.name, type: r.type, hasDataUrl: !!r.dataUrl, dataUrlLength: r.dataUrl?.length })) });
     if (isGrokImageToVideo && references.length > 0) {
@@ -122,7 +122,7 @@ async function createOpenAIVideoTask(config: AiConfig, model: string, prompt: st
             reference_images: imageDataList,
         };
         try {
-            const created = unwrapVideoResponse((await axios.post<ApiVideoResponse>(aiApiUrl(config, "/videos"), payload, { headers: aiHeaders(config, "application/json") })).data);
+            const created = unwrapVideoResponse((await axios.post<ApiVideoResponse>(aiApiUrl(config, "/videos"), payload, { headers: aiHeaders(config, "application/json"), params: videoTaskQueryParams(config, { id: "", provider: "openai", model }, context) })).data);
             if (!created.id) throw new Error("视频接口没有返回任务 ID");
             return { id: created.id, provider: "openai", model };
         } catch (error) {
@@ -139,7 +139,7 @@ async function createOpenAIVideoTask(config: AiConfig, model: string, prompt: st
     const files = await Promise.all(references.slice(0, 7).map(async (image) => dataUrlToFile({ ...image, dataUrl: await imageToDataUrl(image) })));
     files.forEach((file) => body.append("input_reference[]", file));
     try {
-        const created = unwrapVideoResponse((await axios.post<ApiVideoResponse>(aiApiUrl(config, "/videos"), body, { headers: aiHeaders(config) })).data);
+        const created = unwrapVideoResponse((await axios.post<ApiVideoResponse>(aiApiUrl(config, "/videos"), body, { headers: aiHeaders(config), params: videoTaskQueryParams(config, { id: "", provider: "openai", model }, context) })).data);
         if (!created.id) throw new Error("视频接口没有返回任务 ID");
         return { id: created.id, provider: "openai", model };
     } catch (error) {
@@ -175,7 +175,7 @@ async function pollOpenAIVideoTask(config: AiConfig, task: VideoGenerationTask, 
     }
 }
 
-async function createSeedanceTask(config: AiConfig, model: string, prompt: string, references: ReferenceImage[], videoReferences: ReferenceVideo[], audioReferences: ReferenceAudio[]): Promise<VideoGenerationTask> {
+async function createSeedanceTask(config: AiConfig, model: string, prompt: string, references: ReferenceImage[], videoReferences: ReferenceVideo[], audioReferences: ReferenceAudio[], context?: VideoGenerationTaskContext): Promise<VideoGenerationTask> {
     if (audioReferences.length && !references.length && !videoReferences.length) {
         throw new Error("Seedance 参考音频不能单独使用，请同时添加参考图或参考视频");
     }
@@ -194,7 +194,7 @@ async function createSeedanceTask(config: AiConfig, model: string, prompt: strin
     };
 
     try {
-        const created = unwrapSeedanceTask((await axios.post<ApiEnvelope<SeedanceTask>>(seedanceApiUrl(config), payload, { headers: aiHeaders(config, "application/json") })).data);
+        const created = unwrapSeedanceTask((await axios.post<ApiEnvelope<SeedanceTask>>(seedanceApiUrl(config), payload, { headers: aiHeaders(config, "application/json"), params: videoTaskQueryParams(config, { id: "", provider: "seedance", model }, context) })).data);
         if (!created.id) throw new Error("Seedance 接口没有返回任务 ID");
         return { id: created.id, provider: "seedance", model };
     } catch (error) {

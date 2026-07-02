@@ -53,6 +53,31 @@ export type AdminCreditLogListResponse = {
     total: number;
 };
 
+export type AdminGenerationTask = {
+    id: string;
+    upstreamTaskId: string;
+    type: "image" | "video";
+    status: "running" | "succeeded" | "failed";
+    userId: string;
+    username: string;
+    model: string;
+    path: string;
+    canvasId: string;
+    nodeId: string;
+    progress: number;
+    resultUrl: string;
+    resultImages?: string[];
+    errorMsg: string;
+    createdAt: string;
+    updatedAt: string;
+    completedAt?: string;
+};
+
+export type AdminGenerationTaskListResponse = {
+    items: AdminGenerationTask[];
+    total: number;
+};
+
 export type AdminUserQuery = {
     keyword?: string;
     role?: string;
@@ -79,6 +104,10 @@ export async function deleteAdminUser(token: string, id: string) {
 
 export async function fetchAdminCreditLogs(token: string, query: AdminUserQuery = {}) {
     return apiGet<AdminCreditLogListResponse>("/api/admin/credit-logs", compactApiParams(query), token);
+}
+
+export async function fetchAdminGenerationTasks(token: string, query: { keyword?: string; type?: string; status?: string; page?: number; pageSize?: number } = {}) {
+    return apiGet<AdminGenerationTaskListResponse>("/api/admin/tasks", compactApiParams(query), token);
 }
 
 export async function saveAdminCreditLog(token: string, log: Partial<AdminCreditLog>) {

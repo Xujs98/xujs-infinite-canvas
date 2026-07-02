@@ -46,6 +46,19 @@ type ImageApiResponse = {
     code?: number;
     msg?: string;
 };
+type ApiEnvelope<T> = T | { code?: number; data?: T; msg?: string };
+
+export type ImageGenerationTask = {
+    id: string;
+    type: "image";
+    status: "running" | "succeeded" | "failed";
+    model: string;
+    resultImages?: string[];
+    errorMsg?: string;
+};
+
+export type ImageGenerationTaskContext = { canvasId?: string; nodeId?: string };
+export type ImageGenerationTaskState = { status: "pending"; progress?: number } | { status: "completed"; images: Array<{ id: string; dataUrl: string }> } | { status: "failed"; error: string };
 
 const QUALITY_BASE: Record<string, number> = {
     low: 1024,
@@ -249,6 +262,36 @@ export async function requestGeneration(config: AiConfig, prompt: string) {
     }
 }
 
+export async function createImageGenerationTask(config: AiConfig, prompt: string, context?: ImageGenerationTaskContext) {
+    if (config.channelMode !== "remote") {
+        throw new Error("当前配置不是服务端模式，图片刷新恢复需要使用服务端渠道");
+    }
+    const n = Math.max(1, Math.min(15, Math.floor(Math.abs(Number(config.count)) || 1)));
+    const quality = normalizeQuality(config.quality);
+    const requestSize = resolveRequestSize(quality, config.size);
+    try {
+        const response = await axios.post<ApiEnvelope<ImageGenerationTask>>(
+            aiApiUrl(config, "/image-tasks/generations"),
+            {
+                model: config.model,
+                prompt: withSystemPrompt(config, prompt),
+                n,
+                ...(quality ? { quality } : {}),
+                ...(requestSize ? { size: requestSize } : {}),
+                response_format: "b64_json",
+                output_format: IMAGE_OUTPUT_FORMAT,
+            },
+            {
+                headers: aiHeaders(config, "application/json"),
+                params: imageTaskQueryParams(context),
+            },
+        );
+        return unwrapApiEnvelope(response.data);
+    } catch (error) {
+        throw new Error(readAxiosError(error, "图片任务创建失败"));
+    }
+}
+
 export async function requestEdit(config: AiConfig, prompt: string, references: ReferenceImage[], mask?: ReferenceImage) {
     const n = Math.max(1, Math.min(15, Math.floor(Math.abs(Number(config.count)) || 1)));
     const quality = normalizeQuality(config.quality);
@@ -278,6 +321,70 @@ export async function requestEdit(config: AiConfig, prompt: string, references: 
     } catch (error) {
         throw new Error(readAxiosError(error, "请求失败"));
     }
+}
+
+export async function createImageEditTask(config: AiConfig, prompt: string, references: ReferenceImage[], context?: ImageGenerationTaskContext, mask?: ReferenceImage) {
+    if (config.channelMode !== "remote") {
+        throw new Error("当前配置不是服务端模式，图片刷新恢复需要使用服务端渠道");
+    }
+    const n = Math.max(1, Math.min(15, Math.floor(Math.abs(Number(config.count)) || 1)));
+    const quality = normalizeQuality(config.quality);
+    const requestSize = resolveRequestSize(quality, config.size);
+    const requestPrompt = buildImageReferencePromptText(prompt, references);
+    const formData = new FormData();
+    formData.set("model", config.model);
+    formData.set("prompt", withSystemPrompt(config, requestPrompt));
+    formData.set("n", String(n));
+    formData.set("response_format", "b64_json");
+    formData.set("output_format", IMAGE_OUTPUT_FORMAT);
+    if (quality) formData.set("quality", quality);
+    if (requestSize) formData.set("size", requestSize);
+    const files = await Promise.all(references.map(async (image) => dataUrlToFile({ ...image, dataUrl: await imageToDataUrl(image) })));
+    files.forEach((file) => formData.append("image", file));
+    if (mask) formData.set("mask", dataUrlToFile(mask));
+
+    try {
+        const response = await axios.post<ApiEnvelope<ImageGenerationTask>>(aiApiUrl(config, "/image-tasks/edits"), formData, { headers: aiHeaders(config), params: imageTaskQueryParams(context) });
+        return unwrapApiEnvelope(response.data);
+    } catch (error) {
+        throw new Error(readAxiosError(error, "图片任务创建失败"));
+    }
+}
+
+export async function pollImageGenerationTask(config: AiConfig, taskId: string): Promise<ImageGenerationTaskState> {
+    if (config.channelMode !== "remote") {
+        throw new Error("当前配置不是服务端模式，图片刷新恢复需要使用服务端渠道");
+    }
+    try {
+        const task = unwrapApiEnvelope((await axios.get<ApiEnvelope<ImageGenerationTask>>(aiApiUrl(config, `/generation-tasks/${encodeURIComponent(taskId)}`), { headers: aiHeaders(config) })).data);
+        if (task.status === "succeeded") {
+            const images = (task.resultImages || []).map((dataUrl) => ({ id: nanoid(), dataUrl }));
+            if (!images.length) return { status: "failed", error: "图片任务完成但没有返回图片" };
+            refreshRemoteUser(config);
+            return { status: "completed", images };
+        }
+        if (task.status === "failed") return { status: "failed", error: task.errorMsg || "图片生成失败" };
+        return { status: "pending" };
+    } catch (error) {
+        throw new Error(readAxiosError(error, "图片任务查询失败"));
+    }
+}
+
+function imageTaskQueryParams(context?: ImageGenerationTaskContext) {
+    return {
+        ...(context?.canvasId ? { canvasId: context.canvasId } : {}),
+        ...(context?.nodeId ? { nodeId: context.nodeId } : {}),
+    };
+}
+
+function unwrapApiEnvelope<T>(payload: ApiEnvelope<T>): T {
+    if (payload && typeof payload === "object" && "code" in payload) {
+        const envelope = payload as { code?: number; data?: T; msg?: string };
+        if (typeof envelope.code === "number" && envelope.code !== 0) throw new Error(envelope.msg || "请求失败");
+        if (envelope.data === undefined) throw new Error(envelope.msg || "接口返回异常");
+        return envelope.data;
+    }
+    return payload as T;
 }
 
 export async function requestImageQuestion(config: AiConfig, messages: ChatCompletionMessage[], onDelta: (text: string) => void) {
