@@ -261,6 +261,29 @@ export function InfiniteCanvas({ containerRef, viewport, backgroundMode = "lines
         return () => container.removeEventListener("wheel", preventWheelScroll);
     }, [containerRef]);
 
+    useEffect(() => {
+        const container = containerRef.current;
+        if (!container) return;
+
+        const preventBrowserGesture = (event: Event) => {
+            event.preventDefault();
+        };
+        const preventMultiTouchScroll = (event: TouchEvent) => {
+            if (event.touches.length > 1) event.preventDefault();
+        };
+
+        container.addEventListener("gesturestart", preventBrowserGesture, { passive: false });
+        container.addEventListener("gesturechange", preventBrowserGesture, { passive: false });
+        container.addEventListener("gestureend", preventBrowserGesture, { passive: false });
+        container.addEventListener("touchmove", preventMultiTouchScroll, { passive: false });
+        return () => {
+            container.removeEventListener("gesturestart", preventBrowserGesture);
+            container.removeEventListener("gesturechange", preventBrowserGesture);
+            container.removeEventListener("gestureend", preventBrowserGesture);
+            container.removeEventListener("touchmove", preventMultiTouchScroll);
+        };
+    }, [containerRef]);
+
     return (
         <div
             ref={containerRef}
