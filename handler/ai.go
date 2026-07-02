@@ -103,6 +103,13 @@ func proxyAIGetRequest(w http.ResponseWriter, r *http.Request, path string) {
 	if logID != "" {
 		extraArgs = append(extraArgs, requestLogID(logID))
 	}
+	if isPolling {
+		extraArgs = append(extraArgs, canvasGenerationTaskContext{
+			TaskID:   strings.TrimPrefix(path, "/videos/"),
+			CanvasID: r.URL.Query().Get("canvasId"),
+			NodeID:   r.URL.Query().Get("nodeId"),
+		})
+	}
 	copyAIResponse(w, request, nil, user.ID, user.Username, modelName, path, 0, extraArgs...)
 }
 
@@ -259,6 +266,12 @@ type requestUpstreamURL string
 // requestHeadersMap 用于在 extraArgs 中传递请求头
 type requestHeadersMap map[string]string
 
+type canvasGenerationTaskContext struct {
+	TaskID   string
+	CanvasID string
+	NodeID   string
+}
+
 func copyAIResponse(w http.ResponseWriter, request *http.Request, onFailure func(), userID, username, modelName, path string, credits int, extraArgs ...any) {
 	var isPolling bool
 	var videoConfig *model.ChannelVideoConfig
@@ -266,6 +279,7 @@ func copyAIResponse(w http.ResponseWriter, request *http.Request, onFailure func
 	var logID string
 	var logUpstreamURL string
 	var logReqHeaders map[string]string
+	var generationTask canvasGenerationTaskContext
 	for _, arg := range extraArgs {
 		switch v := arg.(type) {
 		case bool:
@@ -282,6 +296,8 @@ func copyAIResponse(w http.ResponseWriter, request *http.Request, onFailure func
 			logUpstreamURL = string(v)
 		case requestHeadersMap:
 			logReqHeaders = v
+		case canvasGenerationTaskContext:
+			generationTask = v
 		}
 	}
 	response, err := http.DefaultClient.Do(request)
@@ -346,6 +362,9 @@ func copyAIResponse(w http.ResponseWriter, request *http.Request, onFailure func
 		// 内容请求始终记录；轮询请求仅在任务完成(SUCCESS/SUBMITTED)或失败(FAILURE)时记录
 		taskDone := isVideoTaskDone(respText) || isVideoTaskCompleted(respText)
 		taskFailed := isVideoTaskFailed(respText)
+		if isPolling && generationTask.TaskID != "" {
+			emitVideoGenerationTaskUpdate(userID, generationTask, respText, taskDone, taskFailed, videoConfig)
+		}
 		if isContentRequest || (isPolling && taskDone) {
 			go service.LogCall(userID, username, modelName, path, !taskFailed, respText, credits)
 		}
@@ -1382,6 +1401,103 @@ func normalizeVideoStatus(status string) string {
 	default:
 		return status
 	}
+}
+
+func emitVideoGenerationTaskUpdate(userID string, task canvasGenerationTaskContext, respText string, taskDone bool, taskFailed bool, videoConfig *model.ChannelVideoConfig) {
+	if userID == "" || task.TaskID == "" {
+		return
+	}
+	var raw map[string]any
+	if err := json.Unmarshal([]byte(respText), &raw); err != nil {
+		return
+	}
+	status := normalizeVideoStatus(extractFieldPath(raw, "", "status", "data.status", "result.status"))
+	if status == "" {
+		switch {
+		case taskFailed:
+			status = "failed"
+		case taskDone:
+			status = "completed"
+		default:
+			status = "pending"
+		}
+	}
+	videoURLPaths := []string{"content.video_url", "result.video_url", "result.url", "data.video_url", "data.video_urls", "url", "video_url", "video.url"}
+	if videoConfig != nil && len(videoConfig.VideoURLPaths) > 0 {
+		videoURLPaths = append(videoConfig.VideoURLPaths, videoURLPaths...)
+	}
+	payload := map[string]any{
+		"type":     "generation-task-updated",
+		"taskId":   task.TaskID,
+		"canvasId": task.CanvasID,
+		"nodeId":   task.NodeID,
+		"status":   status,
+	}
+	if progress := extractProgressNumber(raw); progress >= 0 {
+		payload["progress"] = progress
+	}
+	if videoURL := extractVideoURL(raw, videoURLPaths...); videoURL != "" {
+		payload["resultUrl"] = videoURL
+	}
+	if errorMsg := extractFieldPath(raw, "", "error.message", "data.error.message", "data.error", "data.error_message", "data.fail_reason", "fail_reason", "message"); errorMsg != "" {
+		payload["error"] = errorMsg
+	}
+	ws.DefaultHub.SendToUser(userID, payload)
+}
+
+func extractProgressNumber(raw map[string]any) int {
+	progress := extractFieldPath(raw, "", "progress", "data.progress", "result.progress")
+	if progress == "" {
+		return -1
+	}
+	percent := strings.TrimSuffix(strings.TrimSpace(progress), "%")
+	n, err := strconv.Atoi(percent)
+	if err != nil || n < 0 || n > 100 {
+		return -1
+	}
+	return n
+}
+
+func extractVideoURL(raw map[string]any, paths ...string) string {
+	for _, path := range paths {
+		if val := resolveDottedPathValue(raw, path); val != nil {
+			switch v := val.(type) {
+			case string:
+				if strings.TrimSpace(v) != "" {
+					return v
+				}
+			case []any:
+				for _, item := range v {
+					if s, ok := item.(string); ok && strings.TrimSpace(s) != "" {
+						return s
+					}
+				}
+			case []string:
+				for _, s := range v {
+					if strings.TrimSpace(s) != "" {
+						return s
+					}
+				}
+			}
+		}
+	}
+	return ""
+}
+
+func resolveDottedPathValue(obj map[string]any, path string) any {
+	if path == "" {
+		return nil
+	}
+	parts := strings.Split(path, ".")
+	var current any = obj
+	for _, part := range parts {
+		m, ok := current.(map[string]any)
+		if !ok {
+			return nil
+		}
+		current = m[part]
+	}
+	return current
 }
 
 // isVideoTaskDone 检测视频轮询任务是否已完成（SUCCESS 或 FAILURE），用于停止轮询

@@ -26,6 +26,7 @@ type ReferenceMediaUploadResponse = { id: string; url: string; mimeType: string;
 
 export type VideoGenerationResult = { blob?: Blob; url?: string; mimeType?: string };
 export type VideoGenerationTask = { id: string; provider: "openai" | "seedance"; model: string };
+export type VideoGenerationTaskContext = { canvasId?: string; nodeId?: string };
 export type VideoGenerationTaskState = { status: "pending"; progress?: number } | { status: "completed"; result: VideoGenerationResult } | { status: "failed"; error: string };
 
 function aiApiUrl(config: AiConfig, path: string) {
@@ -96,9 +97,9 @@ export async function createVideoGenerationTask(config: AiConfig, prompt: string
     return createOpenAIVideoTask(config, model, prompt, references);
 }
 
-export async function pollVideoGenerationTask(config: AiConfig, task: VideoGenerationTask): Promise<VideoGenerationTaskState> {
+export async function pollVideoGenerationTask(config: AiConfig, task: VideoGenerationTask, context?: VideoGenerationTaskContext): Promise<VideoGenerationTaskState> {
     assertVideoConfig(config, task.model);
-    return task.provider === "seedance" ? pollSeedanceTask(config, task) : pollOpenAIVideoTask(config, task);
+    return task.provider === "seedance" ? pollSeedanceTask(config, task, context) : pollOpenAIVideoTask(config, task, context);
 }
 
 export async function storeGeneratedVideo(result: VideoGenerationResult): Promise<UploadedFile> {
@@ -146,9 +147,9 @@ async function createOpenAIVideoTask(config: AiConfig, model: string, prompt: st
     }
 }
 
-async function pollOpenAIVideoTask(config: AiConfig, task: VideoGenerationTask): Promise<VideoGenerationTaskState> {
+async function pollOpenAIVideoTask(config: AiConfig, task: VideoGenerationTask, context?: VideoGenerationTaskContext): Promise<VideoGenerationTaskState> {
     try {
-        const raw = (await axios.get<ApiVideoResponse>(aiApiUrl(config, `/videos/${task.id}`), { headers: aiHeaders(config), params: config.channelMode === "remote" ? { model: task.model } : undefined })).data;
+        const raw = (await axios.get<ApiVideoResponse>(aiApiUrl(config, `/videos/${task.id}`), { headers: aiHeaders(config), params: videoTaskQueryParams(config, task, context) })).data;
         const video = unwrapVideoResponse(raw);
         if (video.status === "completed" || video.status === "succeeded") {
             const rawObj = raw as Record<string, unknown>;
@@ -201,9 +202,9 @@ async function createSeedanceTask(config: AiConfig, model: string, prompt: strin
     }
 }
 
-async function pollSeedanceTask(config: AiConfig, task: VideoGenerationTask): Promise<VideoGenerationTaskState> {
+async function pollSeedanceTask(config: AiConfig, task: VideoGenerationTask, context?: VideoGenerationTaskContext): Promise<VideoGenerationTaskState> {
     try {
-        const state = unwrapSeedanceTask((await axios.get<ApiEnvelope<SeedanceTask>>(seedanceApiUrl(config, task.id), { headers: aiHeaders(config), params: config.channelMode === "remote" ? { model: task.model } : undefined })).data);
+        const state = unwrapSeedanceTask((await axios.get<ApiEnvelope<SeedanceTask>>(seedanceApiUrl(config, task.id), { headers: aiHeaders(config), params: videoTaskQueryParams(config, task, context) })).data);
         const isSuccess = state.status === "succeeded" || state.status === "completed";
         if (isSuccess) {
             const url = state.content?.video_url || state.result?.video_url || state.result?.url || state.url || state.video?.url || state.result?.video_urls?.[0];
@@ -216,6 +217,15 @@ async function pollSeedanceTask(config: AiConfig, task: VideoGenerationTask): Pr
     } catch (error) {
         throw new Error(readAxiosError(error, "Seedance 任务查询失败"));
     }
+}
+
+function videoTaskQueryParams(config: AiConfig, task: VideoGenerationTask, context?: VideoGenerationTaskContext) {
+    if (config.channelMode !== "remote") return undefined;
+    return {
+        model: task.model,
+        ...(context?.canvasId ? { canvasId: context.canvasId } : {}),
+        ...(context?.nodeId ? { nodeId: context.nodeId } : {}),
+    };
 }
 
 function assertSeedanceVideoReferences(videoReferences: ReferenceVideo[]) {

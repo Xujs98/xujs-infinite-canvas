@@ -57,6 +57,11 @@ export type CanvasNodeMetadata = {
     mimeType?: string;
     bytes?: number;
     durationMs?: number;
+    progress?: number;
+    generationTaskId?: string;
+    generationTaskProvider?: "openai" | "seedance";
+    generationTaskModel?: string;
+    generationTaskCanvasId?: string;
 };
 
 export type CanvasNodeData = {
