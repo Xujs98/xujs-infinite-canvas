@@ -466,6 +466,12 @@ function CheckInTab() {
 }
 
 // 安全中心 Tab
+const DISPLAY_NAME_MAX_LENGTH = 6;
+
+function limitDisplayName(value: string) {
+    return Array.from(value).slice(0, DISPLAY_NAME_MAX_LENGTH).join("");
+}
+
 function SecurityTab() {
     const { message } = App.useApp();
     const token = useUserStore((state) => state.token);
@@ -478,14 +484,16 @@ function SecurityTab() {
     const [loading, setLoading] = useState(false);
 
     const handleUpdateDisplayName = async () => {
-        if (!displayName.trim()) {
+        const nextDisplayName = limitDisplayName(displayName.trim());
+        if (!nextDisplayName) {
             message.error("请输入昵称");
             return;
         }
         setLoading(true);
         try {
-            const updatedUser = await updateProfile(token, { displayName: displayName.trim() });
+            const updatedUser = await updateProfile(token, { displayName: nextDisplayName });
             setSession(token, updatedUser);
+            setDisplayName(updatedUser.displayName || nextDisplayName);
             message.success("昵称修改成功");
         } catch {
             // error handled by api layer
@@ -533,7 +541,8 @@ function SecurityTab() {
                 <div className="flex gap-2">
                     <Input
                         value={displayName}
-                        onChange={(e) => setDisplayName(e.target.value)}
+                        onChange={(e) => setDisplayName(limitDisplayName(e.target.value))}
+                        maxLength={DISPLAY_NAME_MAX_LENGTH}
                         placeholder="请输入新昵称"
                         className="flex-1"
                     />
@@ -541,6 +550,7 @@ function SecurityTab() {
                         保存
                     </Button>
                 </div>
+                <div className="mt-2 text-xs text-stone-500 dark:text-stone-400">最多 {DISPLAY_NAME_MAX_LENGTH} 个字</div>
             </div>
 
             {/* 修改密码 */}

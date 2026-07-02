@@ -22,6 +22,8 @@ import (
 	"gorm.io/gorm"
 )
 
+const displayNameMaxLength = 6
+
 type TokenClaims struct {
 	UserID   string         `json:"userId"`
 	Username string         `json:"username"`
@@ -381,7 +383,11 @@ func UpdateProfile(userID string, displayName string, password string) (model.Au
 		}
 		return model.AuthUser{}, safeMessageError{message: "用户不存在"}
 	}
+	displayName = strings.TrimSpace(displayName)
 	if displayName != "" {
+		if len([]rune(displayName)) > displayNameMaxLength {
+			return model.AuthUser{}, safeMessageError{message: "昵称最多6个字"}
+		}
 		user.DisplayName = displayName
 	}
 	if password != "" {
