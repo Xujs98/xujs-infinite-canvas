@@ -11,18 +11,18 @@ const (
 
 // ModelChannel 模型渠道配置。
 type ModelChannel struct {
-	Protocol      string            `json:"protocol"`
-	Name          string            `json:"name"`
-	BaseURL       string            `json:"baseUrl"`
-	APIKey        string            `json:"apiKey"`
-	Models        []string          `json:"models"`
-	Weight        int               `json:"weight"`
-	Enabled       bool              `json:"enabled"`
-	Remark        string            `json:"remark"`
-	ExtraHeaders  map[string]string `json:"extraHeaders,omitempty"`
-	ExtraBody     map[string]any    `json:"extraBody,omitempty"`
-	PathPrefix    string            `json:"pathPrefix,omitempty"`
-	VideoConfig   *ChannelVideoConfig `json:"videoConfig,omitempty"`
+	Protocol     string              `json:"protocol"`
+	Name         string              `json:"name"`
+	BaseURL      string              `json:"baseUrl"`
+	APIKey       string              `json:"apiKey"`
+	Models       []string            `json:"models"`
+	Weight       int                 `json:"weight"`
+	Enabled      bool                `json:"enabled"`
+	Remark       string              `json:"remark"`
+	ExtraHeaders map[string]string   `json:"extraHeaders,omitempty"`
+	ExtraBody    map[string]any      `json:"extraBody,omitempty"`
+	PathPrefix   string              `json:"pathPrefix,omitempty"`
+	VideoConfig  *ChannelVideoConfig `json:"videoConfig,omitempty"`
 	// 素材字段映射：自定义请求体中素材字段的名称，留空使用默认值。
 	FieldMapping *ChannelFieldMapping `json:"fieldMapping,omitempty"`
 	// 图片格式：base64 或 url；留空默认 base64。

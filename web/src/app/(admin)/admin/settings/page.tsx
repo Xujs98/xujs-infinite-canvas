@@ -1342,7 +1342,13 @@ function normalizePublicSetting(setting: Partial<AdminSettings["public"]> = {}):
 }
 
 function normalizeModelCosts(items: Partial<AdminSettings["public"]["modelChannel"]["modelCosts"][number]>[]) {
-    return items.filter((item) => item.model).map((item) => ({ model: item.model || "", credits: Math.max(0, Number(item.credits) || 0), alias: item.alias || "" }));
+    return items
+        .filter((item) => item.model)
+        .map((item) => ({
+            model: item.model || "",
+            credits: Math.max(0, Number(item.credits) || 0),
+            alias: item.alias || "",
+        }));
 }
 
 function normalizePrivateSetting(setting: Partial<AdminSettings["private"]> = {}): AdminSettings["private"] {
@@ -1476,7 +1482,11 @@ function setModelCost(form: any, setModelCosts: (items: AdminModelCost[]) => voi
     const current = (form.getFieldValue(["public", "modelChannel", "modelCosts"]) || []) as AdminSettings["public"]["modelChannel"]["modelCosts"];
     const existing = current.find((item) => item.model === model);
     const next = current.filter((item) => item.model !== model);
-    next.push({ model, credits: Math.max(0, credits), alias: alias !== undefined ? alias : (existing?.alias || "") });
+    next.push({
+        model,
+        credits: Math.max(0, credits),
+        alias: alias !== undefined ? alias : (existing?.alias || ""),
+    });
     form.setFieldValue(["public", "modelChannel", "modelCosts"], next);
     setModelCosts(next);
 }
