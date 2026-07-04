@@ -10,7 +10,8 @@ import (
 func AdminRequestLogs(w http.ResponseWriter, r *http.Request) {
 	q := parseQuery(r)
 	method := r.URL.Query().Get("method")
-	logs, err := service.ListRequestLogs(q, method)
+	source := r.URL.Query().Get("source")
+	logs, err := service.ListRequestLogs(q, method, source)
 	if err != nil {
 		FailError(w, err)
 		return

@@ -46,13 +46,13 @@ function InfoRow({ label, value, copyable }: { label: string; value: string; cop
     );
 }
 
-function StatCard({ icon, label, value }: { icon: React.ReactNode; label: string; value: string | number }) {
+function StatCard({ icon, label, value, valueClassName = "text-stone-800 dark:text-stone-100" }: { icon: React.ReactNode; label: string; value: string | number; valueClassName?: string }) {
     return (
         <div className="min-w-0 rounded-lg border border-stone-200 bg-stone-50 p-3 sm:p-4 dark:border-stone-800 dark:bg-stone-800/50">
             <div className="flex items-center gap-2 text-xs text-stone-500 dark:text-stone-400">
                 {icon} {label}
             </div>
-            <div className="mt-2 break-words text-lg font-semibold leading-tight text-stone-800 sm:text-xl dark:text-stone-100">{value}</div>
+            <div className={`mt-2 break-words text-lg font-semibold leading-tight sm:text-xl ${valueClassName}`}>{value}</div>
         </div>
     );
 }
@@ -61,6 +61,8 @@ const creditLogTypeLabels: Record<string, string> = {
     admin_adjust: "后台调整",
     ai_consume: "模型消费",
     ai_refund: "失败返还",
+    offline_consume: "离线消费",
+    offline_refund: "离线返还",
     membership_free: "会员免费",
     role_free: "角色免费",
     invite_reward: "邀请奖励",
@@ -72,12 +74,21 @@ const tagColorMap: Record<string, string> = {
     admin_adjust: "blue",
     ai_consume: "red",
     ai_refund: "green",
+    offline_consume: "volcano",
+    offline_refund: "green",
     membership_free: "cyan",
     role_free: "geekblue",
     invite_reward: "purple",
     redeem: "gold",
     check_in: "lime",
 };
+
+function resolveCreditLogType(item: CreditLog): string {
+    if (item.relatedId?.startsWith("offline:") || item.remark?.startsWith("离线结算")) {
+        return item.amount >= 0 ? "offline_refund" : "offline_consume";
+    }
+    return item.type;
+}
 
 // 个人中心 Tab
 function ProfileTab() {
@@ -97,6 +108,9 @@ function ProfileTab() {
         return `${origin}/login?inviteCode=${user.affCode}`;
     }, [user?.affCode]);
 
+    if (!user) return null;
+
+    const credits = user.credits;
     const membershipActive = user.membershipExpiresAt && dayjs(user.membershipExpiresAt).isAfter(dayjs());
 
     const handleBindAffCode = async () => {
@@ -139,7 +153,7 @@ function ProfileTab() {
         <>
             {/* 统计卡片 */}
             <div className="mt-5 grid grid-cols-2 gap-3 sm:mt-6 sm:grid-cols-3">
-                <StatCard icon={<WalletOutlined />} label="算力点余额" value={`⚡ ${user.credits}`} />
+                <StatCard icon={<WalletOutlined />} label="算力点余额" value={`⚡ ${credits}`} valueClassName={credits < 0 ? "text-red-500" : "text-stone-800 dark:text-stone-100"} />
                 <StatCard
                     icon={<CrownOutlined />}
                     label="会员状态"
@@ -236,7 +250,10 @@ function CreditLogsTab() {
             title: "类型",
             dataIndex: "type",
             width: 120,
-            render: (type: string) => <Tag color={tagColorMap[type]}>{creditLogTypeLabels[type] || type}</Tag>,
+            render: (_: unknown, item: CreditLog) => {
+                const displayType = resolveCreditLogType(item);
+                return <Tag color={tagColorMap[displayType]}>{creditLogTypeLabels[displayType] || displayType}</Tag>;
+            },
         },
         {
             title: "变动",
@@ -252,6 +269,7 @@ function CreditLogsTab() {
             title: "余额",
             dataIndex: "balance",
             width: 80,
+            render: (balance: number) => <span className={balance < 0 ? "text-red-500" : undefined}>{balance}</span>,
         },
         {
             title: "备注",
@@ -279,6 +297,8 @@ function CreditLogsTab() {
                     <option value="">全部类型</option>
                     <option value="ai_consume">模型消费</option>
                     <option value="ai_refund">失败返还</option>
+                    <option value="offline_consume">离线消费</option>
+                    <option value="offline_refund">离线返还</option>
                     <option value="role_free">角色免费</option>
                     <option value="redeem">兑换卡密</option>
                     <option value="admin_adjust">后台调整</option>
@@ -303,14 +323,17 @@ function CreditLogsTab() {
                     logs.map((item) => (
                         <div key={item.id} className="rounded-xl border border-stone-200 bg-white p-4 shadow-sm dark:border-stone-800 dark:bg-stone-900/70">
                             <div className="flex items-start justify-between gap-3">
-                                <Tag color={tagColorMap[item.type]}>{creditLogTypeLabels[item.type] || item.type}</Tag>
+                                {(() => {
+                                    const displayType = resolveCreditLogType(item);
+                                    return <Tag color={tagColorMap[displayType]}>{creditLogTypeLabels[displayType] || displayType}</Tag>;
+                                })()}
                                 <span className={`shrink-0 text-base font-semibold ${item.amount >= 0 ? "text-green-500" : "text-red-500"}`}>
                                     {item.amount >= 0 ? "+" : ""}{item.amount} 点
                                 </span>
                             </div>
                             <div className="mt-3 grid grid-cols-2 gap-2 text-xs text-stone-500 dark:text-stone-400">
                                 <span>余额</span>
-                                <span className="text-right text-stone-700 dark:text-stone-200">{item.balance} 点</span>
+                                <span className={`text-right ${item.balance < 0 ? "text-red-500" : "text-stone-700 dark:text-stone-200"}`}>{item.balance} 点</span>
                                 <span>时间</span>
                                 <span className="text-right text-stone-700 dark:text-stone-200">{item.createdAt ? dayjs(item.createdAt).format("MM-DD HH:mm") : "-"}</span>
                             </div>
@@ -382,8 +405,10 @@ function CheckInTab() {
             if (res.isNew) {
                 message.success(`签到成功，获得 ⚡ ${res.checkIn.reward} 算力点`);
                 // 刷新用户信息
-                const updatedUser = { ...user, credits: (user?.credits || 0) + res.checkIn.reward };
-                setSession(token, updatedUser);
+                if (user) {
+                    const updatedUser = { ...user, credits: user.credits + res.checkIn.reward };
+                    setSession(token, updatedUser);
+                }
                 fetchMonthData();
             }
         } catch {

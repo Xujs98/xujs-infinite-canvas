@@ -1,7 +1,7 @@
 "use client";
 
 import { DeleteOutlined, EditOutlined, GiftOutlined, LockOutlined, PlusOutlined, SafetyOutlined, SearchOutlined, UserOutlined } from "@ant-design/icons";
-import { App, Button, Card, Col, Form, Input, Modal, Row, Select, Space, Table, Tag, Tooltip, Typography } from "antd";
+import { App, Button, Card, Col, Flex, Form, Input, InputNumber, Modal, Row, Select, Space, Switch, Table, Tag, Tooltip, Typography } from "antd";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { useUserStore } from "@/stores/use-user-store";
@@ -78,6 +78,8 @@ export default function AdminRolesPage() {
                     description: values.description,
                     allowedModels: values.allowedModels || [],
                     freeModels: values.freeModels || [],
+                    allowOffline: Boolean(values.allowOffline),
+                    offlineCreditLimit: Boolean(values.allowOffline) ? Math.max(0, Math.floor(Number(values.offlineCreditLimit) || 0)) : 0,
                 });
                 message.success("更新成功");
             } else {
@@ -87,6 +89,8 @@ export default function AdminRolesPage() {
                     description: values.description,
                     allowedModels: values.allowedModels || [],
                     freeModels: values.freeModels || [],
+                    allowOffline: Boolean(values.allowOffline),
+                    offlineCreditLimit: Boolean(values.allowOffline) ? Math.max(0, Math.floor(Number(values.offlineCreditLimit) || 0)) : 0,
                 });
                 message.success("创建成功");
             }
@@ -125,7 +129,7 @@ export default function AdminRolesPage() {
     const openCreate = () => {
         setEditingItem(null);
         form.resetFields();
-        form.setFieldsValue({ allowedModels: [], freeModels: [] });
+        form.setFieldsValue({ allowedModels: [], freeModels: [], allowOffline: false, offlineCreditLimit: 0 });
         setModalOpen(true);
     };
 
@@ -137,6 +141,8 @@ export default function AdminRolesPage() {
             description: item.description,
             allowedModels: item.allowedModels || [],
             freeModels: item.freeModels || [],
+            allowOffline: Boolean(item.allowOffline),
+            offlineCreditLimit: item.offlineCreditLimit ?? 0,
         });
         setModalOpen(true);
     };
@@ -161,34 +167,51 @@ export default function AdminRolesPage() {
         {
             title: "角色",
             dataIndex: "label",
+            width: 220,
             render: (_: unknown, item: AdminRole) => (
-                <Space>
+                <Flex align="center" gap={12} style={{ minWidth: 0 }}>
                     <span
-                        className="inline-flex h-7 w-7 items-center justify-center rounded-lg text-xs font-semibold text-white"
-                        style={{ background: builtinRoleColors[item.name] || "#595959" }}
+                        style={{
+                            width: 36,
+                            height: 36,
+                            flex: "0 0 36px",
+                            borderRadius: 8,
+                            display: "inline-flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            color: "#fff",
+                            fontSize: 14,
+                            fontWeight: 600,
+                            background: builtinRoleColors[item.name] || "#595959",
+                        }}
                     >
                         {item.label?.slice(0, 1)}
                     </span>
-                    <div>
-                        <div className="flex items-center gap-2">
-                            <span className="font-medium">{item.label}</span>
-                            {item.isBuiltin && <Tag color="default">内置</Tag>}
-                        </div>
-                        <div className="text-xs text-gray-400">{item.name}</div>
+                    <div style={{ minWidth: 0 }}>
+                        <Flex align="center" gap={8} wrap={false}>
+                            <Typography.Text strong ellipsis={{ tooltip: item.label }} style={{ maxWidth: 108, fontSize: 14, whiteSpace: "nowrap" }}>
+                                {item.label}
+                            </Typography.Text>
+                            {item.isBuiltin && <Tag color="default" style={{ margin: 0, flex: "0 0 auto" }}>内置</Tag>}
+                        </Flex>
+                        <Typography.Text type="secondary" ellipsis={{ tooltip: item.name }} style={{ display: "block", maxWidth: 160, fontSize: 12, lineHeight: "20px" }}>
+                            {item.name}
+                        </Typography.Text>
                     </div>
-                </Space>
+                </Flex>
             ),
         },
         {
             title: "描述",
             dataIndex: "description",
+            width: 220,
             ellipsis: true,
-            render: (text: string) => <Typography.Text type="secondary">{text || "-"}</Typography.Text>,
+            render: (text: string) => <Typography.Text type="secondary" ellipsis={{ tooltip: text || "-" }} style={{ maxWidth: 180 }}>{text || "-"}</Typography.Text>,
         },
         {
             title: "模型权限",
             dataIndex: "allowedModels",
-            width: 300,
+            width: 260,
             render: (_: unknown, item: AdminRole) => {
                 const models = item.allowedModels || [];
                 if (models.length === 0) {
@@ -207,7 +230,7 @@ export default function AdminRolesPage() {
         {
             title: "免费模型",
             dataIndex: "freeModels",
-            width: 300,
+            width: 260,
             render: (_: unknown, item: AdminRole) => {
                 const models = item.freeModels || [];
                 if (models.length === 0) {
@@ -224,9 +247,23 @@ export default function AdminRolesPage() {
             },
         },
         {
+            title: "允许离线",
+            dataIndex: "allowOffline",
+            width: 120,
+            render: (_: unknown, item: AdminRole) => (
+                <Tag color={item.allowOffline ? "green" : "default"}>{item.allowOffline ? "允许" : "关闭"}</Tag>
+            ),
+        },
+        {
+            title: "离线预支",
+            dataIndex: "offlineCreditLimit",
+            width: 130,
+            render: (_: unknown, item: AdminRole) => item.allowOffline ? <Tag color="gold">{item.offlineCreditLimit && item.offlineCreditLimit > 0 ? `${item.offlineCreditLimit} 点` : "无限制"}</Tag> : <Typography.Text type="secondary">-</Typography.Text>,
+        },
+        {
             title: "操作",
             key: "actions",
-            width: 120,
+            width: 132,
             align: "right" as const,
             render: (_: unknown, item: AdminRole) => (
                 <Space size={4}>
@@ -250,52 +287,56 @@ export default function AdminRolesPage() {
 
     const allowedModelsValue = Form.useWatch("allowedModels", form);
     const freeModelsValue = Form.useWatch("freeModels", form);
+    const allowOfflineValue = Form.useWatch("allowOffline", form);
 
     return (
-        <div className="min-h-screen p-6">
-            <div className="mx-auto max-w-[1200px]">
+        <div style={{ padding: "24px 28px", width: "100%", maxWidth: "100%", minWidth: 0, boxSizing: "border-box", overflowX: "hidden" }}>
+            <div style={{ width: "100%", maxWidth: "100%", minWidth: 0 }}>
                 {/* 页面标题 */}
-                <div className="mb-6 flex items-center gap-3">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-blue-500 to-purple-600 text-white shadow-lg shadow-blue-500/25">
-                        <SafetyOutlined className="text-lg" />
-                    </div>
+                <Flex align="center" gap={14} style={{ marginBottom: 22 }}>
+                    <span style={{ width: 44, height: 44, borderRadius: 10, display: "inline-flex", alignItems: "center", justifyContent: "center", color: "#fff", background: "linear-gradient(135deg, #3b82f6, #7c3aed)", boxShadow: "0 10px 22px rgba(59,130,246,0.22)", flex: "0 0 auto" }}>
+                        <SafetyOutlined style={{ fontSize: 20 }} />
+                    </span>
                     <div>
-                        <Typography.Title level={4} style={{ margin: 0 }}>角色管理</Typography.Title>
-                        <Typography.Text type="secondary" className="text-sm">管理用户角色和模型使用权限</Typography.Text>
+                        <Typography.Title level={4} style={{ margin: 0, fontSize: 20, fontWeight: 600 }}>角色管理</Typography.Title>
+                        <Typography.Text type="secondary" style={{ fontSize: 13 }}>管理用户角色和模型使用权限</Typography.Text>
                     </div>
-                </div>
+                </Flex>
 
                 {/* 工具栏 */}
-                <div className="sticky top-0 z-50 mb-7 flex items-center justify-between rounded-2xl border border-gray-100 bg-white/95 px-5 py-3 shadow-sm backdrop-blur-sm">
-                    <Space>
+                <Card variant="borderless" style={{ marginBottom: 16, borderRadius: 10 }} styles={{ body: { padding: 18 } }}>
+                    <Flex align="center" justify="space-between" gap={12} wrap>
                         <Input
-                            prefix={<SearchOutlined className="text-gray-400" />}
+                            prefix={<SearchOutlined style={{ color: "#8c8c8c" }} />}
                             placeholder="搜索角色"
                             allowClear
                             value={keyword}
                             onChange={(e) => { setKeyword(e.target.value); setPage(1); }}
-                            style={{ width: 220 }}
+                            style={{ width: 260 }}
                         />
-                    </Space>
-                    <Space>
-                        {selectedIds.length > 0 && (
-                            <Button danger icon={<DeleteOutlined />} onClick={() => setIsBatchDeleteOpen(true)}>
-                                删除选中 ({selectedIds.length})
+                        <Space wrap>
+                            {selectedIds.length > 0 && (
+                                <Button danger icon={<DeleteOutlined />} onClick={() => setIsBatchDeleteOpen(true)}>
+                                    删除选中 ({selectedIds.length})
+                                </Button>
+                            )}
+                            <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>
+                                新增角色
                             </Button>
-                        )}
-                        <Button type="primary" icon={<PlusOutlined />} onClick={openCreate} className="!rounded-lg">
-                            新增角色
-                        </Button>
-                    </Space>
-                </div>
+                        </Space>
+                    </Flex>
+                </Card>
 
                 {/* 角色列表 */}
-                <Card variant="borderless" className="!rounded-xl !border-gray-100 !shadow-sm">
+                <Card variant="borderless" style={{ borderRadius: 10, overflow: "hidden" }} styles={{ body: { padding: 18 } }}>
                     <Table
                         rowKey="id"
+                        size="middle"
                         loading={loading}
                         dataSource={items}
                         columns={columns}
+                        tableLayout="fixed"
+                        scroll={{ x: 1242 }}
                         rowSelection={{
                             selectedRowKeys: selectedIds,
                             onChange: (keys) => setSelectedIds(keys as string[]),
@@ -308,6 +349,7 @@ export default function AdminRolesPage() {
                             onChange: setPage,
                             showTotal: (t) => `共 ${t} 条`,
                         }}
+                        style={{ width: "100%" }}
                     />
                 </Card>
             </div>
@@ -390,6 +432,24 @@ export default function AdminRolesPage() {
                             </div>
                         )}
                     </Form.Item>
+                    <Form.Item
+                        name="allowOffline"
+                        label="允许离线"
+                        valuePropName="checked"
+                        tooltip="开启后，该角色 App 端在服务端断开时保留登录，并记录离线算力点账本；服务端恢复后自动结算。"
+                    >
+                        <Switch checkedChildren="开启" unCheckedChildren="关闭" />
+                    </Form.Item>
+                    {allowOfflineValue ? (
+                        <Form.Item
+                            name="offlineCreditLimit"
+                            label="最大允许离线预支算力点"
+                            tooltip="服务端离线时，该角色最多可把余额预支到此额度的负数；不填写或 0 表示无限制预支。"
+                            rules={[{ type: "number", min: 0, message: "预支额度不能小于 0" }]}
+                        >
+                            <InputNumber min={0} precision={0} style={{ width: "100%" }} addonAfter="点" placeholder="不填或 0 表示无限制" />
+                        </Form.Item>
+                    ) : null}
                 </Form>
             </Modal>
 

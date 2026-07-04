@@ -95,8 +95,9 @@ export function ClientRootInit({ children }: { children: ReactNode }) {
             if (closed) return;
             const proto = window.location.protocol === "https:" ? "wss" : "ws";
             const wsHost = window.location.port === "3000" ? `${window.location.hostname}:8080` : window.location.host;
-            const tokenParam = token ? `?token=${encodeURIComponent(token)}` : "";
-            socket = new WebSocket(`${proto}://${wsHost}/api/ws${tokenParam}`);
+            const params = new URLSearchParams({ client: "web" });
+            if (token) params.set("token", token);
+            socket = new WebSocket(`${proto}://${wsHost}/api/ws?${params.toString()}`);
             socket.onclose = () => {
                 if (!closed) reconnectTimer = window.setTimeout(connect, 3000);
             };
@@ -135,6 +136,9 @@ export function ClientRootInit({ children }: { children: ReactNode }) {
                         window.dispatchEvent(new CustomEvent("roles-changed", { detail: roles }));
                     })();
                     void loadPublicSettings();
+                }
+                if (payload.type === "online-status-changed") {
+                    window.dispatchEvent(new CustomEvent("online-status-changed"));
                 }
             };
         };

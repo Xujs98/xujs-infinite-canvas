@@ -84,6 +84,10 @@ func DB() (*gorm.DB, error) {
 			return
 		}
 		dbErr = ensureRoleFreeModelsColumn(db)
+		if dbErr != nil {
+			return
+		}
+		dbErr = ensureRoleOfflineCreditLimitColumn(db)
 	})
 	return db, dbErr
 }
@@ -93,6 +97,13 @@ func ensureRoleFreeModelsColumn(db *gorm.DB) error {
 		return nil
 	}
 	return db.Exec("ALTER TABLE roles ADD COLUMN free_models text").Error
+}
+
+func ensureRoleOfflineCreditLimitColumn(db *gorm.DB) error {
+	if db.Migrator().HasColumn(&model.Role{}, "offline_credit_limit") {
+		return nil
+	}
+	return db.Exec("ALTER TABLE roles ADD COLUMN offline_credit_limit integer DEFAULT 0").Error
 }
 
 func dialector(driver string, dsn string) gorm.Dialector {

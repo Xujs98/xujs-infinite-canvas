@@ -25,6 +25,7 @@ export function useAdminUsers() {
         queryFn: () => fetchAdminUsers(token, { keyword, role, status, page, pageSize }),
         enabled: Boolean(token),
         retry: false,
+        refetchInterval: 15000,
     });
 
     const saveMutation = useMutation({
@@ -79,6 +80,14 @@ export function useAdminUsers() {
             if (errorMessage.includes("未登录") || errorMessage.includes("权限不足") || errorMessage.includes("登录状态无效")) clearSession();
         }
     }, [clearSession, message, query.error, query.isError]);
+
+    useEffect(() => {
+        const refreshOnlineStatus = () => {
+            void queryClient.invalidateQueries({ queryKey: ["admin", "users"] });
+        };
+        window.addEventListener("online-status-changed", refreshOnlineStatus);
+        return () => window.removeEventListener("online-status-changed", refreshOnlineStatus);
+    }, [queryClient]);
 
     const updateFilters = (next: Partial<{ keyword: string; role: string; status: string; page: number; pageSize: number }>) => {
         const queryState = { keyword, role, status, page, pageSize, ...next };

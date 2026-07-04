@@ -16,6 +16,7 @@ import (
 	"github.com/basketikun/infinite-canvas/config"
 	"github.com/basketikun/infinite-canvas/model"
 	"github.com/basketikun/infinite-canvas/repository"
+	"github.com/basketikun/infinite-canvas/ws"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
 	"golang.org/x/crypto/bcrypt"
@@ -304,9 +305,15 @@ func ListUsers(q model.Query) (model.UserList, error) {
 	if err != nil {
 		return model.UserList{}, err
 	}
+	online := ws.DefaultHub.OnlineSnapshot()
 	for i := range users {
 		users[i].Password = ""
 		normalizeUserDefaults(&users[i])
+		if status, ok := online[users[i].ID]; ok {
+			users[i].Online = status.Online
+			users[i].OnlineApp = status.App
+			users[i].OnlineWeb = status.Web
+		}
 	}
 	return model.UserList{Items: users, Total: int(total)}, nil
 }
@@ -586,6 +593,7 @@ func ListCreditLogs(q model.Query) (model.CreditLogList, error) {
 	if err != nil {
 		return model.CreditLogList{}, err
 	}
+	normalizeOfflineCreditLogTypes(logs)
 	fillFreeCreditLogBalances(logs)
 	// 收集用户 ID，批量查询用户名。
 	ids := make([]string, 0)
@@ -605,6 +613,20 @@ func ListCreditLogs(q model.Query) (model.CreditLogList, error) {
 		}
 	}
 	return model.CreditLogList{Items: logs, Total: int(total)}, nil
+}
+
+func normalizeOfflineCreditLogTypes(logs []model.CreditLog) {
+	for i := range logs {
+		if !strings.HasPrefix(logs[i].RelatedID, "offline:") {
+			continue
+		}
+		switch logs[i].Type {
+		case model.CreditLogTypeAIConsume:
+			logs[i].Type = model.CreditLogTypeOfflineConsume
+		case model.CreditLogTypeAIRefund:
+			logs[i].Type = model.CreditLogTypeOfflineRefund
+		}
+	}
 }
 
 func fillFreeCreditLogBalances(logs []model.CreditLog) {

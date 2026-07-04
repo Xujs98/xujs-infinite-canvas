@@ -28,11 +28,27 @@ export type AdminUser = {
     lastLoginAt: string;
     createdAt: string;
     updatedAt: string;
+    online: boolean;
+    onlineApp: boolean;
+    onlineWeb: boolean;
 };
 
 export type AdminUserListResponse = {
     items: AdminUser[];
     total: number;
+};
+
+export type AdminDashboardStats = {
+    onlineUsers: number;
+    onlineAppUsers: number;
+    onlineWebUsers: number;
+    onlineConnections: number;
+    totalUsers: number;
+    modelCount: number;
+};
+
+export type AdminServerOfflineStatus = {
+    offline: boolean;
 };
 
 export type AdminCreditLog = {
@@ -88,6 +104,18 @@ export type AdminUserQuery = {
 
 export async function fetchAdminUsers(token: string, query: AdminUserQuery = {}) {
     return apiGet<AdminUserListResponse>("/api/admin/users", compactApiParams(query), token);
+}
+
+export async function fetchAdminDashboardStats(token: string) {
+    return apiGet<AdminDashboardStats>("/api/admin/dashboard", undefined, token);
+}
+
+export async function fetchAdminServerOfflineStatus(token: string) {
+    return apiGet<AdminServerOfflineStatus>("/api/admin/server/offline", undefined, token);
+}
+
+export async function setAdminServerOfflineStatus(token: string, offline: boolean) {
+    return apiPost<AdminServerOfflineStatus>("/api/admin/server/offline", { offline }, token);
 }
 
 export async function saveAdminUser(token: string, user: Partial<AdminUser> & { password?: string }) {
@@ -435,6 +463,8 @@ export type AdminSystemSettings = {
     checkInRewardMin: number;
     checkInRewardMax: number;
     videoMaxTimeoutSeconds: number;
+    appErrorMessagePrefix: string;
+    appErrorShowDetails: boolean;
     allowCustomChannel: boolean;
     allowRegister: boolean;
     assistantEnabled: boolean;
@@ -527,7 +557,7 @@ export type AdminRequestLogListResponse = {
     items: AdminRequestLog[];
     total: number;
 };
-export async function fetchAdminRequestLogs(token: string, query: AdminUserQuery = {}) {
+export async function fetchAdminRequestLogs(token: string, query: AdminUserQuery & { source?: string } = {}) {
     return apiGet<AdminRequestLogListResponse>("/api/admin/request-logs", compactApiParams(query), token);
 }
 export async function batchDeleteAdminRequestLogs(token: string, ids: string[]) {

@@ -46,6 +46,7 @@ export function UserStatusActions({ showConfig = true, variant = "default", onOp
     const canvasTheme = useCanvasTheme();
     const userName = user?.displayName || user?.username || "";
     const credits = user?.credits ?? 0;
+    const isNegativeCredits = credits < 0;
     const avatarUrl = user?.avatarUrl?.trim();
     const avatarText = (userName.trim()[0] || "U").toUpperCase();
     const naturalIconClass = "inline-flex size-7 shrink-0 items-center justify-center text-stone-600 transition hover:text-stone-950 dark:text-stone-300 dark:hover:text-white [&_svg]:size-4";
@@ -119,7 +120,7 @@ export function UserStatusActions({ showConfig = true, variant = "default", onOp
             <AnnouncementBell />
             {variant === "canvas" && user ? (
                 <Tooltip title="当前算力点余额" placement="bottom">
-                    <div className="flex h-8 shrink-0 items-center gap-1.5 px-1.5 text-xs font-medium tabular-nums opacity-75 transition hover:opacity-100" style={{ color: canvasTheme.node.text }}>
+                    <div className="flex h-8 shrink-0 items-center gap-1.5 px-1.5 text-xs font-medium tabular-nums opacity-75 transition hover:opacity-100" style={{ color: isNegativeCredits ? "#ef4444" : canvasTheme.node.text }}>
                         <CreditSymbol className="text-sm leading-none" />
                         <span>{credits.toLocaleString()}</span>
                     </div>

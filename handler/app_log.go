@@ -10,17 +10,17 @@ import (
 
 // AppRequestLogInput App 端提交的请求日志
 type AppRequestLogInput struct {
-	Model         string `json:"model"`
-	Method        string `json:"method"`
-	Path          string `json:"path"`
-	URL           string `json:"url"`
+	Model          string `json:"model"`
+	Method         string `json:"method"`
+	Path           string `json:"path"`
+	URL            string `json:"url"`
 	RequestHeaders string `json:"requestHeaders"`
-	RequestBody   string `json:"requestBody"`
-	ResponseBody  string `json:"responseBody"`
-	StatusCode    int    `json:"statusCode"`
-	Success       bool   `json:"success"`
-	ErrorMsg      string `json:"errorMsg"`
-	ElapsedMs     int64  `json:"elapsedMs"`
+	RequestBody    string `json:"requestBody"`
+	ResponseBody   string `json:"responseBody"`
+	StatusCode     int    `json:"statusCode"`
+	Success        bool   `json:"success"`
+	ErrorMsg       string `json:"errorMsg"`
+	ElapsedMs      int64  `json:"elapsedMs"`
 }
 
 // SubmitAppRequestLog App 端提交请求日志

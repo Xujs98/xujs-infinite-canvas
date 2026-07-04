@@ -110,8 +110,8 @@ func LogRequestResponse(id string, responseBody string, statusCode int, success 
 	}
 }
 
-func ListRequestLogs(q model.Query, method string) (model.RequestLogList, error) {
-	return repository.ListRequestLogs(q, method)
+func ListRequestLogs(q model.Query, method string, source string) (model.RequestLogList, error) {
+	return repository.ListRequestLogs(q, method, source)
 }
 
 func BatchDeleteRequestLogs(ids []string) error {
@@ -121,20 +121,20 @@ func BatchDeleteRequestLogs(ids []string) error {
 // LogAppRequest 记录 App 端提交的请求日志
 func LogAppRequest(userID, username, model_, method, path, url string, requestHeaders string, requestBody string, responseBody string, statusCode int, success bool, errorMsg string, elapsedMs int64) string {
 	entry := &model.RequestLog{
-		ID:             uuid.NewString(),
-		UserID:         userID,
-		Username:       username,
-		Model:          model_,
-		Method:         method,
-		Path:           path,
-		URL:            url,
-		RequestHeaders: requestHeaders,
-		RequestBody:    requestBody,
-		ResponseBody:   responseBody,
-		StatusCode:     statusCode,
-		Success:        success,
-		ErrorMsg:       errorMsg,
-		Source:         "app",
+		ID:              uuid.NewString(),
+		UserID:          userID,
+		Username:        username,
+		Model:           model_,
+		Method:          method,
+		Path:            path,
+		URL:             url,
+		RequestHeaders:  requestHeaders,
+		RequestBody:     requestBody,
+		ResponseBody:    responseBody,
+		StatusCode:      statusCode,
+		Success:         success,
+		ErrorMsg:        errorMsg,
+		Source:          "app",
 		RequestBodySize: len(requestBody),
 	}
 	if err := repository.CreateRequestLog(entry); err != nil {

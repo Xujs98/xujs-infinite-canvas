@@ -44,6 +44,7 @@ func GetAllRoles() ([]model.Role, error) {
 func CreateRole(role model.Role) (model.Role, error) {
 	role.ID = newID("role")
 	role.IsBuiltin = false
+	normalizeRoleOfflineLimit(&role)
 	role.CreatedAt = now()
 	role.UpdatedAt = now()
 	return repository.SaveRole(role)
@@ -62,6 +63,9 @@ func UpdateRole(id string, role model.Role) (model.Role, error) {
 	current.Description = role.Description
 	current.AllowedModels = role.AllowedModels
 	current.FreeModels = role.FreeModels
+	current.AllowOffline = role.AllowOffline
+	current.OfflineCreditLimit = role.OfflineCreditLimit
+	normalizeRoleOfflineLimit(&current)
 	current.UpdatedAt = now()
 	return repository.SaveRole(current)
 }
@@ -118,4 +122,25 @@ func IsModelFreeForRole(roleName, modelName string) bool {
 		}
 	}
 	return false
+}
+
+// IsRoleAllowedOffline 检查角色是否允许 App 在服务端断开后继续保留登录和离线扣费。
+func IsRoleAllowedOffline(roleName string) bool {
+	role, ok, _ := repository.GetRoleByName(roleName)
+	return ok && role.AllowOffline
+}
+
+// GetRoleOfflineCreditLimit 获取角色允许离线时可预支的最大算力点；0 表示无限制。
+func GetRoleOfflineCreditLimit(roleName string) int {
+	role, ok, _ := repository.GetRoleByName(roleName)
+	if !ok || !role.AllowOffline || role.OfflineCreditLimit <= 0 {
+		return 0
+	}
+	return role.OfflineCreditLimit
+}
+
+func normalizeRoleOfflineLimit(role *model.Role) {
+	if !role.AllowOffline || role.OfflineCreditLimit < 0 {
+		role.OfflineCreditLimit = 0
+	}
 }

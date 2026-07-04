@@ -15,6 +15,8 @@ const creditLogTypeLabels: Record<string, string> = {
     admin_adjust: "后台调整",
     ai_consume: "模型消费",
     ai_refund: "失败返还",
+    offline_consume: "离线消费",
+    offline_refund: "离线返还",
     membership_free: "会员免费",
     role_free: "角色免费",
     invite_reward: "邀请奖励",
@@ -26,12 +28,21 @@ const tagColorMap: Record<string, string> = {
     admin_adjust: "blue",
     ai_consume: "red",
     ai_refund: "green",
+    offline_consume: "volcano",
+    offline_refund: "green",
     membership_free: "cyan",
     role_free: "geekblue",
     invite_reward: "purple",
     redeem: "gold",
     check_in: "lime",
 };
+
+function resolveCreditLogType(item: AdminCreditLog): string {
+    if (item.relatedId?.startsWith("offline:") || item.remark?.startsWith("离线结算")) {
+        return item.amount >= 0 ? "offline_refund" : "offline_consume";
+    }
+    return item.type || "";
+}
 
 export default function AdminCreditLogsPage() {
     const { logs, keyword, page, pageSize, total, isLoading, searchLogs, changePage, changePageSize, resetFilters, refreshLogs, saveLog: saveAdminLog, deleteLog, batchDeleteLogs } = useAdminCreditLogs();
@@ -71,7 +82,10 @@ export default function AdminCreditLogsPage() {
             title: "类型",
             dataIndex: "type",
             width: 140,
-            render: (_, item) => <Tag color={tagColorMap[item.type]}>{creditLogTypeLabels[item.type] || item.type || "-"}</Tag>,
+            render: (_, item) => {
+                const displayType = resolveCreditLogType(item);
+                return <Tag color={tagColorMap[displayType]}>{creditLogTypeLabels[displayType] || displayType || "-"}</Tag>;
+            },
         },
         {
             title: "变动",
@@ -83,6 +97,7 @@ export default function AdminCreditLogsPage() {
             title: "余额",
             dataIndex: "balance",
             width: 100,
+            render: (_, item) => <Typography.Text type={item.balance < 0 ? "danger" : undefined}>{item.balance}</Typography.Text>,
         },
         {
             title: "备注",

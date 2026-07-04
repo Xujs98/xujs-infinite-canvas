@@ -1,6 +1,6 @@
 "use client";
 
-import { DeleteOutlined, EditOutlined, PlusOutlined, ReloadOutlined, SearchOutlined } from "@ant-design/icons";
+import { DeleteOutlined, DesktopOutlined, EditOutlined, MobileOutlined, PlusOutlined, ReloadOutlined, SearchOutlined } from "@ant-design/icons";
 import { ProTable, type ProColumns } from "@ant-design/pro-components";
 import { Avatar, Button, Card, Col, DatePicker, Divider, Flex, Form, Input, InputNumber, Modal, Row, Select, Space, Tag, Tooltip, Typography } from "antd";
 import dayjs, { type Dayjs } from "dayjs";
@@ -93,14 +93,18 @@ export default function AdminUsersPage() {
         {
             title: "用户",
             dataIndex: "username",
-            width: 150,
+            width: 140,
             render: (_, item) => <Typography.Text copyable>{item.username}</Typography.Text>,
         },
         {
             title: "昵称",
             dataIndex: "displayName",
-            width: 120,
-            render: (_, item) => <Typography.Text>{item.displayName || "-"}</Typography.Text>,
+            width: 110,
+            render: (_, item) => (
+                <Typography.Text ellipsis={{ tooltip: item.displayName || "-" }} style={{ maxWidth: 96 }}>
+                    {item.displayName || "-"}
+                </Typography.Text>
+            ),
         },
         {
             title: "角色",
@@ -122,26 +126,45 @@ export default function AdminUsersPage() {
             render: (_, item) => <Tag color={item.status === "ban" ? "red" : "green"}>{item.status === "ban" ? "禁用" : "正常"}</Tag>,
         },
         {
+            title: "在线",
+            dataIndex: "online",
+            width: 130,
+            render: (_, item) => (
+                <Space size={4} wrap>
+                    <Tag color={item.onlineApp ? "blue" : "default"} icon={<MobileOutlined />}>
+                        App
+                    </Tag>
+                    <Tag color={item.onlineWeb ? "green" : "default"} icon={<DesktopOutlined />}>
+                        Web
+                    </Tag>
+                </Space>
+            ),
+        },
+        {
             title: "算力点",
             dataIndex: "credits",
             width: 100,
-            render: (_, item) => <Typography.Text>{item.credits}</Typography.Text>,
+            render: (_, item) => <Typography.Text type={item.credits < 0 ? "danger" : undefined}>{item.credits}</Typography.Text>,
         },
         {
             title: "会员到期",
             dataIndex: "membershipExpiresAt",
-            width: 170,
+            width: 150,
             render: (_, item) => {
                 if (!item.membershipExpiresAt) return <Typography.Text type="secondary">-</Typography.Text>;
                 const expired = dayjs(item.membershipExpiresAt).isBefore(dayjs());
-                return <Tag color={expired ? "default" : "green"}>{dayjs(item.membershipExpiresAt).format("YYYY-MM-DD HH:mm")}</Tag>;
+                return <Typography.Text type={expired ? "secondary" : undefined}>{dayjs(item.membershipExpiresAt).format("YYYY-MM-DD HH:mm")}</Typography.Text>;
             },
         },
         {
             title: "Linux.do",
             dataIndex: "linuxDoId",
-            width: 140,
-            render: (_, item) => <Typography.Text type="secondary">{item.linuxDoId || "-"}</Typography.Text>,
+            width: 120,
+            render: (_, item) => (
+                <Typography.Text type="secondary" ellipsis={{ tooltip: item.linuxDoId || "-" }} style={{ maxWidth: 104 }}>
+                    {item.linuxDoId || "-"}
+                </Typography.Text>
+            ),
         },
         {
             title: "最近登录",
@@ -170,16 +193,16 @@ export default function AdminUsersPage() {
     ];
 
     return (
-        <div style={{ padding: "24px 28px" }}>
+        <div style={{ padding: "24px 28px", width: "100%", maxWidth: "100%", minWidth: 0, boxSizing: "border-box", overflowX: "hidden" }}>
             <div style={{ marginBottom: 20 }}>
                 <Typography.Title level={4} style={{ margin: 0, fontSize: 20, fontWeight: 600 }}>用户管理</Typography.Title>
                 <Typography.Text type="secondary" style={{ fontSize: 13 }}>管理平台用户账户和权限</Typography.Text>
             </div>
-            <Flex vertical gap={16}>
-                <Card variant="borderless">
+            <Flex vertical gap={16} style={{ width: "100%", maxWidth: "100%", minWidth: 0 }}>
+                <Card variant="borderless" style={{ width: "100%", maxWidth: "100%", minWidth: 0 }}>
                     <Form layout="vertical">
-                        <Row gutter={16} align="bottom">
-                            <Col flex="360px">
+                        <Row gutter={[16, 12]} align="bottom" wrap>
+                            <Col xs={24} md={12} xl={8} xxl={7}>
                                 <Form.Item label="关键词">
                                     <Input.Search
                                         value={keywordText}
@@ -191,7 +214,7 @@ export default function AdminUsersPage() {
                                     />
                                 </Form.Item>
                             </Col>
-                            <Col flex="160px">
+                            <Col xs={12} md={6} xl={4} xxl={3}>
                                 <Form.Item label="角色">
                                     <Select
                                         value={role || undefined}
@@ -202,7 +225,7 @@ export default function AdminUsersPage() {
                                     />
                                 </Form.Item>
                             </Col>
-                            <Col flex="160px">
+                            <Col xs={12} md={6} xl={4} xxl={3}>
                                 <Form.Item label="状态">
                                     <Select
                                         value={status || undefined}
@@ -213,9 +236,9 @@ export default function AdminUsersPage() {
                                     />
                                 </Form.Item>
                             </Col>
-                            <Col flex="none">
+                            <Col xs={24} md={8} xl={4} xxl={3}>
                                 <Form.Item>
-                                    <Space>
+                                    <Space wrap>
                                         <Button
                                             onClick={() => {
                                                 setKeywordText("");
@@ -241,14 +264,16 @@ export default function AdminUsersPage() {
                     search={false}
                     defaultSize="middle"
                     tableLayout="fixed"
-                    cardProps={{ variant: "borderless" }}
+                    scroll={{ x: 1210 }}
+                    cardProps={{ variant: "borderless", style: { width: "100%", maxWidth: "100%", minWidth: 0, overflow: "hidden" } }}
+                    tableStyle={{ minWidth: 1210 }}
                     rowSelection={{
                         selectedRowKeys: selectedIds,
                         onChange: (keys) => setSelectedIds(keys.map(String)),
                         getCheckboxProps: (record) => ({ disabled: record.role === "admin" }),
                     }}
                     headerTitle={
-                        <Space>
+                        <Space wrap>
                             <Typography.Text strong>用户列表</Typography.Text>
                             <Tag>{total} 人</Tag>
                         </Space>
@@ -277,41 +302,41 @@ export default function AdminUsersPage() {
                 />
             </Flex>
 
-            <Modal title={editingUser?.id ? "编辑用户" : "新增用户"} open={Boolean(editingUser)} width={680} onCancel={() => setEditingUser(null)} onOk={() => void saveUser()} okText="保存" cancelText="取消" destroyOnHidden>
+            <Modal title={editingUser?.id ? "编辑用户" : "新增用户"} open={Boolean(editingUser)} width="min(720px, calc(100vw - 32px))" onCancel={() => setEditingUser(null)} onOk={() => void saveUser()} okText="保存" cancelText="取消" destroyOnHidden>
                 <Form form={form} layout="vertical" requiredMark={false}>
                     <Typography.Text strong>基础信息</Typography.Text>
-                    <Row gutter={14}>
-                        <Col span={12}>
+                    <Row gutter={[14, 4]}>
+                        <Col xs={24} md={12}>
                             <Form.Item name="username" label="用户名" rules={[{ required: true, message: "请输入用户名" }]}>
                                 <Input />
                             </Form.Item>
                         </Col>
-                        <Col span={12}>
+                        <Col xs={24} md={12}>
                             <Form.Item name="password" label={editingUser?.id ? "新密码" : "密码"} rules={editingUser?.id ? [] : [{ required: true, message: "请输入密码" }]}>
                                 <Input.Password autoComplete="new-password" />
                             </Form.Item>
                         </Col>
-                        <Col span={12}>
+                        <Col xs={24} md={12}>
                             <Form.Item name="displayName" label="昵称">
                                 <Input />
                             </Form.Item>
                         </Col>
-                        <Col span={12}>
+                        <Col xs={24} md={12}>
                             <Form.Item name="email" label="邮箱">
                                 <Input />
                             </Form.Item>
                         </Col>
-                        <Col span={12}>
+                        <Col xs={24} md={12}>
                             <Form.Item name="role" label="角色" rules={[{ required: true, message: "请选择角色" }]}>
                                 <Select options={roleOptions} />
                             </Form.Item>
                         </Col>
-                        <Col span={12}>
+                        <Col xs={24} md={12}>
                             <Form.Item name="status" label="状态" rules={[{ required: true, message: "请选择状态" }]}>
                                 <Select options={statusOptions} />
                             </Form.Item>
                         </Col>
-                        <Col span={12}>
+                        <Col xs={24} md={12}>
                             <Form.Item name="membershipExpiresAt" label="会员到期时间">
                                 <DatePicker showTime format="YYYY-MM-DD HH:mm:ss" style={{ width: "100%" }} placeholder="不设置则非会员" allowClear />
                             </Form.Item>
@@ -321,8 +346,8 @@ export default function AdminUsersPage() {
                         <>
                             <Divider style={{ margin: "4px 0 16px" }} />
                             <Typography.Text strong>算力点调整</Typography.Text>
-                            <Row gutter={14}>
-                                <Col span={12}>
+                            <Row gutter={[14, 4]}>
+                                <Col xs={24} md={12}>
                                     <Form.Item label="算力点">
                                         <Space.Compact style={{ width: "100%" }}>
                                             <Form.Item name="credits" noStyle>

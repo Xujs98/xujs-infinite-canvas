@@ -268,6 +268,18 @@ export default function AdminSystemSettingsPage() {
                                         </Form.Item>
                                     </Col>
                                 </Row>
+                                <Row gutter={[24, 0]}>
+                                    <Col span={12}>
+                                        <Form.Item name="appErrorMessagePrefix" label="App 错误提示前缀" extra="保存后 App 端画布错误弹窗会自动带上这段文案，可用于统一客服提示。">
+                                            <Input placeholder="例如：生成失败，请检查模型配置或联系管理员：" />
+                                        </Form.Item>
+                                    </Col>
+                                    <Col span={6}>
+                                        <Form.Item name="appErrorShowDetails" label="App 显示错误详情" valuePropName="checked" extra="关闭后用户弹窗只显示简短错误，但详情仍会上报到日志。">
+                                            <Switch checkedChildren="显示" unCheckedChildren="隐藏" />
+                                        </Form.Item>
+                                    </Col>
+                                </Row>
                             </div>
                         </div>
                     )}

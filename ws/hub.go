@@ -10,19 +10,33 @@ import (
 )
 
 type Client struct {
-	Conn   *websocket.Conn
-	Send   chan []byte
-	Hub    *Hub
-	UserID string
+	Conn       *websocket.Conn
+	Send       chan []byte
+	Hub        *Hub
+	UserID     string
+	ClientType string
+}
+
+type UserOnlineStatus struct {
+	Online bool `json:"online"`
+	App    bool `json:"app"`
+	Web    bool `json:"web"`
+}
+
+type OnlineStats struct {
+	Users int `json:"users"`
+	App   int `json:"app"`
+	Web   int `json:"web"`
+	Total int `json:"total"`
 }
 
 type Hub struct {
-	clients    map[*Client]bool
+	clients     map[*Client]bool
 	userClients map[string]map[*Client]bool
-	broadcast  chan []byte
-	register   chan *Client
-	unregister chan *Client
-	mu         sync.RWMutex
+	broadcast   chan []byte
+	register    chan *Client
+	unregister  chan *Client
+	mu          sync.RWMutex
 }
 
 var DefaultHub *Hub
@@ -56,6 +70,7 @@ func (h *Hub) Run() {
 			}
 			h.mu.Unlock()
 			log.Printf("[WS] Client connected (user=%s), total: %d", client.UserID, len(h.clients))
+			go h.BroadcastJSON(map[string]any{"type": "online-status-changed"})
 
 		case client := <-h.unregister:
 			h.mu.Lock()
@@ -73,6 +88,7 @@ func (h *Hub) Run() {
 			}
 			h.mu.Unlock()
 			log.Printf("[WS] Client disconnected, total: %d", len(h.clients))
+			go h.BroadcastJSON(map[string]any{"type": "online-status-changed"})
 
 		case message := <-h.broadcast:
 			h.mu.RLock()
@@ -134,6 +150,76 @@ func (h *Hub) ClientCount() int {
 	h.mu.RLock()
 	defer h.mu.RUnlock()
 	return len(h.clients)
+}
+
+func (h *Hub) DisconnectAll() {
+	h.mu.Lock()
+	clients := make([]*Client, 0, len(h.clients))
+	for client := range h.clients {
+		clients = append(clients, client)
+		delete(h.clients, client)
+		if client.UserID != "" {
+			if conns, ok := h.userClients[client.UserID]; ok {
+				delete(conns, client)
+				if len(conns) == 0 {
+					delete(h.userClients, client.UserID)
+				}
+			}
+		}
+	}
+	h.mu.Unlock()
+
+	for _, client := range clients {
+		close(client.Send)
+		_ = client.Conn.Close()
+	}
+	go h.BroadcastJSON(map[string]any{"type": "online-status-changed"})
+}
+
+func (h *Hub) OnlineSnapshot() map[string]UserOnlineStatus {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+	result := make(map[string]UserOnlineStatus, len(h.userClients))
+	for userID, clients := range h.userClients {
+		status := UserOnlineStatus{}
+		for client := range clients {
+			switch client.ClientType {
+			case "app":
+				status.App = true
+			case "web":
+				status.Web = true
+			}
+		}
+		status.Online = status.App || status.Web || len(clients) > 0
+		result[userID] = status
+	}
+	return result
+}
+
+func (h *Hub) OnlineStats() OnlineStats {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+	stats := OnlineStats{Total: len(h.clients)}
+	for _, clients := range h.userClients {
+		userHasApp := false
+		userHasWeb := false
+		for client := range clients {
+			switch client.ClientType {
+			case "app":
+				userHasApp = true
+			case "web":
+				userHasWeb = true
+			}
+		}
+		stats.Users++
+		if userHasApp {
+			stats.App++
+		}
+		if userHasWeb {
+			stats.Web++
+		}
+	}
+	return stats
 }
 
 func (c *Client) ReadPump() {

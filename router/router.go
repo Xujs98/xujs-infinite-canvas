@@ -15,6 +15,7 @@ func New() *gin.Engine {
 	router.RedirectTrailingSlash = false
 	_ = router.SetTrustedProxies(nil)
 	api := router.Group("/api")
+	api.Use(middleware.TestOfflineMode)
 	api.GET("/health", func(c *gin.Context) {
 		c.String(http.StatusOK, "ok")
 	})
@@ -49,6 +50,7 @@ func New() *gin.Engine {
 	v1.GET("/credit-logs", gin.WrapF(handler.UserCreditLogs))
 	v1.POST("/credits/consume", gin.WrapF(handler.ConsumeCredits))
 	v1.POST("/credits/refund", gin.WrapF(handler.RefundCredits))
+	v1.POST("/offline-credits/sync", gin.WrapF(handler.SyncOfflineCredits))
 	v1.POST("/checkin", gin.WrapF(handler.DailyCheckIn))
 	v1.GET("/checkin/month", gin.WrapF(handler.GetCheckInMonth))
 	v1.POST("/request-logs", gin.WrapF(handler.SubmitAppRequestLog))
@@ -83,6 +85,9 @@ func New() *gin.Engine {
 	api.POST("/admin/login", gin.WrapF(handler.AdminLogin))
 
 	admin := api.Group("/admin", middleware.AdminAuth)
+	admin.GET("/dashboard", gin.WrapF(handler.AdminDashboard))
+	admin.GET("/server/offline", gin.WrapF(handler.AdminGetServerOffline))
+	admin.POST("/server/offline", gin.WrapF(handler.AdminSetServerOffline))
 	admin.GET("/users", gin.WrapF(handler.AdminUsers))
 	admin.POST("/users", gin.WrapF(handler.AdminSaveUser))
 	admin.POST("/users/:id/credits", func(c *gin.Context) {

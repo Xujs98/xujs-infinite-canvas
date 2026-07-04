@@ -133,6 +133,7 @@ export default function AdminRequestLogsPage() {
     const [keyword, setKeyword] = useState("");
     const [keywordInput, setKeywordInput] = useState("");
     const [methodFilter, setMethodFilter] = useState("");
+    const [sourceFilter, setSourceFilter] = useState("");
     const [isLoading, setIsLoading] = useState(false);
     const [selectedIds, setSelectedIds] = useState<string[]>([]);
     const [batchDeleteOpen, setBatchDeleteOpen] = useState(false);
@@ -144,6 +145,7 @@ export default function AdminRequestLogsPage() {
         try {
             const params: Record<string, any> = { keyword, page, pageSize };
             if (methodFilter) params.method = methodFilter;
+            if (sourceFilter) params.source = sourceFilter;
             const data = await fetchAdminRequestLogs(token, params);
             setLogs(data.items || []);
             setTotal(data.total || 0);
@@ -152,7 +154,7 @@ export default function AdminRequestLogsPage() {
         }
     };
 
-    useEffect(() => { void loadLogs(); }, [token, page, pageSize, keyword, methodFilter]);
+    useEffect(() => { void loadLogs(); }, [token, page, pageSize, keyword, methodFilter, sourceFilter]);
 
     const handleBatchDelete = async () => {
         if (!token || !selectedIds.length) return;
@@ -174,7 +176,7 @@ export default function AdminRequestLogsPage() {
             title: "方法",
             dataIndex: "method",
             width: 80,
-            render: (_, item) => <Tag color={item.method === "POST" ? "blue" : "green"}>{item.method}</Tag>,
+            render: (_, item) => <Tag color={item.method === "ERROR" ? "red" : item.method === "POST" ? "blue" : "green"}>{item.method}</Tag>,
         },
         {
             title: "来源",
@@ -230,8 +232,8 @@ export default function AdminRequestLogsPage() {
     return (
         <div style={{ padding: "24px 28px" }}>
             <div style={{ marginBottom: 20 }}>
-                <Typography.Title level={4} style={{ margin: 0, fontSize: 20, fontWeight: 600 }}>请求管理</Typography.Title>
-                <Typography.Text type="secondary" style={{ fontSize: 13 }}>查看 AI 代理层的完整请求和响应</Typography.Text>
+                <Typography.Title level={4} style={{ margin: 0, fontSize: 20, fontWeight: 600 }}>日志管理</Typography.Title>
+                <Typography.Text type="secondary" style={{ fontSize: 13 }}>查看 Web/App 请求日志和 App 端画布错误</Typography.Text>
             </div>
             <Space direction="vertical" size={16} style={{ width: "100%" }}>
                 <Card variant="borderless">
@@ -255,6 +257,16 @@ export default function AdminRequestLogsPage() {
                                         <Button type={!methodFilter ? "primary" : "default"} onClick={() => { setMethodFilter(""); setPage(1); }}>全部</Button>
                                         <Button type={methodFilter === "POST" ? "primary" : "default"} onClick={() => { setMethodFilter("POST"); setPage(1); }}>POST</Button>
                                         <Button type={methodFilter === "GET" ? "primary" : "default"} onClick={() => { setMethodFilter("GET"); setPage(1); }}>GET</Button>
+                                        <Button type={methodFilter === "ERROR" ? "primary" : "default"} onClick={() => { setMethodFilter("ERROR"); setPage(1); }}>错误</Button>
+                                    </Space>
+                                </Form.Item>
+                            </Col>
+                            <Col flex="none">
+                                <Form.Item label="来源">
+                                    <Space>
+                                        <Button type={!sourceFilter ? "primary" : "default"} onClick={() => { setSourceFilter(""); setPage(1); }}>全部</Button>
+                                        <Button type={sourceFilter === "app" ? "primary" : "default"} onClick={() => { setSourceFilter("app"); setPage(1); }}>App</Button>
+                                        <Button type={sourceFilter === "web" ? "primary" : "default"} onClick={() => { setSourceFilter("web"); setPage(1); }}>Web</Button>
                                     </Space>
                                 </Form.Item>
                             </Col>
@@ -278,7 +290,7 @@ export default function AdminRequestLogsPage() {
                     rowSelection={{ selectedRowKeys: selectedIds, onChange: (keys) => setSelectedIds(keys.map(String)) }}
                     headerTitle={
                         <Space>
-                            <Typography.Text strong>请求日志</Typography.Text>
+                            <Typography.Text strong>日志记录</Typography.Text>
                             <Tag>{total} 条</Tag>
                         </Space>
                     }
@@ -322,8 +334,9 @@ export default function AdminRequestLogsPage() {
                 {detailLog && (
                     <div className="space-y-4">
                         <div className="flex items-center gap-3 flex-wrap">
-                            <Tag color={detailLog.method === "POST" ? "blue" : "green"}>{detailLog.method}</Tag>
+                            <Tag color={detailLog.method === "ERROR" ? "red" : detailLog.method === "POST" ? "blue" : "green"}>{detailLog.method}</Tag>
                             <Typography.Text code className="!text-xs">{detailLog.model}</Typography.Text>
+                            <Tag color={detailLog.source === "app" ? "purple" : "default"}>{detailLog.source === "app" ? "App" : "Web"}</Tag>
                             {detailLog.statusCode ? <Tag color={detailLog.statusCode < 400 ? "success" : "error"}>{detailLog.statusCode}</Tag> : null}
                             {detailLog.isPolling && <Tag color="orange">轮询</Tag>}
                             <Typography.Text type="secondary" className="!text-xs">{dayjs(detailLog.createdAt).format("YYYY-MM-DD HH:mm:ss")}</Typography.Text>
