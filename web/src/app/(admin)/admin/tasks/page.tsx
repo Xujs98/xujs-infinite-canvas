@@ -1,11 +1,12 @@
 "use client";
 
-import { ReloadOutlined, SearchOutlined } from "@ant-design/icons";
+import { ReloadOutlined } from "@ant-design/icons";
 import { ProTable, type ProColumns } from "@ant-design/pro-components";
 import { Button, Card, Form, Input, Space, Tag, Typography } from "antd";
 import dayjs from "dayjs";
 import { useEffect, useState } from "react";
 
+import { ClickToCopyText } from "@/components/admin/click-to-copy-text";
 import { fetchAdminGenerationTasks, type AdminGenerationTask } from "@/services/api/admin";
 import { useUserStore } from "@/stores/use-user-store";
 
@@ -93,7 +94,11 @@ export default function AdminTasksPage() {
             dataIndex: "model",
             width: 220,
             ellipsis: true,
-            render: (_, task) => <Typography.Text code className="!text-xs">{task.model}</Typography.Text>,
+            render: (_, task) => (
+                <Typography.Text code className="!text-xs">
+                    {task.model}
+                </Typography.Text>
+            ),
         },
         {
             title: "任务 ID",
@@ -102,8 +107,14 @@ export default function AdminTasksPage() {
             ellipsis: true,
             render: (_, task) => (
                 <Space direction="vertical" size={0}>
-                    <Typography.Text copyable className="!text-xs">{task.id}</Typography.Text>
-                    {task.upstreamTaskId ? <Typography.Text type="secondary" className="!text-xs">上游：{task.upstreamTaskId}</Typography.Text> : null}
+                    <ClickToCopyText value={task.id} className="!text-xs">
+                        {task.id}
+                    </ClickToCopyText>
+                    {task.upstreamTaskId ? (
+                        <Typography.Text type="secondary" className="!text-xs">
+                            上游：{task.upstreamTaskId}
+                        </Typography.Text>
+                    ) : null}
                 </Space>
             ),
         },
@@ -112,12 +123,15 @@ export default function AdminTasksPage() {
             key: "canvas",
             width: 220,
             ellipsis: true,
-            render: (_, task) => task.canvasId || task.nodeId ? (
-                <Space direction="vertical" size={0}>
-                    {task.canvasId ? <Typography.Text className="!text-xs">画布：{task.canvasId}</Typography.Text> : null}
-                    {task.nodeId ? <Typography.Text className="!text-xs">节点：{task.nodeId}</Typography.Text> : null}
-                </Space>
-            ) : "-",
+            render: (_, task) =>
+                task.canvasId || task.nodeId ? (
+                    <Space direction="vertical" size={0}>
+                        {task.canvasId ? <Typography.Text className="!text-xs">画布：{task.canvasId}</Typography.Text> : null}
+                        {task.nodeId ? <Typography.Text className="!text-xs">节点：{task.nodeId}</Typography.Text> : null}
+                    </Space>
+                ) : (
+                    "-"
+                ),
         },
         {
             title: "耗时",
@@ -129,7 +143,7 @@ export default function AdminTasksPage() {
             title: "更新时间",
             dataIndex: "updatedAt",
             width: 170,
-            render: (_, task) => task.updatedAt ? dayjs(task.updatedAt).format("YYYY-MM-DD HH:mm:ss") : "-",
+            render: (_, task) => (task.updatedAt ? dayjs(task.updatedAt).format("YYYY-MM-DD HH:mm:ss") : "-"),
         },
         {
             title: "错误",
@@ -140,23 +154,26 @@ export default function AdminTasksPage() {
     ];
 
     return (
-        <div style={{ padding: "24px 28px" }}>
-            <div style={{ marginBottom: 20 }}>
-                <Typography.Title level={4} style={{ margin: 0, fontSize: 20, fontWeight: 600 }}>任务管理</Typography.Title>
-                <Typography.Text type="secondary" style={{ fontSize: 13 }}>查看当前服务端图片和视频生成任务</Typography.Text>
+        <div className="admin-data-page">
+            <div className="admin-page-title">
+                <Typography.Title level={4} style={{ margin: 0, fontSize: 20, fontWeight: 600 }}>
+                    任务管理
+                </Typography.Title>
+                <Typography.Text type="secondary" style={{ fontSize: 13 }}>
+                    查看当前服务端图片和视频生成任务
+                </Typography.Text>
             </div>
-            <Card variant="borderless">
+            <Card className="admin-filter-card" variant="borderless">
                 <Form layout="vertical">
                     <Space wrap align="end">
                         <Form.Item label="关键词">
-                            <Input.Search
+                            <Input
                                 value={keywordInput}
                                 placeholder="搜索用户、模型、任务 ID、画布或节点"
                                 allowClear
-                                enterButton={<SearchOutlined />}
                                 style={{ width: 360 }}
-                                onSearch={(value) => {
-                                    setKeyword(value);
+                                onPressEnter={() => {
+                                    setKeyword(keywordInput);
                                     setPage(1);
                                 }}
                                 onChange={(event) => setKeywordInput(event.target.value)}
@@ -164,21 +181,79 @@ export default function AdminTasksPage() {
                         </Form.Item>
                         <Form.Item label="类型">
                             <Space>
-                                <Button type={!type ? "primary" : "default"} onClick={() => { setType(""); setPage(1); }}>全部</Button>
-                                <Button type={type === "image" ? "primary" : "default"} onClick={() => { setType("image"); setPage(1); }}>图片</Button>
-                                <Button type={type === "video" ? "primary" : "default"} onClick={() => { setType("video"); setPage(1); }}>视频</Button>
+                                <Button
+                                    type={!type ? "primary" : "default"}
+                                    onClick={() => {
+                                        setType("");
+                                        setPage(1);
+                                    }}
+                                >
+                                    全部
+                                </Button>
+                                <Button
+                                    type={type === "image" ? "primary" : "default"}
+                                    onClick={() => {
+                                        setType("image");
+                                        setPage(1);
+                                    }}
+                                >
+                                    图片
+                                </Button>
+                                <Button
+                                    type={type === "video" ? "primary" : "default"}
+                                    onClick={() => {
+                                        setType("video");
+                                        setPage(1);
+                                    }}
+                                >
+                                    视频
+                                </Button>
                             </Space>
                         </Form.Item>
                         <Form.Item label="状态">
                             <Space>
-                                <Button type={status === "running" ? "primary" : "default"} onClick={() => { setStatus("running"); setPage(1); }}>进行中</Button>
-                                <Button type={!status ? "primary" : "default"} onClick={() => { setStatus(""); setPage(1); }}>全部</Button>
-                                <Button type={status === "succeeded" ? "primary" : "default"} onClick={() => { setStatus("succeeded"); setPage(1); }}>已完成</Button>
-                                <Button type={status === "failed" ? "primary" : "default"} onClick={() => { setStatus("failed"); setPage(1); }}>失败</Button>
+                                <Button
+                                    type={status === "running" ? "primary" : "default"}
+                                    onClick={() => {
+                                        setStatus("running");
+                                        setPage(1);
+                                    }}
+                                >
+                                    进行中
+                                </Button>
+                                <Button
+                                    type={!status ? "primary" : "default"}
+                                    onClick={() => {
+                                        setStatus("");
+                                        setPage(1);
+                                    }}
+                                >
+                                    全部
+                                </Button>
+                                <Button
+                                    type={status === "succeeded" ? "primary" : "default"}
+                                    onClick={() => {
+                                        setStatus("succeeded");
+                                        setPage(1);
+                                    }}
+                                >
+                                    已完成
+                                </Button>
+                                <Button
+                                    type={status === "failed" ? "primary" : "default"}
+                                    onClick={() => {
+                                        setStatus("failed");
+                                        setPage(1);
+                                    }}
+                                >
+                                    失败
+                                </Button>
                             </Space>
                         </Form.Item>
                         <Form.Item label=" ">
-                            <Button icon={<ReloadOutlined />} onClick={() => void loadTasks()}>刷新</Button>
+                            <Button icon={<ReloadOutlined />} onClick={() => void loadTasks()}>
+                                刷新
+                            </Button>
                         </Form.Item>
                     </Space>
                 </Form>

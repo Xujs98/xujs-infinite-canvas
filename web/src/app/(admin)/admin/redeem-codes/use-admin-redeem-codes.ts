@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { App } from "antd";
 
-import { batchDeleteAdminRedeemCodes, deleteAdminRedeemCode, fetchAdminRedeemCodes, generateAdminRedeemCodes, type AdminGenerateRedeemCodesRequest, type AdminRedeemCode } from "@/services/api/admin";
+import { batchDeleteAdminRedeemCodes, deleteAdminRedeemCode, deleteInvalidAdminRedeemCodes, fetchAdminRedeemCodes, generateAdminRedeemCodes, type AdminGenerateRedeemCodesRequest, type AdminRedeemCode } from "@/services/api/admin";
 import { useUserStore } from "@/stores/use-user-store";
 
 const defaultPageSize = 10;
@@ -54,6 +54,15 @@ export function useAdminRedeemCodes() {
         onError: (error) => message.error(error instanceof Error ? error.message : "批量删除失败"),
     });
 
+    const deleteInvalidMutation = useMutation({
+        mutationFn: () => deleteInvalidAdminRedeemCodes(token),
+        onSuccess: async (deleted) => {
+            await queryClient.invalidateQueries({ queryKey: ["admin", "redeem-codes"] });
+            message.success(deleted ? `已删除 ${deleted} 张无效兑换码` : "没有需要删除的无效兑换码");
+        },
+        onError: (error) => message.error(error instanceof Error ? error.message : "删除无效兑换码失败"),
+    });
+
     useEffect(() => {
         if (query.isError) {
             const errorMessage = query.error instanceof Error ? query.error.message : "读取卡密失败";
@@ -82,7 +91,7 @@ export function useAdminRedeemCodes() {
         page,
         pageSize,
         total: data?.total || 0,
-        isLoading: query.isFetching || generateMutation.isPending || deleteMutation.isPending || batchDeleteMutation.isPending,
+        isLoading: query.isFetching || generateMutation.isPending || deleteMutation.isPending || batchDeleteMutation.isPending || deleteInvalidMutation.isPending,
         searchCodes: (value = keyword) => updateFilters({ keyword: value }),
         changeType: (value: string) => updateFilters({ type: value }),
         changeStatus: (value: string) => updateFilters({ status: value }),
@@ -93,5 +102,6 @@ export function useAdminRedeemCodes() {
         generateCodes: (payload: AdminGenerateRedeemCodesRequest) => generateMutation.mutateAsync(payload),
         deleteCode: (id: string) => deleteMutation.mutateAsync(id),
         batchDeleteCodes: (ids: string[]) => batchDeleteMutation.mutateAsync(ids),
+        deleteInvalidCodes: () => deleteInvalidMutation.mutateAsync(),
     };
 }

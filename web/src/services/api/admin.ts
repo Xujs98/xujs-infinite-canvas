@@ -96,6 +96,7 @@ export type AdminGenerationTaskListResponse = {
 
 export type AdminUserQuery = {
     keyword?: string;
+    type?: string;
     role?: string;
     status?: string;
     page?: number;
@@ -274,6 +275,23 @@ export async function deleteAdminRedeemCode(token: string, id: string) {
 
 export async function batchDeleteAdminRedeemCodes(token: string, ids: string[]) {
     return apiPost<boolean>("/api/admin/redeem-codes/batch-delete", { ids }, token);
+}
+
+export async function deleteInvalidAdminRedeemCodes(token: string) {
+    const invalidStatuses = ["used", "disabled", "expired"];
+    let deleted = 0;
+
+    for (const status of invalidStatuses) {
+        while (true) {
+            const result = await fetchAdminRedeemCodes(token, { status, page: 1, pageSize: 100 });
+            const ids = result.items.map((item) => item.id).filter(Boolean);
+            if (!ids.length) break;
+            await batchDeleteAdminRedeemCodes(token, ids);
+            deleted += ids.length;
+        }
+    }
+
+    return deleted;
 }
 
 export type AdminChannelFieldMapping = {

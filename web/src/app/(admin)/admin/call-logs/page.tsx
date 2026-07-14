@@ -1,6 +1,6 @@
 "use client";
 
-import { DeleteOutlined, EyeOutlined, ReloadOutlined, SearchOutlined } from "@ant-design/icons";
+import { DeleteOutlined, EyeOutlined, ReloadOutlined } from "@ant-design/icons";
 import { ProTable, type ProColumns } from "@ant-design/pro-components";
 import { Button, Card, Col, Drawer, Form, Input, Modal, Row, Space, Tag, Typography } from "antd";
 import dayjs from "dayjs";
@@ -57,17 +57,7 @@ function unescapeJsonStrings(obj: unknown): unknown {
 function extractVideoUrl(text: string): string | null {
     try {
         const obj = JSON.parse(text);
-        const candidates = [
-            obj?.content?.video_url,
-            obj?.result?.video_url,
-            obj?.result?.url,
-            obj?.result?.video_urls?.[0],
-            obj?.data?.video_url,
-            obj?.data?.video_urls?.[0],
-            obj?.video_url,
-            obj?.url,
-            obj?.video?.url,
-        ];
+        const candidates = [obj?.content?.video_url, obj?.result?.video_url, obj?.result?.url, obj?.result?.video_urls?.[0], obj?.data?.video_url, obj?.data?.video_urls?.[0], obj?.video_url, obj?.url, obj?.video?.url];
         for (const v of candidates) {
             if (typeof v === "string" && /^https?:\/\//i.test(v)) return v;
         }
@@ -128,14 +118,17 @@ export default function AdminCallLogsPage() {
         void loadLogs();
     };
 
-    const pathLabel = useMemo(() => ({
-        "/images/generations": "图片生成",
-        "/images/edits": "图片编辑",
-        "/chat/completions": "对话补全",
-        "/audio/speech": "语音合成",
-        "/videos": "视频生成",
-        "/contents/generations/tasks": "视频生成",
-    }), []);
+    const pathLabel = useMemo(
+        () => ({
+            "/images/generations": "图片生成",
+            "/images/edits": "图片编辑",
+            "/chat/completions": "对话补全",
+            "/audio/speech": "语音合成",
+            "/videos": "视频生成",
+            "/contents/generations/tasks": "视频生成",
+        }),
+        [],
+    );
 
     const resolvePathLabel = (path: string) => {
         if (pathLabel[path as keyof typeof pathLabel]) return pathLabel[path as keyof typeof pathLabel];
@@ -173,7 +166,7 @@ export default function AdminCallLogsPage() {
             title: "状态",
             dataIndex: "success",
             width: 80,
-            render: (_, item) => item.success ? <Tag color="success">成功</Tag> : <Tag color="error">失败</Tag>,
+            render: (_, item) => (item.success ? <Tag color="success">成功</Tag> : <Tag color="error">失败</Tag>),
         },
         {
             title: "算力",
@@ -199,42 +192,41 @@ export default function AdminCallLogsPage() {
             title: "时间",
             dataIndex: "createdAt",
             width: 170,
-            render: (_, item) => item.createdAt ? dayjs(item.createdAt).format("YYYY-MM-DD HH:mm:ss") : "-",
+            render: (_, item) => (item.createdAt ? dayjs(item.createdAt).format("YYYY-MM-DD HH:mm:ss") : "-"),
         },
         {
             title: "操作",
             key: "actions",
             width: 60,
             align: "center",
-            render: (_, item) => (
-                <Button
-                    type="text"
-                    size="small"
-                    icon={<EyeOutlined />}
-                    onClick={() => setDetailLog(item)}
-                />
-            ),
+            render: (_, item) => <Button type="text" size="small" icon={<EyeOutlined />} onClick={() => setDetailLog(item)} />,
         },
     ];
 
     return (
-        <div style={{ padding: "24px 28px" }}>
-            <div style={{ marginBottom: 20 }}>
-                <Typography.Title level={4} style={{ margin: 0, fontSize: 20, fontWeight: 600 }}>日志管理</Typography.Title>
-                <Typography.Text type="secondary" style={{ fontSize: 13 }}>查看用户 AI 接口调用记录</Typography.Text>
+        <div className="admin-data-page">
+            <div className="admin-page-title">
+                <Typography.Title level={4} style={{ margin: 0, fontSize: 20, fontWeight: 600 }}>
+                    日志管理
+                </Typography.Title>
+                <Typography.Text type="secondary" style={{ fontSize: 13 }}>
+                    查看用户 AI 接口调用记录
+                </Typography.Text>
             </div>
             <Space direction="vertical" size={16} style={{ width: "100%" }}>
-                <Card variant="borderless">
+                <Card className="admin-filter-card" variant="borderless">
                     <Form layout="vertical">
                         <Row gutter={16} align="bottom">
                             <Col flex="360px">
                                 <Form.Item label="关键词">
-                                    <Input.Search
+                                    <Input
                                         value={keywordInput}
                                         placeholder="搜索用户名、模型或错误信息"
                                         allowClear
-                                        enterButton={<SearchOutlined />}
-                                        onSearch={(v) => { setKeyword(v); setPage(1); }}
+                                        onPressEnter={() => {
+                                            setKeyword(keywordInput);
+                                            setPage(1);
+                                        }}
                                         onChange={(e) => setKeywordInput(e.target.value)}
                                     />
                                 </Form.Item>
@@ -242,15 +234,41 @@ export default function AdminCallLogsPage() {
                             <Col flex="none">
                                 <Form.Item label="状态">
                                     <Space>
-                                        <Button type={statusFilter === "" ? "primary" : "default"} onClick={() => { setStatusFilter(""); setPage(1); }}>全部</Button>
-                                        <Button type={statusFilter === "success" ? "primary" : "default"} onClick={() => { setStatusFilter("success"); setPage(1); }}>成功</Button>
-                                        <Button type={statusFilter === "fail" ? "primary" : "default"} onClick={() => { setStatusFilter("fail"); setPage(1); }}>失败</Button>
+                                        <Button
+                                            type={statusFilter === "" ? "primary" : "default"}
+                                            onClick={() => {
+                                                setStatusFilter("");
+                                                setPage(1);
+                                            }}
+                                        >
+                                            全部
+                                        </Button>
+                                        <Button
+                                            type={statusFilter === "success" ? "primary" : "default"}
+                                            onClick={() => {
+                                                setStatusFilter("success");
+                                                setPage(1);
+                                            }}
+                                        >
+                                            成功
+                                        </Button>
+                                        <Button
+                                            type={statusFilter === "fail" ? "primary" : "default"}
+                                            onClick={() => {
+                                                setStatusFilter("fail");
+                                                setPage(1);
+                                            }}
+                                        >
+                                            失败
+                                        </Button>
                                     </Space>
                                 </Form.Item>
                             </Col>
                             <Col flex="none">
                                 <Form.Item>
-                                    <Button icon={<ReloadOutlined />} onClick={() => void loadLogs()}>刷新</Button>
+                                    <Button icon={<ReloadOutlined />} onClick={() => void loadLogs()}>
+                                        刷新
+                                    </Button>
                                 </Form.Item>
                             </Col>
                         </Row>
@@ -290,93 +308,91 @@ export default function AdminCallLogsPage() {
                 />
             </Space>
 
-            <Modal
-                title="批量删除日志"
-                open={batchDeleteOpen}
-                onCancel={() => setBatchDeleteOpen(false)}
-                onOk={() => void handleBatchDelete()}
-                okText="删除"
-                okButtonProps={{ danger: true }}
-                cancelText="取消"
-            >
+            <Modal title="批量删除日志" open={batchDeleteOpen} onCancel={() => setBatchDeleteOpen(false)} onOk={() => void handleBatchDelete()} okText="删除" okButtonProps={{ danger: true }} cancelText="取消">
                 确定删除已选中的 {selectedIds.length} 条日志吗？
             </Modal>
 
-            <Drawer
-                title={detailLog?.success ? "响应详情" : "错误详情"}
-                open={Boolean(detailLog)}
-                onClose={() => setDetailLog(null)}
-                width={720}
-                destroyOnHidden
-            >
+            <Drawer title={detailLog?.success ? "响应详情" : "错误详情"} open={Boolean(detailLog)} onClose={() => setDetailLog(null)} width={720} destroyOnHidden>
                 {detailLog && (
                     <Space direction="vertical" size={20} style={{ width: "100%" }}>
                         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px 24px" }}>
                             <div>
-                                <Typography.Text type="secondary" style={{ fontSize: 12 }}>用户</Typography.Text>
+                                <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+                                    用户
+                                </Typography.Text>
                                 <div>{detailLog.username || detailLog.userId || "-"}</div>
                             </div>
                             <div>
-                                <Typography.Text type="secondary" style={{ fontSize: 12 }}>模型</Typography.Text>
+                                <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+                                    模型
+                                </Typography.Text>
                                 <div style={{ fontFamily: "monospace" }}>{detailLog.model}</div>
                             </div>
                             <div>
-                                <Typography.Text type="secondary" style={{ fontSize: 12 }}>接口</Typography.Text>
+                                <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+                                    接口
+                                </Typography.Text>
                                 <div>{resolvePathLabel(detailLog.path)}</div>
                             </div>
                             <div>
-                                <Typography.Text type="secondary" style={{ fontSize: 12 }}>状态</Typography.Text>
+                                <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+                                    状态
+                                </Typography.Text>
                                 <div>{detailLog.success ? <Tag color="success">成功</Tag> : <Tag color="error">失败</Tag>}</div>
                             </div>
                             <div>
-                                <Typography.Text type="secondary" style={{ fontSize: 12 }}>算力消耗</Typography.Text>
+                                <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+                                    算力消耗
+                                </Typography.Text>
                                 <div>{detailLog.credits || "-"}</div>
                             </div>
                             <div>
-                                <Typography.Text type="secondary" style={{ fontSize: 12 }}>调用时间</Typography.Text>
+                                <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+                                    调用时间
+                                </Typography.Text>
                                 <div>{detailLog.createdAt ? dayjs(detailLog.createdAt).format("YYYY-MM-DD HH:mm:ss") : "-"}</div>
                             </div>
                         </div>
                         {detailLog.errorMsg && (
                             <div>
-                                <Typography.Text type="secondary" style={{ fontSize: 12 }}>{detailLog.success ? "响应数据" : "错误信息"}</Typography.Text>
-                                <div style={{
-                                    marginTop: 8,
-                                    padding: 16,
-                                    background: "#fafafa",
-                                    borderRadius: 8,
-                                    fontSize: 13,
-                                    lineHeight: 1.7,
-                                    overflow: "auto",
-                                    whiteSpace: "pre-wrap",
-                                    wordBreak: "break-word",
-                                    border: "1px solid #e8e8e8",
-                                    maxHeight: "calc(100vh - 340px)",
-                                }}>
-                                    {errorDetail?.isJson ? (
-                                        <JsonHighlight text={errorDetail.formatted} />
-                                    ) : (
-                                        <code>{errorDetail?.formatted || detailLog.errorMsg}</code>
-                                    )}
+                                <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+                                    {detailLog.success ? "响应数据" : "错误信息"}
+                                </Typography.Text>
+                                <div
+                                    style={{
+                                        marginTop: 8,
+                                        padding: 16,
+                                        background: "#fafafa",
+                                        borderRadius: 8,
+                                        fontSize: 13,
+                                        lineHeight: 1.7,
+                                        overflow: "auto",
+                                        whiteSpace: "pre-wrap",
+                                        wordBreak: "break-word",
+                                        border: "1px solid #e8e8e8",
+                                        maxHeight: "calc(100vh - 340px)",
+                                    }}
+                                >
+                                    {errorDetail?.isJson ? <JsonHighlight text={errorDetail.formatted} /> : <code>{errorDetail?.formatted || detailLog.errorMsg}</code>}
                                 </div>
                             </div>
                         )}
-                        {detailLog.success && detailLog.errorMsg && (() => {
-                            const videoUrl = extractVideoUrl(detailLog.errorMsg);
-                            if (!videoUrl) return null;
-                            return (
-                                <div>
-                                    <Typography.Text type="secondary" style={{ fontSize: 12 }}>视频预览</Typography.Text>
-                                    <div style={{ marginTop: 8 }}>
-                                        <video
-                                            src={videoUrl}
-                                            controls
-                                            style={{ width: "100%", maxHeight: 400, borderRadius: 8, background: "#000" }}
-                                        />
+                        {detailLog.success &&
+                            detailLog.errorMsg &&
+                            (() => {
+                                const videoUrl = extractVideoUrl(detailLog.errorMsg);
+                                if (!videoUrl) return null;
+                                return (
+                                    <div>
+                                        <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+                                            视频预览
+                                        </Typography.Text>
+                                        <div style={{ marginTop: 8 }}>
+                                            <video src={videoUrl} controls style={{ width: "100%", maxHeight: 400, borderRadius: 8, background: "#000" }} />
+                                        </div>
                                     </div>
-                                </div>
-                            );
-                        })()}
+                                );
+                            })()}
                     </Space>
                 )}
             </Drawer>

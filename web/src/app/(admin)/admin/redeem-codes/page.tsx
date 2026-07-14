@@ -1,11 +1,12 @@
 "use client";
 
-import { CopyOutlined, DeleteOutlined, PlusOutlined, ReloadOutlined, SearchOutlined } from "@ant-design/icons";
+import { DeleteOutlined, PlusOutlined, ReloadOutlined, SearchOutlined } from "@ant-design/icons";
 import { ProTable, type ProColumns } from "@ant-design/pro-components";
 import { Button, Card, Col, Form, Input, InputNumber, Modal, Row, Select, Space, Tag, Tooltip, Typography } from "antd";
 import dayjs from "dayjs";
 import { useEffect, useState } from "react";
 
+import { ClickToCopyText } from "@/components/admin/click-to-copy-text";
 import type { AdminRedeemCode } from "@/services/api/admin";
 import { useAdminRedeemCodes } from "./use-admin-redeem-codes";
 
@@ -20,7 +21,8 @@ const codeStatusLabels: Record<string, { label: string; color: string }> = {
 };
 
 export default function AdminRedeemCodesPage() {
-    const { codes, keyword, type, status, page, pageSize, total, isLoading, searchCodes, changeType, changeStatus, changePage, changePageSize, resetFilters, refreshCodes, generateCodes, deleteCode, batchDeleteCodes } = useAdminRedeemCodes();
+    const { codes, keyword, type, status, page, pageSize, total, isLoading, searchCodes, changeType, changeStatus, changePage, changePageSize, resetFilters, refreshCodes, generateCodes, deleteCode, batchDeleteCodes, deleteInvalidCodes } =
+        useAdminRedeemCodes();
     const [form] = Form.useForm();
     const [keywordText, setKeywordText] = useState(keyword);
     const [generating, setGenerating] = useState(false);
@@ -28,6 +30,7 @@ export default function AdminRedeemCodesPage() {
     const [copiedId, setCopiedId] = useState<string | null>(null);
     const [selectedIds, setSelectedIds] = useState<string[]>([]);
     const [batchDeleteOpen, setBatchDeleteOpen] = useState(false);
+    const [deleteInvalidOpen, setDeleteInvalidOpen] = useState(false);
 
     useEffect(() => setKeywordText(keyword), [keyword]);
 
@@ -49,12 +52,6 @@ export default function AdminRedeemCodesPage() {
         }
     };
 
-    const copyCode = async (code: string, id: string) => {
-        await navigator.clipboard.writeText(code);
-        setCopiedId(id);
-        setTimeout(() => setCopiedId(null), 1500);
-    };
-
     const handleBatchCopy = async () => {
         const selected = codes.filter((item) => selectedIds.includes(item.id));
         const text = selected.map((item) => item.code).join("\n");
@@ -69,20 +66,21 @@ export default function AdminRedeemCodesPage() {
         setBatchDeleteOpen(false);
     };
 
+    const handleDeleteInvalid = async () => {
+        await deleteInvalidCodes();
+        setDeleteInvalidOpen(false);
+        setSelectedIds([]);
+    };
+
     const columns: ProColumns<AdminRedeemCode>[] = [
         {
             title: "卡密",
             dataIndex: "code",
             width: 200,
             render: (_, item) => (
-                <Space size={4}>
-                    <Typography.Text copyable={{ text: item.code }} className="font-mono text-xs">
-                        {item.code}
-                    </Typography.Text>
-                    <Tooltip title={copiedId === item.id ? "已复制" : "复制卡密"}>
-                        <Button type="text" size="small" icon={<CopyOutlined />} onClick={() => void copyCode(item.code, item.id)} />
-                    </Tooltip>
-                </Space>
+                <ClickToCopyText value={item.code} className="font-mono text-xs" successText="卡密已复制">
+                    {item.code}
+                </ClickToCopyText>
             ),
         },
         {
@@ -122,7 +120,18 @@ export default function AdminRedeemCodesPage() {
             dataIndex: "usedBy",
             width: 180,
             ellipsis: true,
-            render: (_, item) => (item.usedByName ? <Typography.Text copyable={{ text: item.usedBy }} className="text-xs">{item.usedByName}</Typography.Text> : item.usedBy ? <Typography.Text copyable className="text-xs">{item.usedBy}</Typography.Text> : <Typography.Text type="secondary">-</Typography.Text>),
+            render: (_, item) =>
+                item.usedByName ? (
+                    <ClickToCopyText value={item.usedBy} className="text-xs">
+                        {item.usedByName}
+                    </ClickToCopyText>
+                ) : item.usedBy ? (
+                    <ClickToCopyText value={item.usedBy} className="text-xs">
+                        {item.usedBy}
+                    </ClickToCopyText>
+                ) : (
+                    <Typography.Text type="secondary">-</Typography.Text>
+                ),
         },
         {
             title: "创建时间",
@@ -144,18 +153,22 @@ export default function AdminRedeemCodesPage() {
     ];
 
     return (
-        <div style={{ padding: "24px 28px" }}>
-            <div style={{ marginBottom: 20 }}>
-                <Typography.Title level={4} style={{ margin: 0, fontSize: 20, fontWeight: 600 }}>卡密管理</Typography.Title>
-                <Typography.Text type="secondary" style={{ fontSize: 13 }}>生成和管理兑换卡密</Typography.Text>
+        <div className="admin-data-page">
+            <div className="admin-page-title">
+                <Typography.Title level={4} style={{ margin: 0, fontSize: 20, fontWeight: 600 }}>
+                    卡密管理
+                </Typography.Title>
+                <Typography.Text type="secondary" style={{ fontSize: 13 }}>
+                    生成和管理兑换卡密
+                </Typography.Text>
             </div>
             <Space direction="vertical" size={16} style={{ width: "100%" }}>
-                <Card variant="borderless">
+                <Card className="admin-filter-card" variant="borderless">
                     <Form layout="vertical">
                         <Row gutter={16} align="bottom">
                             <Col flex="360px">
                                 <Form.Item label="关键词">
-                                    <Input.Search value={keywordText} placeholder="搜索卡密、批次、备注或使用者" allowClear enterButton={<SearchOutlined />} onSearch={() => searchCodes(keywordText)} onChange={(event) => setKeywordText(event.target.value)} />
+                                    <Input value={keywordText} placeholder="搜索卡密、批次、备注或使用者" allowClear onPressEnter={() => searchCodes(keywordText)} onChange={(event) => setKeywordText(event.target.value)} />
                                 </Form.Item>
                             </Col>
                             <Col flex="160px">
@@ -197,7 +210,7 @@ export default function AdminRedeemCodesPage() {
                                         >
                                             重置
                                         </Button>
-                                        <Button type="primary" icon={<ReloadOutlined />} onClick={() => searchCodes(keywordText)}>
+                                        <Button type="primary" icon={<SearchOutlined />} onClick={() => searchCodes(keywordText)}>
                                             查询
                                         </Button>
                                     </Space>
@@ -225,7 +238,10 @@ export default function AdminRedeemCodesPage() {
                     }
                     options={{ density: true, setting: true, reload: () => void refreshCodes() }}
                     toolBarRender={() => [
-                        <Button key="batch-copy" icon={<CopyOutlined />} disabled={!selectedIds.length} onClick={() => void handleBatchCopy()}>
+                        <Button key="delete-invalid" danger icon={<DeleteOutlined />} onClick={() => setDeleteInvalidOpen(true)}>
+                            删除无效
+                        </Button>,
+                        <Button key="batch-copy" disabled={!selectedIds.length} onClick={() => void handleBatchCopy()}>
                             {copiedId === "batch" ? "已复制" : `复制选中${selectedIds.length ? ` ${selectedIds.length}` : ""}`}
                         </Button>,
                         <Button key="batch-delete" danger icon={<DeleteOutlined />} disabled={!selectedIds.length} onClick={() => setBatchDeleteOpen(true)}>
@@ -324,16 +340,24 @@ export default function AdminRedeemCodesPage() {
                 确定删除卡密 <Typography.Text code>{deletingCode?.code}</Typography.Text> 吗？
             </Modal>
 
-            <Modal
-                title="批量删除卡密"
-                open={batchDeleteOpen}
-                onCancel={() => setBatchDeleteOpen(false)}
-                onOk={() => void handleBatchDelete()}
-                okText="删除"
-                okButtonProps={{ danger: true }}
-                cancelText="取消"
-            >
+            <Modal title="批量删除卡密" open={batchDeleteOpen} onCancel={() => setBatchDeleteOpen(false)} onOk={() => void handleBatchDelete()} okText="删除" okButtonProps={{ danger: true }} cancelText="取消">
                 确定删除已选中的 {selectedIds.length} 张卡密吗？
+            </Modal>
+
+            <Modal
+                title="删除无效的兑换码？"
+                open={deleteInvalidOpen}
+                onCancel={() => setDeleteInvalidOpen(false)}
+                onOk={() => void handleDeleteInvalid()}
+                okText="删除无效"
+                okButtonProps={{ danger: true, icon: <DeleteOutlined /> }}
+                cancelText="取消"
+                confirmLoading={isLoading}
+            >
+                <Typography.Paragraph style={{ marginBottom: 8 }}>
+                    这将删除所有 <Typography.Text strong>已使用</Typography.Text>、<Typography.Text strong>已禁用</Typography.Text> 和 <Typography.Text strong>已过期</Typography.Text> 的兑换码。
+                </Typography.Paragraph>
+                <Typography.Text type="secondary">此操作无法撤销。</Typography.Text>
             </Modal>
         </div>
     );

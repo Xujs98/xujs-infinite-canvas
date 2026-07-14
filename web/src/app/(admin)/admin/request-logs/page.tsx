@@ -1,14 +1,14 @@
 "use client";
 
-import { DeleteOutlined, DownloadOutlined, EyeOutlined, FileImageOutlined, PlayCircleOutlined, ReloadOutlined, SearchOutlined, SoundOutlined } from "@ant-design/icons";
+import { DeleteOutlined, DownloadOutlined, EyeOutlined, FileImageOutlined, PlayCircleOutlined, ReloadOutlined, SoundOutlined } from "@ant-design/icons";
 import { ProTable, type ProColumns } from "@ant-design/pro-components";
 import { Button, Card, Col, Drawer, Form, Input, Modal, Row, Space, Tag, Typography } from "antd";
 import dayjs from "dayjs";
 import { useEffect, useState } from "react";
 
+import { ClickToCopyText } from "@/components/admin/click-to-copy-text";
 import { batchDeleteAdminRequestLogs, fetchAdminRequestLogs, type AdminRequestLog } from "@/services/api/admin";
 import { useUserStore } from "@/stores/use-user-store";
-
 
 const MEDIA_FIELD_KEYS = new Set(["image", "images", "image_urls", "input_reference[]", "reference_images", "reference_videos", "reference_audios"]);
 
@@ -33,7 +33,10 @@ function extractMediaFromJson(text: string): { images: string[]; videos: string[
             if (val == null) continue;
             const items = collect(val);
             for (const item of items) {
-                if (!isPreviewableUrl(item)) { truncatedCount++; continue; }
+                if (!isPreviewableUrl(item)) {
+                    truncatedCount++;
+                    continue;
+                }
                 if (key === "reference_videos") {
                     videos.push(item);
                 } else if (key === "reference_audios") {
@@ -43,7 +46,9 @@ function extractMediaFromJson(text: string): { images: string[]; videos: string[
                 }
             }
         }
-    } catch { /* not json */ }
+    } catch {
+        /* not json */
+    }
     return { images, videos, audios, truncatedCount };
 }
 
@@ -54,7 +59,14 @@ function MediaPreview({ body }: { body: string }) {
         <div className="flex flex-wrap gap-2 mt-2">
             {images.map((src, i) => (
                 <div key={i} className="group relative cursor-pointer" onClick={() => window.open(src.startsWith("data:") ? src : `/api/proxy-image?url=${encodeURIComponent(src)}`, "_blank")}>
-                    <img src={src.startsWith("data:") ? src : `/api/proxy-image?url=${encodeURIComponent(src)}`} alt={`图片${i + 1}`} className="h-20 w-20 rounded-lg border border-gray-200 object-cover transition-shadow hover:shadow-md" onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
+                    <img
+                        src={src.startsWith("data:") ? src : `/api/proxy-image?url=${encodeURIComponent(src)}`}
+                        alt={`图片${i + 1}`}
+                        className="h-20 w-20 rounded-lg border border-gray-200 object-cover transition-shadow hover:shadow-md"
+                        onError={(e) => {
+                            (e.target as HTMLImageElement).style.display = "none";
+                        }}
+                    />
                     <div className="absolute inset-0 flex items-center justify-center rounded-lg bg-black/0 transition-colors group-hover:bg-black/30">
                         <EyeOutlined className="text-white opacity-0 group-hover:opacity-100 transition-opacity text-lg" />
                     </div>
@@ -94,7 +106,9 @@ function tryFormatJson(text: string): { isJson: boolean; formatted: string } {
                 const obj = JSON.stringify(JSON.parse(m[1]), null, 2);
                 const prefix = text.slice(0, text.indexOf(m[1])).trim();
                 return { isJson: true, formatted: prefix ? `${prefix}\n\n${obj}` : obj };
-            } catch { /* ignore */ }
+            } catch {
+                /* ignore */
+            }
         }
         return { isJson: false, formatted: text };
     }
@@ -154,7 +168,9 @@ export default function AdminRequestLogsPage() {
         }
     };
 
-    useEffect(() => { void loadLogs(); }, [token, page, pageSize, keyword, methodFilter, sourceFilter]);
+    useEffect(() => {
+        void loadLogs();
+    }, [token, page, pageSize, keyword, methodFilter, sourceFilter]);
 
     const handleBatchDelete = async () => {
         if (!token || !selectedIds.length) return;
@@ -182,13 +198,14 @@ export default function AdminRequestLogsPage() {
             title: "来源",
             dataIndex: "source",
             width: 80,
-            filters: [{ text: "Web 端", value: "web" }, { text: "App 端", value: "app" }],
+            filters: [
+                { text: "Web 端", value: "web" },
+                { text: "App 端", value: "app" },
+            ],
             onFilter: (value, record) => record.source === value,
             render: (_, item) => {
                 const source = item.source || "web";
-                return source === "app"
-                    ? <Tag color="purple">App</Tag>
-                    : <Tag color="default">Web</Tag>;
+                return source === "app" ? <Tag color="purple">App</Tag> : <Tag color="default">Web</Tag>;
             },
         },
         {
@@ -196,57 +213,67 @@ export default function AdminRequestLogsPage() {
             dataIndex: "model",
             width: 200,
             ellipsis: true,
-            render: (_, item) => <Typography.Text code className="!text-xs">{item.model}</Typography.Text>,
+            render: (_, item) => (
+                <Typography.Text code className="!text-xs">
+                    {item.model}
+                </Typography.Text>
+            ),
         },
         {
             title: "状态",
             dataIndex: "statusCode",
             width: 80,
-            render: (_, item) => item.statusCode
-                ? <Tag color={item.statusCode < 400 ? "success" : "error"}>{item.statusCode}</Tag>
-                : <Tag>等待</Tag>,
+            render: (_, item) => (item.statusCode ? <Tag color={item.statusCode < 400 ? "success" : "error"}>{item.statusCode}</Tag> : <Tag>等待</Tag>),
         },
         {
             title: "URL",
             dataIndex: "url",
             ellipsis: true,
-            render: (_, item) => <Typography.Text className="!text-xs" copyable>{item.url}</Typography.Text>,
+            render: (_, item) => (
+                <ClickToCopyText value={item.url} className="!text-xs">
+                    {item.url}
+                </ClickToCopyText>
+            ),
         },
         {
             title: "时间",
             dataIndex: "createdAt",
             width: 170,
-            render: (_, item) => item.createdAt ? dayjs(item.createdAt).format("YYYY-MM-DD HH:mm:ss") : "-",
+            render: (_, item) => (item.createdAt ? dayjs(item.createdAt).format("YYYY-MM-DD HH:mm:ss") : "-"),
         },
         {
             title: "操作",
             key: "actions",
             width: 60,
             align: "center",
-            render: (_, item) => (
-                <Button type="text" size="small" icon={<EyeOutlined />} onClick={() => setDetailLog(item)} />
-            ),
+            render: (_, item) => <Button type="text" size="small" icon={<EyeOutlined />} onClick={() => setDetailLog(item)} />,
         },
     ];
 
     return (
-        <div style={{ padding: "24px 28px" }}>
-            <div style={{ marginBottom: 20 }}>
-                <Typography.Title level={4} style={{ margin: 0, fontSize: 20, fontWeight: 600 }}>日志管理</Typography.Title>
-                <Typography.Text type="secondary" style={{ fontSize: 13 }}>查看 Web/App 请求日志和 App 端画布错误</Typography.Text>
+        <div className="admin-data-page">
+            <div className="admin-page-title">
+                <Typography.Title level={4} style={{ margin: 0, fontSize: 20, fontWeight: 600 }}>
+                    日志管理
+                </Typography.Title>
+                <Typography.Text type="secondary" style={{ fontSize: 13 }}>
+                    查看 Web/App 请求日志和 App 端画布错误
+                </Typography.Text>
             </div>
             <Space direction="vertical" size={16} style={{ width: "100%" }}>
-                <Card variant="borderless">
+                <Card className="admin-filter-card" variant="borderless">
                     <Form layout="vertical">
                         <Row gutter={16} align="bottom">
                             <Col flex="360px">
                                 <Form.Item label="关键词">
-                                    <Input.Search
+                                    <Input
                                         value={keywordInput}
                                         placeholder="搜索用户名、模型、URL或错误信息"
                                         allowClear
-                                        enterButton={<SearchOutlined />}
-                                        onSearch={(v) => { setKeyword(v); setPage(1); }}
+                                        onPressEnter={() => {
+                                            setKeyword(keywordInput);
+                                            setPage(1);
+                                        }}
                                         onChange={(e) => setKeywordInput(e.target.value)}
                                     />
                                 </Form.Item>
@@ -254,25 +281,83 @@ export default function AdminRequestLogsPage() {
                             <Col flex="none">
                                 <Form.Item label="方法">
                                     <Space>
-                                        <Button type={!methodFilter ? "primary" : "default"} onClick={() => { setMethodFilter(""); setPage(1); }}>全部</Button>
-                                        <Button type={methodFilter === "POST" ? "primary" : "default"} onClick={() => { setMethodFilter("POST"); setPage(1); }}>POST</Button>
-                                        <Button type={methodFilter === "GET" ? "primary" : "default"} onClick={() => { setMethodFilter("GET"); setPage(1); }}>GET</Button>
-                                        <Button type={methodFilter === "ERROR" ? "primary" : "default"} onClick={() => { setMethodFilter("ERROR"); setPage(1); }}>错误</Button>
+                                        <Button
+                                            type={!methodFilter ? "primary" : "default"}
+                                            onClick={() => {
+                                                setMethodFilter("");
+                                                setPage(1);
+                                            }}
+                                        >
+                                            全部
+                                        </Button>
+                                        <Button
+                                            type={methodFilter === "POST" ? "primary" : "default"}
+                                            onClick={() => {
+                                                setMethodFilter("POST");
+                                                setPage(1);
+                                            }}
+                                        >
+                                            POST
+                                        </Button>
+                                        <Button
+                                            type={methodFilter === "GET" ? "primary" : "default"}
+                                            onClick={() => {
+                                                setMethodFilter("GET");
+                                                setPage(1);
+                                            }}
+                                        >
+                                            GET
+                                        </Button>
+                                        <Button
+                                            type={methodFilter === "ERROR" ? "primary" : "default"}
+                                            onClick={() => {
+                                                setMethodFilter("ERROR");
+                                                setPage(1);
+                                            }}
+                                        >
+                                            错误
+                                        </Button>
                                     </Space>
                                 </Form.Item>
                             </Col>
                             <Col flex="none">
                                 <Form.Item label="来源">
                                     <Space>
-                                        <Button type={!sourceFilter ? "primary" : "default"} onClick={() => { setSourceFilter(""); setPage(1); }}>全部</Button>
-                                        <Button type={sourceFilter === "app" ? "primary" : "default"} onClick={() => { setSourceFilter("app"); setPage(1); }}>App</Button>
-                                        <Button type={sourceFilter === "web" ? "primary" : "default"} onClick={() => { setSourceFilter("web"); setPage(1); }}>Web</Button>
+                                        <Button
+                                            type={!sourceFilter ? "primary" : "default"}
+                                            onClick={() => {
+                                                setSourceFilter("");
+                                                setPage(1);
+                                            }}
+                                        >
+                                            全部
+                                        </Button>
+                                        <Button
+                                            type={sourceFilter === "app" ? "primary" : "default"}
+                                            onClick={() => {
+                                                setSourceFilter("app");
+                                                setPage(1);
+                                            }}
+                                        >
+                                            App
+                                        </Button>
+                                        <Button
+                                            type={sourceFilter === "web" ? "primary" : "default"}
+                                            onClick={() => {
+                                                setSourceFilter("web");
+                                                setPage(1);
+                                            }}
+                                        >
+                                            Web
+                                        </Button>
                                     </Space>
                                 </Form.Item>
                             </Col>
                             <Col flex="none">
                                 <Form.Item>
-                                    <Button icon={<ReloadOutlined />} onClick={() => void loadLogs()}>刷新</Button>
+                                    <Button icon={<ReloadOutlined />} onClick={() => void loadLogs()}>
+                                        刷新
+                                    </Button>
                                 </Form.Item>
                             </Col>
                         </Row>
@@ -312,65 +397,69 @@ export default function AdminRequestLogsPage() {
                 />
             </Space>
 
-            <Modal
-                title="批量删除请求日志"
-                open={batchDeleteOpen}
-                onCancel={() => setBatchDeleteOpen(false)}
-                onOk={() => void handleBatchDelete()}
-                okText="删除"
-                okButtonProps={{ danger: true }}
-                cancelText="取消"
-            >
+            <Modal title="批量删除请求日志" open={batchDeleteOpen} onCancel={() => setBatchDeleteOpen(false)} onOk={() => void handleBatchDelete()} okText="删除" okButtonProps={{ danger: true }} cancelText="取消">
                 确定删除已选中的 {selectedIds.length} 条请求日志吗？
             </Modal>
 
-            <Drawer
-                title="请求详情"
-                open={Boolean(detailLog)}
-                onClose={() => setDetailLog(null)}
-                width={800}
-                destroyOnHidden
-            >
+            <Drawer title="请求详情" open={Boolean(detailLog)} onClose={() => setDetailLog(null)} width={800} destroyOnHidden>
                 {detailLog && (
                     <div className="space-y-4">
                         <div className="flex items-center gap-3 flex-wrap">
                             <Tag color={detailLog.method === "ERROR" ? "red" : detailLog.method === "POST" ? "blue" : "green"}>{detailLog.method}</Tag>
-                            <Typography.Text code className="!text-xs">{detailLog.model}</Typography.Text>
+                            <Typography.Text code className="!text-xs">
+                                {detailLog.model}
+                            </Typography.Text>
                             <Tag color={detailLog.source === "app" ? "purple" : "default"}>{detailLog.source === "app" ? "App" : "Web"}</Tag>
                             {detailLog.statusCode ? <Tag color={detailLog.statusCode < 400 ? "success" : "error"}>{detailLog.statusCode}</Tag> : null}
                             {detailLog.isPolling && <Tag color="orange">轮询</Tag>}
-                            <Typography.Text type="secondary" className="!text-xs">{dayjs(detailLog.createdAt).format("YYYY-MM-DD HH:mm:ss")}</Typography.Text>
+                            <Typography.Text type="secondary" className="!text-xs">
+                                {dayjs(detailLog.createdAt).format("YYYY-MM-DD HH:mm:ss")}
+                            </Typography.Text>
                         </div>
                         <div>
-                            <Typography.Text type="secondary" className="!text-xs">请求者</Typography.Text>
+                            <Typography.Text type="secondary" className="!text-xs">
+                                请求者
+                            </Typography.Text>
                             <div className="!text-sm">{detailLog.username || detailLog.userId || "-"}</div>
                         </div>
                         <div>
-                            <Typography.Text type="secondary" className="!text-xs">URL</Typography.Text>
-                            <Typography.Text code className="!block !mt-1 !text-xs break-all">{detailLog.url}</Typography.Text>
+                            <Typography.Text type="secondary" className="!text-xs">
+                                URL
+                            </Typography.Text>
+                            <Typography.Text code className="!block !mt-1 !text-xs break-all">
+                                {detailLog.url}
+                            </Typography.Text>
                         </div>
                         {detailLog.requestHeaders && detailLog.requestHeaders !== "{}" && (
                             <div>
-                                <Typography.Text type="secondary" className="!text-xs">请求头 (Headers)</Typography.Text>
+                                <Typography.Text type="secondary" className="!text-xs">
+                                    请求头 (Headers)
+                                </Typography.Text>
                                 <JsonBlock text={detailLog.requestHeaders} />
                             </div>
                         )}
                         {detailLog.requestBody && (
                             <div>
-                                <Typography.Text type="secondary" className="!text-xs">请求体 (Body) - {detailLog.requestBodySize} bytes</Typography.Text>
+                                <Typography.Text type="secondary" className="!text-xs">
+                                    请求体 (Body) - {detailLog.requestBodySize} bytes
+                                </Typography.Text>
                                 <JsonBlock text={detailLog.requestBody} />
                                 <MediaPreview body={detailLog.requestMedia || detailLog.requestBody} />
                             </div>
                         )}
                         {detailLog.responseBody && (
                             <div>
-                                <Typography.Text type="secondary" className="!text-xs">响应体 (Response)</Typography.Text>
+                                <Typography.Text type="secondary" className="!text-xs">
+                                    响应体 (Response)
+                                </Typography.Text>
                                 <JsonBlock text={detailLog.responseBody} />
                             </div>
                         )}
                         {detailLog.errorMsg && (
                             <div>
-                                <Typography.Text type="danger" className="!text-xs">错误 (Error)</Typography.Text>
+                                <Typography.Text type="danger" className="!text-xs">
+                                    错误 (Error)
+                                </Typography.Text>
                                 <pre className="!mt-1 !text-xs !bg-red-50 !p-3 !rounded overflow-x-auto text-red-600">{truncateBase64(detailLog.errorMsg)}</pre>
                             </div>
                         )}

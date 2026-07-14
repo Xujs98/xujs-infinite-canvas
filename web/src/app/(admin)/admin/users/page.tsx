@@ -6,6 +6,7 @@ import { Avatar, Button, Card, Col, DatePicker, Divider, Flex, Form, Input, Inpu
 import dayjs, { type Dayjs } from "dayjs";
 import { useEffect, useMemo, useState } from "react";
 
+import { ClickToCopyText } from "@/components/admin/click-to-copy-text";
 import type { AdminUser } from "@/services/api/admin";
 import { useQuery } from "@tanstack/react-query";
 import { useAdminUsers } from "./use-admin-users";
@@ -37,7 +38,28 @@ export default function AdminUsersPage() {
         }
         return map;
     }, [roles]);
-    const { users, keyword, role, status, page, pageSize, total, isLoading, searchUsers, changeRole, changeStatus, changePage, changePageSize, resetFilters, refreshUsers, saveUser: saveAdminUser, adjustCredits, deleteUser, batchDeleteUsers, batchUpdateStatus } = useAdminUsers();
+    const {
+        users,
+        keyword,
+        role,
+        status,
+        page,
+        pageSize,
+        total,
+        isLoading,
+        searchUsers,
+        changeRole,
+        changeStatus,
+        changePage,
+        changePageSize,
+        resetFilters,
+        refreshUsers,
+        saveUser: saveAdminUser,
+        adjustCredits,
+        deleteUser,
+        batchDeleteUsers,
+        batchUpdateStatus,
+    } = useAdminUsers();
     const [form] = Form.useForm<UserFormValues>();
     const [keywordText, setKeywordText] = useState(keyword);
     const [editingUser, setEditingUser] = useState<Partial<AdminUser> | null>(null);
@@ -94,7 +116,7 @@ export default function AdminUsersPage() {
             title: "用户",
             dataIndex: "username",
             width: 140,
-            render: (_, item) => <Typography.Text copyable>{item.username}</Typography.Text>,
+            render: (_, item) => <ClickToCopyText value={item.username}>{item.username}</ClickToCopyText>,
         },
         {
             title: "昵称",
@@ -193,47 +215,32 @@ export default function AdminUsersPage() {
     ];
 
     return (
-        <div style={{ padding: "24px 28px", width: "100%", maxWidth: "100%", minWidth: 0, boxSizing: "border-box", overflowX: "hidden" }}>
-            <div style={{ marginBottom: 20 }}>
-                <Typography.Title level={4} style={{ margin: 0, fontSize: 20, fontWeight: 600 }}>用户管理</Typography.Title>
-                <Typography.Text type="secondary" style={{ fontSize: 13 }}>管理平台用户账户和权限</Typography.Text>
+        <div className="admin-data-page" style={{ width: "100%", maxWidth: "100%", minWidth: 0, boxSizing: "border-box", overflowX: "hidden" }}>
+            <div className="admin-page-title">
+                <Typography.Title level={4} style={{ margin: 0, fontSize: 20, fontWeight: 600 }}>
+                    用户管理
+                </Typography.Title>
+                <Typography.Text type="secondary" style={{ fontSize: 13 }}>
+                    管理平台用户账户和权限
+                </Typography.Text>
             </div>
             <Flex vertical gap={16} style={{ width: "100%", maxWidth: "100%", minWidth: 0 }}>
-                <Card variant="borderless" style={{ width: "100%", maxWidth: "100%", minWidth: 0 }}>
+                <Card className="admin-filter-card" variant="borderless" style={{ width: "100%", maxWidth: "100%", minWidth: 0 }}>
                     <Form layout="vertical">
                         <Row gutter={[16, 12]} align="bottom" wrap>
                             <Col xs={24} md={12} xl={8} xxl={7}>
                                 <Form.Item label="关键词">
-                                    <Input.Search
-                                        value={keywordText}
-                                        placeholder="搜索用户名、昵称、邮箱或 Linux.do ID"
-                                        allowClear
-                                        enterButton={<SearchOutlined />}
-                                        onSearch={() => searchUsers(keywordText)}
-                                        onChange={(event) => setKeywordText(event.target.value)}
-                                    />
+                                    <Input value={keywordText} placeholder="搜索用户名、昵称、邮箱或 Linux.do ID" allowClear onPressEnter={() => searchUsers(keywordText)} onChange={(event) => setKeywordText(event.target.value)} />
                                 </Form.Item>
                             </Col>
                             <Col xs={12} md={6} xl={4} xxl={3}>
                                 <Form.Item label="角色">
-                                    <Select
-                                        value={role || undefined}
-                                        placeholder="全部"
-                                        allowClear
-                                        options={roleOptions}
-                                        onChange={(value) => changeRole(value || "")}
-                                    />
+                                    <Select value={role || undefined} placeholder="全部" allowClear options={roleOptions} onChange={(value) => changeRole(value || "")} />
                                 </Form.Item>
                             </Col>
                             <Col xs={12} md={6} xl={4} xxl={3}>
                                 <Form.Item label="状态">
-                                    <Select
-                                        value={status || undefined}
-                                        placeholder="全部"
-                                        allowClear
-                                        options={statusOptions}
-                                        onChange={(value) => changeStatus(value || "")}
-                                    />
+                                    <Select value={status || undefined} placeholder="全部" allowClear options={statusOptions} onChange={(value) => changeStatus(value || "")} />
                                 </Form.Item>
                             </Col>
                             <Col xs={24} md={8} xl={4} xxl={3}>
@@ -247,7 +254,7 @@ export default function AdminUsersPage() {
                                         >
                                             重置
                                         </Button>
-                                        <Button type="primary" icon={<ReloadOutlined />} onClick={() => searchUsers(keywordText)}>
+                                        <Button type="primary" icon={<SearchOutlined />} onClick={() => searchUsers(keywordText)}>
                                             查询
                                         </Button>
                                     </Space>
@@ -379,26 +386,11 @@ export default function AdminUsersPage() {
                 确定删除「{deletingUser?.displayName || deletingUser?.username}」吗？删除后该账号将无法继续登录。
             </Modal>
 
-            <Modal
-                title="批量删除用户"
-                open={batchDeleteOpen}
-                onCancel={() => setBatchDeleteOpen(false)}
-                onOk={() => void handleBatchDelete()}
-                okText="删除"
-                okButtonProps={{ danger: true }}
-                cancelText="取消"
-            >
+            <Modal title="批量删除用户" open={batchDeleteOpen} onCancel={() => setBatchDeleteOpen(false)} onOk={() => void handleBatchDelete()} okText="删除" okButtonProps={{ danger: true }} cancelText="取消">
                 确定删除已选中的 {selectedIds.length} 个用户吗？删除后这些账号将无法继续登录。
             </Modal>
 
-            <Modal
-                title="批量修改状态"
-                open={batchStatusOpen}
-                onCancel={() => setBatchStatusOpen(false)}
-                onOk={() => void handleBatchStatus()}
-                okText="确定"
-                cancelText="取消"
-            >
+            <Modal title="批量修改状态" open={batchStatusOpen} onCancel={() => setBatchStatusOpen(false)} onOk={() => void handleBatchStatus()} okText="确定" cancelText="取消">
                 <Typography.Text>将已选中的 {selectedIds.length} 个用户状态修改为：</Typography.Text>
                 <Select value={batchStatusValue} onChange={setBatchStatusValue} options={statusOptions} style={{ width: 120, marginLeft: 8 }} />
             </Modal>

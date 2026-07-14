@@ -91,7 +91,12 @@ export default function AdminCreditLogsPage() {
             title: "变动",
             dataIndex: "amount",
             width: 100,
-            render: (_, item) => item.type === "membership_free" || item.type === "role_free" ? <Typography.Text type="success">{creditLogTypeLabels[item.type]}</Typography.Text> : <Typography.Text type={item.amount >= 0 ? "success" : "danger"}>{item.amount}</Typography.Text>,
+            render: (_, item) =>
+                item.type === "membership_free" || item.type === "role_free" ? (
+                    <Typography.Text type="success">{creditLogTypeLabels[item.type]}</Typography.Text>
+                ) : (
+                    <Typography.Text type={item.amount >= 0 ? "success" : "danger"}>{item.amount}</Typography.Text>
+                ),
         },
         {
             title: "余额",
@@ -130,18 +135,22 @@ export default function AdminCreditLogsPage() {
     ];
 
     return (
-        <div style={{ padding: "24px 28px" }}>
-            <div style={{ marginBottom: 20 }}>
-                <Typography.Title level={4} style={{ margin: 0, fontSize: 20, fontWeight: 600 }}>算力点日志</Typography.Title>
-                <Typography.Text type="secondary" style={{ fontSize: 13 }}>查看和管理用户算力点变动记录</Typography.Text>
+        <div className="admin-data-page">
+            <div className="admin-page-title">
+                <Typography.Title level={4} style={{ margin: 0, fontSize: 20, fontWeight: 600 }}>
+                    算力点日志
+                </Typography.Title>
+                <Typography.Text type="secondary" style={{ fontSize: 13 }}>
+                    查看和管理用户算力点变动记录
+                </Typography.Text>
             </div>
             <Space direction="vertical" size={16} style={{ width: "100%" }}>
-                <Card variant="borderless">
+                <Card className="admin-filter-card" variant="borderless">
                     <Form layout="vertical">
                         <Row gutter={16} align="bottom">
                             <Col flex="360px">
                                 <Form.Item label="关键词">
-                                    <Input.Search value={keywordText} placeholder="搜索用户 ID、类型、备注或关联 ID" allowClear enterButton={<SearchOutlined />} onSearch={() => searchLogs(keywordText)} onChange={(event) => setKeywordText(event.target.value)} />
+                                    <Input value={keywordText} placeholder="搜索用户 ID、类型、备注或关联 ID" allowClear onPressEnter={() => searchLogs(keywordText)} onChange={(event) => setKeywordText(event.target.value)} />
                                 </Form.Item>
                             </Col>
                             <Col flex="none">
@@ -155,7 +164,7 @@ export default function AdminCreditLogsPage() {
                                         >
                                             重置
                                         </Button>
-                                        <Button type="primary" icon={<ReloadOutlined />} onClick={() => searchLogs(keywordText)}>
+                                        <Button type="primary" icon={<SearchOutlined />} onClick={() => searchLogs(keywordText)}>
                                             查询
                                         </Button>
                                     </Space>
@@ -264,15 +273,7 @@ export default function AdminCreditLogsPage() {
                 确定删除这条算力点日志吗？
             </Modal>
 
-            <Modal
-                title="批量删除日志"
-                open={batchDeleteOpen}
-                onCancel={() => setBatchDeleteOpen(false)}
-                onOk={() => void handleBatchDelete()}
-                okText="删除"
-                okButtonProps={{ danger: true }}
-                cancelText="取消"
-            >
+            <Modal title="批量删除日志" open={batchDeleteOpen} onCancel={() => setBatchDeleteOpen(false)} onOk={() => void handleBatchDelete()} okText="删除" okButtonProps={{ danger: true }} cancelText="取消">
                 确定删除已选中的 {selectedIds.length} 条日志吗？
             </Modal>
         </div>

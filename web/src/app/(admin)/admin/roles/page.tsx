@@ -4,6 +4,7 @@ import { DeleteOutlined, EditOutlined, GiftOutlined, LockOutlined, PlusOutlined,
 import { App, Button, Card, Col, Flex, Form, Input, InputNumber, Modal, Row, Select, Space, Switch, Table, Tag, Tooltip, Typography } from "antd";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
+import { ClickToCopyText } from "@/components/admin/click-to-copy-text";
 import { useUserStore } from "@/stores/use-user-store";
 import { fetchAllChannelModels, fetchAdminUsers, type AdminUser } from "@/services/api/admin";
 import { type AdminRole, fetchAdminRoles, createAdminRole, updateAdminRole, deleteAdminRole, batchDeleteAdminRoles } from "@/services/api/role";
@@ -192,7 +193,11 @@ export default function AdminRolesPage() {
                             <Typography.Text strong ellipsis={{ tooltip: item.label }} style={{ maxWidth: 108, fontSize: 14, whiteSpace: "nowrap" }}>
                                 {item.label}
                             </Typography.Text>
-                            {item.isBuiltin && <Tag color="default" style={{ margin: 0, flex: "0 0 auto" }}>内置</Tag>}
+                            {item.isBuiltin && (
+                                <Tag color="default" style={{ margin: 0, flex: "0 0 auto" }}>
+                                    内置
+                                </Tag>
+                            )}
                         </Flex>
                         <Typography.Text type="secondary" ellipsis={{ tooltip: item.name }} style={{ display: "block", maxWidth: 160, fontSize: 12, lineHeight: "20px" }}>
                             {item.name}
@@ -206,7 +211,11 @@ export default function AdminRolesPage() {
             dataIndex: "description",
             width: 220,
             ellipsis: true,
-            render: (text: string) => <Typography.Text type="secondary" ellipsis={{ tooltip: text || "-" }} style={{ maxWidth: 180 }}>{text || "-"}</Typography.Text>,
+            render: (text: string) => (
+                <Typography.Text type="secondary" ellipsis={{ tooltip: text || "-" }} style={{ maxWidth: 180 }}>
+                    {text || "-"}
+                </Typography.Text>
+            ),
         },
         {
             title: "模型权限",
@@ -239,7 +248,9 @@ export default function AdminRolesPage() {
                 return (
                     <Space size={[4, 4]} wrap>
                         {models.slice(0, 4).map((m) => (
-                            <Tag key={m} color="cyan">{m}</Tag>
+                            <Tag key={m} color="cyan">
+                                {m}
+                            </Tag>
                         ))}
                         {models.length > 4 && <Tag color="cyan">+{models.length - 4}</Tag>}
                     </Space>
@@ -250,15 +261,14 @@ export default function AdminRolesPage() {
             title: "允许离线",
             dataIndex: "allowOffline",
             width: 120,
-            render: (_: unknown, item: AdminRole) => (
-                <Tag color={item.allowOffline ? "green" : "default"}>{item.allowOffline ? "允许" : "关闭"}</Tag>
-            ),
+            render: (_: unknown, item: AdminRole) => <Tag color={item.allowOffline ? "green" : "default"}>{item.allowOffline ? "允许" : "关闭"}</Tag>,
         },
         {
             title: "离线预支",
             dataIndex: "offlineCreditLimit",
             width: 130,
-            render: (_: unknown, item: AdminRole) => item.allowOffline ? <Tag color="gold">{item.offlineCreditLimit && item.offlineCreditLimit > 0 ? `${item.offlineCreditLimit} 点` : "无限制"}</Tag> : <Typography.Text type="secondary">-</Typography.Text>,
+            render: (_: unknown, item: AdminRole) =>
+                item.allowOffline ? <Tag color="gold">{item.offlineCreditLimit && item.offlineCreditLimit > 0 ? `${item.offlineCreditLimit} 点` : "无限制"}</Tag> : <Typography.Text type="secondary">-</Typography.Text>,
         },
         {
             title: "操作",
@@ -290,28 +300,48 @@ export default function AdminRolesPage() {
     const allowOfflineValue = Form.useWatch("allowOffline", form);
 
     return (
-        <div style={{ padding: "24px 28px", width: "100%", maxWidth: "100%", minWidth: 0, boxSizing: "border-box", overflowX: "hidden" }}>
+        <div className="admin-data-page" style={{ width: "100%", maxWidth: "100%", minWidth: 0, boxSizing: "border-box", overflowX: "hidden" }}>
             <div style={{ width: "100%", maxWidth: "100%", minWidth: 0 }}>
                 {/* 页面标题 */}
-                <Flex align="center" gap={14} style={{ marginBottom: 22 }}>
-                    <span style={{ width: 44, height: 44, borderRadius: 10, display: "inline-flex", alignItems: "center", justifyContent: "center", color: "#fff", background: "linear-gradient(135deg, #3b82f6, #7c3aed)", boxShadow: "0 10px 22px rgba(59,130,246,0.22)", flex: "0 0 auto" }}>
+                <Flex className="admin-page-title" align="center" gap={14}>
+                    <span
+                        style={{
+                            width: 44,
+                            height: 44,
+                            borderRadius: 10,
+                            display: "inline-flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            color: "#fff",
+                            background: "linear-gradient(135deg, #3b82f6, #7c3aed)",
+                            boxShadow: "0 10px 22px rgba(59,130,246,0.22)",
+                            flex: "0 0 auto",
+                        }}
+                    >
                         <SafetyOutlined style={{ fontSize: 20 }} />
                     </span>
                     <div>
-                        <Typography.Title level={4} style={{ margin: 0, fontSize: 20, fontWeight: 600 }}>角色管理</Typography.Title>
-                        <Typography.Text type="secondary" style={{ fontSize: 13 }}>管理用户角色和模型使用权限</Typography.Text>
+                        <Typography.Title level={4} style={{ margin: 0, fontSize: 20, fontWeight: 600 }}>
+                            角色管理
+                        </Typography.Title>
+                        <Typography.Text type="secondary" style={{ fontSize: 13 }}>
+                            管理用户角色和模型使用权限
+                        </Typography.Text>
                     </div>
                 </Flex>
 
                 {/* 工具栏 */}
-                <Card variant="borderless" style={{ marginBottom: 16, borderRadius: 10 }} styles={{ body: { padding: 18 } }}>
+                <Card className="admin-filter-card" variant="borderless" style={{ marginBottom: 16 }} styles={{ body: { padding: 18 } }}>
                     <Flex align="center" justify="space-between" gap={12} wrap>
                         <Input
                             prefix={<SearchOutlined style={{ color: "#8c8c8c" }} />}
                             placeholder="搜索角色"
                             allowClear
                             value={keyword}
-                            onChange={(e) => { setKeyword(e.target.value); setPage(1); }}
+                            onChange={(e) => {
+                                setKeyword(e.target.value);
+                                setPage(1);
+                            }}
                             style={{ width: 260 }}
                         />
                         <Space wrap>
@@ -359,7 +389,11 @@ export default function AdminRolesPage() {
                 title={editingItem ? "编辑角色" : "新增角色"}
                 open={modalOpen}
                 width={640}
-                onCancel={() => { setModalOpen(false); setEditingItem(null); form.resetFields(); }}
+                onCancel={() => {
+                    setModalOpen(false);
+                    setEditingItem(null);
+                    form.resetFields();
+                }}
                 onOk={() => void handleSave()}
                 okText="保存"
                 cancelText="取消"
@@ -382,7 +416,9 @@ export default function AdminRolesPage() {
                     </Form.Item>
                     <Form.Item label="模型使用权限">
                         <div className="mb-2 flex items-center gap-2">
-                            <Typography.Text type="secondary" className="text-xs">留空表示允许使用全部模型</Typography.Text>
+                            <Typography.Text type="secondary" className="text-xs">
+                                留空表示允许使用全部模型
+                            </Typography.Text>
                         </div>
                         <Form.Item name="allowedModels" noStyle>
                             <Select
@@ -392,9 +428,7 @@ export default function AdminRolesPage() {
                                 maxTagCount="responsive"
                                 allowClear
                                 showSearch
-                                filterOption={(input, option) =>
-                                    (option?.label as string)?.toLowerCase().includes(input.toLowerCase())
-                                }
+                                filterOption={(input, option) => (option?.label as string)?.toLowerCase().includes(input.toLowerCase())}
                             />
                         </Form.Item>
                         {allowedModelsValue && allowedModelsValue.length > 0 && (
@@ -408,7 +442,9 @@ export default function AdminRolesPage() {
                     </Form.Item>
                     <Form.Item label="可免费使用模型">
                         <div className="mb-2 flex items-center gap-2">
-                            <Typography.Text type="secondary" className="text-xs">默认不选中；选中的模型调用时不扣除算力点</Typography.Text>
+                            <Typography.Text type="secondary" className="text-xs">
+                                默认不选中；选中的模型调用时不扣除算力点
+                            </Typography.Text>
                         </div>
                         <Form.Item name="freeModels" noStyle>
                             <Select
@@ -418,9 +454,7 @@ export default function AdminRolesPage() {
                                 maxTagCount="responsive"
                                 allowClear
                                 showSearch
-                                filterOption={(input, option) =>
-                                    (option?.label as string)?.toLowerCase().includes(input.toLowerCase())
-                                }
+                                filterOption={(input, option) => (option?.label as string)?.toLowerCase().includes(input.toLowerCase())}
                             />
                         </Form.Item>
                         {freeModelsValue && freeModelsValue.length > 0 && (
@@ -432,21 +466,11 @@ export default function AdminRolesPage() {
                             </div>
                         )}
                     </Form.Item>
-                    <Form.Item
-                        name="allowOffline"
-                        label="允许离线"
-                        valuePropName="checked"
-                        tooltip="开启后，该角色 App 端在服务端断开时保留登录，并记录离线算力点账本；服务端恢复后自动结算。"
-                    >
+                    <Form.Item name="allowOffline" label="允许离线" valuePropName="checked" tooltip="开启后，该角色 App 端在服务端断开时保留登录，并记录离线算力点账本；服务端恢复后自动结算。">
                         <Switch checkedChildren="开启" unCheckedChildren="关闭" />
                     </Form.Item>
                     {allowOfflineValue ? (
-                        <Form.Item
-                            name="offlineCreditLimit"
-                            label="最大允许离线预支算力点"
-                            tooltip="服务端离线时，该角色最多可把余额预支到此额度的负数；不填写或 0 表示无限制预支。"
-                            rules={[{ type: "number", min: 0, message: "预支额度不能小于 0" }]}
-                        >
+                        <Form.Item name="offlineCreditLimit" label="最大允许离线预支算力点" tooltip="服务端离线时，该角色最多可把余额预支到此额度的负数；不填写或 0 表示无限制预支。" rules={[{ type: "number", min: 0, message: "预支额度不能小于 0" }]}>
                             <InputNumber min={0} precision={0} style={{ width: "100%" }} addonAfter="点" placeholder="不填或 0 表示无限制" />
                         </Form.Item>
                     ) : null}
@@ -454,15 +478,7 @@ export default function AdminRolesPage() {
             </Modal>
 
             {/* 删除确认 */}
-            <Modal
-                title="删除角色"
-                open={Boolean(deletingItem)}
-                onCancel={() => setDeletingItem(null)}
-                onOk={() => void handleDelete(deletingItem!)}
-                okText="删除"
-                okButtonProps={{ danger: true }}
-                cancelText="取消"
-            >
+            <Modal title="删除角色" open={Boolean(deletingItem)} onCancel={() => setDeletingItem(null)} onOk={() => void handleDelete(deletingItem!)} okText="删除" okButtonProps={{ danger: true }} cancelText="取消">
                 确定删除角色「{deletingItem?.label}」吗？
             </Modal>
 
@@ -479,9 +495,7 @@ export default function AdminRolesPage() {
                 ]}
             >
                 <div className="mb-3 flex items-center justify-between">
-                    <Typography.Text type="secondary">
-                        角色标识：{viewingRole?.name || "-"}
-                    </Typography.Text>
+                    <Typography.Text type="secondary">角色标识：{viewingRole?.name || "-"}</Typography.Text>
                     <Tag color="blue">共 {roleUsersTotal} 人</Tag>
                 </div>
                 <Table<AdminUser>
@@ -494,7 +508,7 @@ export default function AdminRolesPage() {
                         {
                             title: "用户",
                             dataIndex: "username",
-                            render: (_, user) => <Typography.Text copyable>{user.username}</Typography.Text>,
+                            render: (_, user) => <ClickToCopyText value={user.username}>{user.username}</ClickToCopyText>,
                         },
                         {
                             title: "昵称",
@@ -523,15 +537,7 @@ export default function AdminRolesPage() {
             </Modal>
 
             {/* 批量删除确认 */}
-            <Modal
-                title="批量删除角色"
-                open={isBatchDeleteOpen}
-                onCancel={() => setIsBatchDeleteOpen(false)}
-                onOk={() => void handleBatchDelete()}
-                okText="删除"
-                okButtonProps={{ danger: true }}
-                cancelText="取消"
-            >
+            <Modal title="批量删除角色" open={isBatchDeleteOpen} onCancel={() => setIsBatchDeleteOpen(false)} onOk={() => void handleBatchDelete()} okText="删除" okButtonProps={{ danger: true }} cancelText="取消">
                 确定删除已选中的 {selectedIds.length} 个角色吗？
             </Modal>
         </div>

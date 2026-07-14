@@ -1,6 +1,6 @@
 "use client";
 
-import { CopyOutlined, DeleteOutlined, EditOutlined, EyeOutlined, PlusOutlined, ReloadOutlined, SearchOutlined } from "@ant-design/icons";
+import { DeleteOutlined, EditOutlined, EyeOutlined, PlusOutlined, ReloadOutlined, SearchOutlined } from "@ant-design/icons";
 import { ProTable, type ProColumns } from "@ant-design/pro-components";
 import { Button, Card, Col, Flex, Form, Image, Input, Modal, Row, Select, Space, Tag, Tooltip, Typography } from "antd";
 import { useEffect, useState } from "react";
@@ -115,18 +115,22 @@ export default function AdminAssetsPage() {
     ];
 
     return (
-        <div style={{ padding: "24px 28px" }}>
-            <div style={{ marginBottom: 20 }}>
-                <Typography.Title level={4} style={{ margin: 0, fontSize: 20, fontWeight: 600 }}>素材库</Typography.Title>
-                <Typography.Text type="secondary" style={{ fontSize: 13 }}>管理创作素材资源</Typography.Text>
+        <div className="admin-data-page">
+            <div className="admin-page-title">
+                <Typography.Title level={4} style={{ margin: 0, fontSize: 20, fontWeight: 600 }}>
+                    素材库
+                </Typography.Title>
+                <Typography.Text type="secondary" style={{ fontSize: 13 }}>
+                    管理创作素材资源
+                </Typography.Text>
             </div>
             <Flex vertical gap={16}>
-                <Card variant="borderless">
+                <Card className="admin-filter-card" variant="borderless">
                     <Form layout="vertical">
                         <Row gutter={16} align="bottom">
                             <Col flex="360px">
                                 <Form.Item label="关键词">
-                                    <Input.Search value={keywordText} placeholder="搜索标题、内容或标签" allowClear enterButton={<SearchOutlined />} onSearch={() => searchAssets(keywordText)} onChange={(event) => setKeywordText(event.target.value)} />
+                                    <Input value={keywordText} placeholder="搜索标题、内容或标签" allowClear onPressEnter={() => searchAssets(keywordText)} onChange={(event) => setKeywordText(event.target.value)} />
                                 </Form.Item>
                             </Col>
                             <Col flex="180px">
@@ -150,7 +154,7 @@ export default function AdminAssetsPage() {
                                         >
                                             重置
                                         </Button>
-                                        <Button type="primary" icon={<ReloadOutlined />} onClick={() => searchAssets(keywordText)}>
+                                        <Button type="primary" icon={<SearchOutlined />} onClick={() => searchAssets(keywordText)}>
                                             查询
                                         </Button>
                                     </Space>
@@ -248,9 +252,7 @@ export default function AdminAssetsPage() {
                             </Typography.Paragraph>
                         ) : null}
                         <Input.TextArea value={detailAsset.type === "image" ? detailAsset.url || detailAsset.coverUrl : detailAsset.content} rows={7} readOnly />
-                        <Button icon={<CopyOutlined />} onClick={() => copyText(detailAsset.type === "image" ? detailAsset.url || detailAsset.coverUrl : detailAsset.content)}>
-                            复制内容
-                        </Button>
+                        <Button onClick={() => copyText(detailAsset.type === "image" ? detailAsset.url || detailAsset.coverUrl : detailAsset.content)}>复制内容</Button>
                     </Flex>
                 ) : null}
             </Modal>
