@@ -68,10 +68,13 @@ export default function AgentManagementPage() {
     const token = useUserStore((state) => state.token);
     const palette = useThemeStore((state) => state.palette);
     const adminColors = useMemo(() => getAdminColors(palette), [palette]);
-    const primaryBtnStyle = useMemo(() => ({
-        background: adminColors.primary,
-        borderColor: adminColors.primary,
-    }), [adminColors.primary]);
+    const primaryBtnStyle = useMemo(
+        () => ({
+            background: adminColors.primary,
+            borderColor: adminColors.primary,
+        }),
+        [adminColors.primary],
+    );
 
     const headers = { Authorization: `Bearer ${token}` };
 
@@ -214,9 +217,9 @@ export default function AgentManagementPage() {
     };
 
     return (
-        <div style={{ padding: "24px 28px" }}>
+        <div className="admin-data-page admin-agent-page">
             {contextHolder}
-            <div style={{ marginBottom: 20 }}>
+            <div className="admin-page-title">
                 <Typography.Title level={4} style={{ margin: 0, fontSize: 20, fontWeight: 600 }}>
                     Agent 管理
                 </Typography.Title>
@@ -226,54 +229,41 @@ export default function AgentManagementPage() {
             </div>
 
             {/* 服务状态 */}
-            <div style={{ background: "#fff", borderRadius: 12, padding: "24px 28px", marginBottom: 20 }}>
+            <div className="admin-panel">
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
                     <div>
-                        <Typography.Text strong style={{ fontSize: 15 }}>服务状态</Typography.Text>
+                        <Typography.Text strong style={{ fontSize: 15 }}>
+                            服务状态
+                        </Typography.Text>
                     </div>
-                    <Button icon={<ReloadOutlined />} onClick={() => { fetchStatus(); fetchSettings(); }} loading={loading} size="small">
+                    <Button
+                        icon={<ReloadOutlined />}
+                        onClick={() => {
+                            fetchStatus();
+                            fetchSettings();
+                        }}
+                        loading={loading}
+                        size="small"
+                    >
                         刷新
                     </Button>
                 </div>
                 <Spin spinning={loading}>
                     <Descriptions column={{ xs: 1, sm: 2, md: 3 }}>
-                        <Descriptions.Item label="运行状态">
-                            {status?.running ? (
-                                <Tag color="success">运行中</Tag>
-                            ) : (
-                                <Tag color="default">已停止</Tag>
-                            )}
-                        </Descriptions.Item>
-                        <Descriptions.Item label="端口">
-                            {status?.running ? "17371" : "-"}
-                        </Descriptions.Item>
+                        <Descriptions.Item label="运行状态">{status?.running ? <Tag color="success">运行中</Tag> : <Tag color="default">已停止</Tag>}</Descriptions.Item>
+                        <Descriptions.Item label="端口">{status?.running ? "17371" : "-"}</Descriptions.Item>
                         <Descriptions.Item label="操作">
                             <Space>
                                 {!status?.running ? (
-                                    <Button
-                                        type="primary"
-                                        icon={<PlayCircleOutlined />}
-                                        onClick={handleStart}
-                                        loading={loading}
-                                        style={primaryBtnStyle}
-                                    >
+                                    <Button type="primary" icon={<PlayCircleOutlined />} onClick={handleStart} loading={loading} style={primaryBtnStyle}>
                                         启动
                                     </Button>
                                 ) : (
                                     <>
-                                        <Button
-                                            icon={<ReloadOutlined />}
-                                            onClick={handleRestart}
-                                            loading={loading}
-                                        >
+                                        <Button icon={<ReloadOutlined />} onClick={handleRestart} loading={loading}>
                                             重启
                                         </Button>
-                                        <Button
-                                            danger
-                                            icon={<PoweroffOutlined />}
-                                            onClick={handleStop}
-                                            loading={loading}
-                                        >
+                                        <Button danger icon={<PoweroffOutlined />} onClick={handleStop} loading={loading}>
                                             停止
                                         </Button>
                                     </>
@@ -285,9 +275,11 @@ export default function AgentManagementPage() {
             </div>
 
             {/* 访问控制 */}
-            <div style={{ background: "#fff", borderRadius: 12, padding: "24px 28px", marginBottom: 20 }}>
+            <div className="admin-panel">
                 <div style={{ marginBottom: 20 }}>
-                    <Typography.Text strong style={{ fontSize: 15 }}>访问控制</Typography.Text>
+                    <Typography.Text strong style={{ fontSize: 15 }}>
+                        访问控制
+                    </Typography.Text>
                     <div>
                         <Typography.Text type="secondary" style={{ fontSize: 13 }}>
                             配置 Agent 的启用状态和访问权限
@@ -295,39 +287,31 @@ export default function AgentManagementPage() {
                     </div>
                 </div>
                 <Spin spinning={settingsLoading}>
-                    <Form
-                        form={form}
-                        layout="vertical"
-                        initialValues={settings}
-                        onFinish={handleSaveSettings}
-                        style={{ maxWidth: 600 }}
-                    >
-                        <Form.Item
-                            name="agentEnabled"
-                            label="启用 Agent"
-                            valuePropName="checked"
-                        >
+                    <Form form={form} layout="vertical" initialValues={settings} onFinish={handleSaveSettings} style={{ maxWidth: 600 }}>
+                        <Form.Item name="agentEnabled" label="启用 Agent" valuePropName="checked">
                             <Switch />
                         </Form.Item>
-                        <Form.Item
-                            name="agentVisible"
-                            label="前台展示 Agent"
-                            valuePropName="checked"
-                            extra="关闭后用户在画布页面将看不到 Agent 入口"
-                        >
+                        <Form.Item name="agentVisible" label="前台展示 Agent" valuePropName="checked" extra="关闭后用户在画布页面将看不到 Agent 入口">
                             <Switch />
                         </Form.Item>
-                        <Form.Item
-                            name="agentAccessLevel"
-                            label="访问权限"
-                            extra="选中的角色可以使用 Agent 功能，管理员始终拥有权限"
-                        >
+                        <Form.Item name="agentAccessLevel" label="访问权限" extra="选中的角色可以使用 Agent 功能，管理员始终拥有权限">
                             <Form.Item name="agentAccessLevel" noStyle>
                                 <AccessLevelSelector accentColor={adminColors.primary} />
                             </Form.Item>
                         </Form.Item>
                         <Form.Item>
-                            <Button type="primary" htmlType="submit" icon={<SaveOutlined />} style={primaryBtnStyle} onMouseEnter={(e) => { e.currentTarget.style.opacity = "0.85"; }} onMouseLeave={(e) => { e.currentTarget.style.opacity = "1"; }}>
+                            <Button
+                                type="primary"
+                                htmlType="submit"
+                                icon={<SaveOutlined />}
+                                style={primaryBtnStyle}
+                                onMouseEnter={(e) => {
+                                    e.currentTarget.style.opacity = "0.85";
+                                }}
+                                onMouseLeave={(e) => {
+                                    e.currentTarget.style.opacity = "1";
+                                }}
+                            >
                                 保存设置
                             </Button>
                         </Form.Item>

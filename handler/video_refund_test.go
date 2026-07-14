@@ -2,6 +2,9 @@ package handler
 
 import (
 	"testing"
+
+	"github.com/basketikun/infinite-canvas/model"
+	"github.com/basketikun/infinite-canvas/service"
 )
 
 func TestIsVideoTaskDone(t *testing.T) {
@@ -87,5 +90,40 @@ func TestNormalizeVideoStatus(t *testing.T) {
 				t.Errorf("normalizeVideoStatus(%q) = %q, want %q", tt.input, got, tt.want)
 			}
 		})
+	}
+}
+
+func TestEmitVideoGenerationTaskUpdateUpdatesLocalTaskID(t *testing.T) {
+	task := service.CreateGenerationTask(service.GenerationTaskCreate{
+		UpstreamTaskID: "local-task-id",
+		Type:           model.GenerationTaskTypeVideo,
+		UserID:         "user-local-task",
+		Username:       "user-local-task",
+		Model:          "grok-imagine-video-1.5-preview",
+		CanvasID:       "canvas-1",
+		NodeID:         "video-1",
+	})
+
+	emitVideoGenerationTaskUpdate(
+		"user-local-task",
+		canvasGenerationTaskContext{TaskID: task.ID, CanvasID: "canvas-1", NodeID: "video-1"},
+		`{"id":"upstream-task-id","status":"completed","result":{"video_url":"https://example.com/video.mp4"}}`,
+		true,
+		false,
+		nil,
+	)
+
+	updated, ok := service.GetGenerationTask(task.ID)
+	if !ok {
+		t.Fatalf("task not found")
+	}
+	if updated.Status != model.GenerationTaskStatusSucceeded {
+		t.Fatalf("status = %s, want %s", updated.Status, model.GenerationTaskStatusSucceeded)
+	}
+	if updated.ResultURL != "https://example.com/video.mp4" {
+		t.Fatalf("resultURL = %q", updated.ResultURL)
+	}
+	if updated.UpstreamTaskID != "upstream-task-id" {
+		t.Fatalf("upstreamTaskID = %q", updated.UpstreamTaskID)
 	}
 }

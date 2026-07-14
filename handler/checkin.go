@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	"github.com/basketikun/infinite-canvas/service"
+	"github.com/basketikun/infinite-canvas/ws"
 )
 
 func DailyCheckIn(w http.ResponseWriter, r *http.Request) {
@@ -18,6 +19,7 @@ func DailyCheckIn(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	OK(w, map[string]any{"checkIn": log, "isNew": isNew})
+	ws.DefaultHub.SendToUser(user.ID, map[string]any{"type": "credits-changed"})
 }
 
 func GetCheckInMonth(w http.ResponseWriter, r *http.Request) {

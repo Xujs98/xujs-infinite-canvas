@@ -17,7 +17,7 @@ export type AdminUser = {
     email: string;
     displayName: string;
     avatarUrl: string;
-    role: "user" | "member" | "admin";
+    role: string;
     credits: number;
     affCode: string;
     affCount: number;
@@ -28,11 +28,27 @@ export type AdminUser = {
     lastLoginAt: string;
     createdAt: string;
     updatedAt: string;
+    online: boolean;
+    onlineApp: boolean;
+    onlineWeb: boolean;
 };
 
 export type AdminUserListResponse = {
     items: AdminUser[];
     total: number;
+};
+
+export type AdminDashboardStats = {
+    onlineUsers: number;
+    onlineAppUsers: number;
+    onlineWebUsers: number;
+    onlineConnections: number;
+    totalUsers: number;
+    modelCount: number;
+};
+
+export type AdminServerOfflineStatus = {
+    offline: boolean;
 };
 
 export type AdminCreditLog = {
@@ -53,8 +69,34 @@ export type AdminCreditLogListResponse = {
     total: number;
 };
 
+export type AdminGenerationTask = {
+    id: string;
+    upstreamTaskId: string;
+    type: "image" | "video";
+    status: "running" | "succeeded" | "failed";
+    userId: string;
+    username: string;
+    model: string;
+    path: string;
+    canvasId: string;
+    nodeId: string;
+    progress: number;
+    resultUrl: string;
+    resultImages?: string[];
+    errorMsg: string;
+    createdAt: string;
+    updatedAt: string;
+    completedAt?: string;
+};
+
+export type AdminGenerationTaskListResponse = {
+    items: AdminGenerationTask[];
+    total: number;
+};
+
 export type AdminUserQuery = {
     keyword?: string;
+    type?: string;
     role?: string;
     status?: string;
     page?: number;
@@ -63,6 +105,18 @@ export type AdminUserQuery = {
 
 export async function fetchAdminUsers(token: string, query: AdminUserQuery = {}) {
     return apiGet<AdminUserListResponse>("/api/admin/users", compactApiParams(query), token);
+}
+
+export async function fetchAdminDashboardStats(token: string) {
+    return apiGet<AdminDashboardStats>("/api/admin/dashboard", undefined, token);
+}
+
+export async function fetchAdminServerOfflineStatus(token: string) {
+    return apiGet<AdminServerOfflineStatus>("/api/admin/server/offline", undefined, token);
+}
+
+export async function setAdminServerOfflineStatus(token: string, offline: boolean) {
+    return apiPost<AdminServerOfflineStatus>("/api/admin/server/offline", { offline }, token);
 }
 
 export async function saveAdminUser(token: string, user: Partial<AdminUser> & { password?: string }) {
@@ -79,6 +133,10 @@ export async function deleteAdminUser(token: string, id: string) {
 
 export async function fetchAdminCreditLogs(token: string, query: AdminUserQuery = {}) {
     return apiGet<AdminCreditLogListResponse>("/api/admin/credit-logs", compactApiParams(query), token);
+}
+
+export async function fetchAdminGenerationTasks(token: string, query: { keyword?: string; type?: string; status?: string; page?: number; pageSize?: number } = {}) {
+    return apiGet<AdminGenerationTaskListResponse>("/api/admin/tasks", compactApiParams(query), token);
 }
 
 export async function saveAdminCreditLog(token: string, log: Partial<AdminCreditLog>) {
@@ -219,6 +277,23 @@ export async function batchDeleteAdminRedeemCodes(token: string, ids: string[]) 
     return apiPost<boolean>("/api/admin/redeem-codes/batch-delete", { ids }, token);
 }
 
+export async function deleteInvalidAdminRedeemCodes(token: string) {
+    const invalidStatuses = ["used", "disabled", "expired"];
+    let deleted = 0;
+
+    for (const status of invalidStatuses) {
+        while (true) {
+            const result = await fetchAdminRedeemCodes(token, { status, page: 1, pageSize: 100 });
+            const ids = result.items.map((item) => item.id).filter(Boolean);
+            if (!ids.length) break;
+            await batchDeleteAdminRedeemCodes(token, ids);
+            deleted += ids.length;
+        }
+    }
+
+    return deleted;
+}
+
 export type AdminChannelFieldMapping = {
     image?: string;
     images?: string;
@@ -227,14 +302,61 @@ export type AdminChannelFieldMapping = {
     imagesType?: "string" | "array";
 };
 
+export type AdminChannelVideoInputConfig = {
+    enabled: boolean;
+    min: number;
+    max: number;
+    field?: string;
+    roles?: string[];
+    requireImageHost?: boolean;
+};
+
 export type AdminChannelVideoConfig = {
+    // 基础配置
     path?: string;
-    requestFormat?: "" | "openai";
+    method?: string;
+    requestBodyMode?: "json" | "multipart";
+    requestFormat?: "" | "openai" | "generic-json";
     responseFormat?: "" | "openai";
+    // 任务管理
     taskIdField?: string;
+    statusEndpointPath?: string;
+    contentEndpointPath?: string;
+    statusMethod?: "GET" | "POST";
     statusField?: string;
-    videoUrlField?: string;
-    fieldMapping?: AdminChannelFieldMapping;
+    videoUrlPaths?: string[];
+    // 视频下载字段路径
+    videoDownloadField?: string;
+    videoProgressField?: string;
+    // 状态值
+    pendingValues?: string[];
+    successValues?: string[];
+    failedValues?: string[];
+    // 轮询控制
+    pollIntervalMs?: number;
+    pollTimeoutMs?: number;
+    // 请求体字段映射
+    modelField?: string;
+    promptField?: string;
+    sizeField?: string;
+    secondsField?: string;
+    secondsAsString?: boolean;
+    aspectRatioField?: string;
+    resolutionField?: string;
+    // 参考素材字段
+    referenceImagesField?: string;
+    referenceVideosField?: string;
+    referenceAudiosField?: string;
+    firstFrameField?: string;
+    lastFrameField?: string;
+    modeField?: string;
+    framesModeValue?: string;
+    // 默认参数
+    defaultRequestParams?: Record<string, unknown>;
+    // 输入 Schema
+    imageInput?: AdminChannelVideoInputConfig;
+    videoInput?: AdminChannelVideoInputConfig;
+    audioInput?: AdminChannelVideoInputConfig;
 };
 
 export type AdminModelChannel = {
@@ -252,6 +374,14 @@ export type AdminModelChannel = {
     videoConfig?: AdminChannelVideoConfig;
     fieldMapping?: AdminChannelFieldMapping;
     imageFormat?: "base64" | "url";
+    // App 端配置字段
+    mediaType?: "image" | "video" | "chat";
+    apiStyle?: string;
+    endpointPath?: string;
+    responseFormat?: string;
+    supportedResolutions?: string[];
+    supportedModelVersions?: string[];
+    supportsWebSearch?: boolean;
 };
 
 export type ChannelRequestLog = {
@@ -351,6 +481,8 @@ export type AdminSystemSettings = {
     checkInRewardMin: number;
     checkInRewardMax: number;
     videoMaxTimeoutSeconds: number;
+    appErrorMessagePrefix: string;
+    appErrorShowDetails: boolean;
     allowCustomChannel: boolean;
     allowRegister: boolean;
     assistantEnabled: boolean;
@@ -436,13 +568,14 @@ export type AdminRequestLog = {
     success: boolean;
     errorMsg: string;
     isPolling: boolean;
+    source: string;
     createdAt: string;
 };
 export type AdminRequestLogListResponse = {
     items: AdminRequestLog[];
     total: number;
 };
-export async function fetchAdminRequestLogs(token: string, query: AdminUserQuery = {}) {
+export async function fetchAdminRequestLogs(token: string, query: AdminUserQuery & { source?: string } = {}) {
     return apiGet<AdminRequestLogListResponse>("/api/admin/request-logs", compactApiParams(query), token);
 }
 export async function batchDeleteAdminRequestLogs(token: string, ids: string[]) {
@@ -455,6 +588,7 @@ export type VideoModelConfig = {
     ratios: string[];
     durations: string[]; // 支持 "adaptive" 和数字字符串如 "15"
     maxDuration: number;
+    billingMode?: "per_second" | "per_call";
     supportGenerateAudio: boolean;
     supportWatermark: boolean;
 };
@@ -472,6 +606,13 @@ export type AudioModelConfig = {
     speedRange: { min: number; max: number } | null;
 };
 
+export type ChatModelConfig = {
+    supportsMultimodal: boolean;
+    contextWindow: number;
+    maxOutputTokens: number;
+    description: string;
+};
+
 export type RequestFieldConfig = {
     fieldName: string;
     requestKey: string;
@@ -486,6 +627,7 @@ export type AdminModelClassification = {
     videoConfig: VideoModelConfig | null;
     imageConfig: ImageModelConfig | null;
     audioConfig: AudioModelConfig | null;
+    chatConfig: ChatModelConfig | null;
     createdAt: string;
     updatedAt: string;
 };

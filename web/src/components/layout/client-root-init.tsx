@@ -5,9 +5,40 @@ import { useEffect, useRef } from "react";
 import { usePathname } from "next/navigation";
 import { App } from "antd";
 
-import { getModelClassificationDetail, useModelClassificationsVersion, useConfigStore } from "@/stores/use-config-store";
+import {
+    getModelClassificationDetail,
+    setModelClassificationsCache,
+    setModelClassificationsMap,
+    useModelClassificationsVersion,
+    useConfigStore,
+    type ModelClassificationDetail,
+} from "@/stores/use-config-store";
 import { useUserStore } from "@/stores/use-user-store";
 import type { AdminRole } from "@/services/api/role";
+
+type AppSocketMessage =
+    | {
+          type: "model-classifications-changed";
+          data?: ModelClassificationDetail[];
+      }
+    | {
+          type: "roles-changed";
+          data?: AdminRole[];
+      }
+    | {
+          type: string;
+          [key: string]: unknown;
+      };
+
+function applyRolesToCurrentUser(roles: AdminRole[]) {
+    const userRole = useUserStore.getState().user?.role;
+    if (!userRole || userRole === "guest") {
+        useConfigStore.setState({ roleAllowedModels: [] });
+        return;
+    }
+    const matched = roles.find((role) => role.name === userRole);
+    useConfigStore.setState({ roleAllowedModels: matched?.allowedModels || [] });
+}
 
 export function ClientRootInit({ children }: { children: ReactNode }) {
     const { message } = App.useApp();
@@ -21,6 +52,7 @@ export function ClientRootInit({ children }: { children: ReactNode }) {
     const updateConfig = useConfigStore((state) => state.updateConfig);
     const openConfigDialog = useConfigStore((state) => state.openConfigDialog);
     const loadRoles = useConfigStore((state) => state.loadRoles);
+    const token = useUserStore((state) => state.token);
     const isLoginPage = pathname === "/login" || pathname === "/admin/login";
 
     // 监听分类变化，自动适配视频秒数
@@ -47,16 +79,77 @@ export function ClientRootInit({ children }: { children: ReactNode }) {
         void (async () => {
             try {
                 const roles = await loadRoles();
-                const userRole = useUserStore.getState().user?.role;
-                if (userRole && roles.length) {
-                    const matched = roles.find((r: AdminRole) => r.name === userRole);
-                    useConfigStore.setState({ roleAllowedModels: matched?.allowedModels || [] });
-                }
+                applyRolesToCurrentUser(roles);
             } catch {
                 // ignore
             }
         })();
     }, [loadPublicSettings, loadPublicSystemSettings, loadModelClassifications, loadRoles]);
+
+    useEffect(() => {
+        let socket: WebSocket | undefined;
+        let reconnectTimer: number | undefined;
+        let closed = false;
+
+        const connect = () => {
+            if (closed) return;
+            const proto = window.location.protocol === "https:" ? "wss" : "ws";
+            const wsHost = window.location.port === "3000" ? `${window.location.hostname}:8080` : window.location.host;
+            const params = new URLSearchParams({ client: "web" });
+            if (token) params.set("token", token);
+            socket = new WebSocket(`${proto}://${wsHost}/api/ws?${params.toString()}`);
+            socket.onclose = () => {
+                if (!closed) reconnectTimer = window.setTimeout(connect, 3000);
+            };
+            socket.onmessage = (event) => {
+                let payload: AppSocketMessage;
+                try {
+                    payload = JSON.parse(event.data) as AppSocketMessage;
+                } catch {
+                    return;
+                }
+                if (payload.type === "model-classifications-changed" && Array.isArray(payload.data)) {
+                    const map: Record<string, string> = {};
+                    for (const item of payload.data) {
+                        if (item.modelName) map[item.modelName] = item.capability;
+                    }
+                    setModelClassificationsMap(map);
+                    setModelClassificationsCache(payload.data);
+                    void loadPublicSettings();
+                    return;
+                }
+                if (payload.type === "model-classifications-changed") {
+                    void loadModelClassifications();
+                    void loadPublicSettings();
+                    return;
+                }
+                if (payload.type === "roles-changed" && Array.isArray(payload.data)) {
+                    applyRolesToCurrentUser(payload.data);
+                    window.dispatchEvent(new CustomEvent("roles-changed", { detail: payload.data }));
+                    void loadPublicSettings();
+                    return;
+                }
+                if (payload.type === "roles-changed") {
+                    void (async () => {
+                        const roles = await loadRoles();
+                        applyRolesToCurrentUser(roles);
+                        window.dispatchEvent(new CustomEvent("roles-changed", { detail: roles }));
+                    })();
+                    void loadPublicSettings();
+                }
+                if (payload.type === "online-status-changed") {
+                    window.dispatchEvent(new CustomEvent("online-status-changed"));
+                }
+            };
+        };
+
+        connect();
+        return () => {
+            closed = true;
+            if (reconnectTimer) window.clearTimeout(reconnectTimer);
+            socket?.close();
+        };
+    }, [loadModelClassifications, loadPublicSettings, token]);
 
     useEffect(() => {
         if (!isLoginPage) void hydrateUser();
@@ -71,8 +164,7 @@ export function ClientRootInit({ children }: { children: ReactNode }) {
         }
         void (async () => {
             const roles = await loadRoles();
-            const matched = roles.find((r: AdminRole) => r.name === user.role);
-            useConfigStore.setState({ roleAllowedModels: matched?.allowedModels || [] });
+            applyRolesToCurrentUser(roles);
         })();
     }, [user, loadRoles]);
 

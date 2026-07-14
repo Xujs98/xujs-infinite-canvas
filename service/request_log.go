@@ -6,7 +6,6 @@ import (
 	"regexp"
 	"strings"
 	"sync"
-	"time"
 
 	"github.com/basketikun/infinite-canvas/model"
 	"github.com/basketikun/infinite-canvas/repository"
@@ -68,6 +67,10 @@ func markTaskCompleted(path string) {
 
 // LogRequest 记录 AI 代理请求
 func LogRequest(userID, username, model_, method, path, url string, requestHeaders map[string]string, requestBody string, requestBodySize int, requestMedia string) string {
+	return LogRequestWithSource(userID, username, model_, method, path, url, requestHeaders, requestBody, requestBodySize, requestMedia, "web")
+}
+
+func LogRequestWithSource(userID, username, model_, method, path, url string, requestHeaders map[string]string, requestBody string, requestBodySize int, requestMedia string, source string) string {
 	headersJSON, _ := json.Marshal(requestHeaders)
 
 	entry := &model.RequestLog{
@@ -83,7 +86,7 @@ func LogRequest(userID, username, model_, method, path, url string, requestHeade
 		RequestMedia:    requestMedia,
 		RequestBodySize: requestBodySize,
 		IsPolling:       extractTaskID(path) != "",
-		CreatedAt:       time.Now(),
+		Source:          source,
 	}
 
 	if err := repository.CreateRequestLog(entry); err != nil {
@@ -107,10 +110,35 @@ func LogRequestResponse(id string, responseBody string, statusCode int, success 
 	}
 }
 
-func ListRequestLogs(q model.Query, method string) (model.RequestLogList, error) {
-	return repository.ListRequestLogs(q, method)
+func ListRequestLogs(q model.Query, method string, source string) (model.RequestLogList, error) {
+	return repository.ListRequestLogs(q, method, source)
 }
 
 func BatchDeleteRequestLogs(ids []string) error {
 	return repository.BatchDeleteRequestLogs(ids)
+}
+
+// LogAppRequest 记录 App 端提交的请求日志
+func LogAppRequest(userID, username, model_, method, path, url string, requestHeaders string, requestBody string, responseBody string, statusCode int, success bool, errorMsg string, elapsedMs int64) string {
+	entry := &model.RequestLog{
+		ID:              uuid.NewString(),
+		UserID:          userID,
+		Username:        username,
+		Model:           model_,
+		Method:          method,
+		Path:            path,
+		URL:             url,
+		RequestHeaders:  requestHeaders,
+		RequestBody:     requestBody,
+		ResponseBody:    responseBody,
+		StatusCode:      statusCode,
+		Success:         success,
+		ErrorMsg:        errorMsg,
+		Source:          "app",
+		RequestBodySize: len(requestBody),
+	}
+	if err := repository.CreateRequestLog(entry); err != nil {
+		log.Printf("LogAppRequest create failed: %v", err)
+	}
+	return entry.ID
 }

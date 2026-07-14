@@ -46,7 +46,7 @@ export function VideoSettingsPanel({ config, onConfigChange, theme, showTitle = 
 
     const model = config.model || config.videoModel;
     const seconds = config.videoSeconds || "6";
-    const size = normalizeVideoSizeValue(config.size);
+    const ratio = normalizeVideoRatioValue(config.size);
     const resolution = normalizeVideoResolutionValue(config.vquality);
 
     // 获取模型配置
@@ -96,7 +96,7 @@ export function VideoSettingsPanel({ config, onConfigChange, theme, showTitle = 
                 <SettingGroup title="比例" color={theme.node.muted}>
                     <div className="grid grid-cols-3 gap-2.5">
                         {availableRatioOptions.map((item) => (
-                            <OptionPill key={item.value} selected={size === item.value} theme={theme} onClick={() => onConfigChange("size", item.value)}>
+                            <OptionPill key={item.value} selected={ratio === item.value} theme={theme} onClick={() => onConfigChange("size", item.value)}>
                                 <span>{item.label}</span>
                                 {item.desc && <span className="text-[10px] opacity-60">{item.desc}</span>}
                             </OptionPill>
@@ -239,6 +239,12 @@ export function normalizeVideoSizeValue(value: string) {
     return ["9:16", "2:3", "3:4"].includes(value) ? "720x1280" : "1280x720";
 }
 
+function normalizeVideoRatioValue(value: string) {
+    if (value === "auto" || value === "adaptive") return "adaptive";
+    if (["16:9", "9:16", "1:1", "4:3", "3:4", "21:9"].includes(value)) return value;
+    return normalizeSeedanceRatio(value);
+}
+
 export function normalizeVideoResolutionValue(value: string) {
     if (value === "480p" || value === "low") return "480";
     if (value === "720p" || value === "auto" || value === "high" || value === "medium") return "720";
@@ -309,4 +315,3 @@ function SwitchRow({ label, checked, disabled = false, theme, onChange }: { labe
         </div>
     );
 }
-

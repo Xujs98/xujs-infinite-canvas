@@ -3,7 +3,7 @@ package model
 type UserRole string
 
 const (
-	UserRoleGuest UserRole = "guest"
+	UserRoleGuest  UserRole = "guest"
 	UserRoleUser   UserRole = "user"
 	UserRoleMember UserRole = "member"
 	UserRoleAdmin  UserRole = "admin"
@@ -38,6 +38,9 @@ type User struct {
 	Extra               string     `json:"extra" gorm:"type:text"`
 	CreatedAt           string     `json:"createdAt"`
 	UpdatedAt           string     `json:"updatedAt"`
+	Online              bool       `json:"online" gorm:"-"`
+	OnlineApp           bool       `json:"onlineApp" gorm:"-"`
+	OnlineWeb           bool       `json:"onlineWeb" gorm:"-"`
 }
 
 // UserList 用户分页结果。
@@ -93,8 +96,11 @@ const (
 	CreditLogTypeAdminAdjust    CreditLogType = "admin_adjust"
 	CreditLogTypeAIConsume      CreditLogType = "ai_consume"
 	CreditLogTypeAIRefund       CreditLogType = "ai_refund"
+	CreditLogTypeOfflineConsume CreditLogType = "offline_consume"
+	CreditLogTypeOfflineRefund  CreditLogType = "offline_refund"
 	CreditLogTypeRedeem         CreditLogType = "redeem"
 	CreditLogTypeMembershipFree CreditLogType = "membership_free"
+	CreditLogTypeRoleFree       CreditLogType = "role_free"
 	CreditLogTypeInviteReward   CreditLogType = "invite_reward"
 	CreditLogTypeCheckIn        CreditLogType = "check_in"
 )

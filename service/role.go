@@ -24,6 +24,7 @@ func EnsureBuiltinRoles() {
 				Label:         r.label,
 				Description:   r.desc,
 				AllowedModels: []string{},
+				FreeModels:    []string{},
 				IsBuiltin:     true,
 				CreatedAt:     now(),
 				UpdatedAt:     now(),
@@ -43,6 +44,7 @@ func GetAllRoles() ([]model.Role, error) {
 func CreateRole(role model.Role) (model.Role, error) {
 	role.ID = newID("role")
 	role.IsBuiltin = false
+	normalizeRoleOfflineLimit(&role)
 	role.CreatedAt = now()
 	role.UpdatedAt = now()
 	return repository.SaveRole(role)
@@ -60,6 +62,10 @@ func UpdateRole(id string, role model.Role) (model.Role, error) {
 	current.Label = role.Label
 	current.Description = role.Description
 	current.AllowedModels = role.AllowedModels
+	current.FreeModels = role.FreeModels
+	current.AllowOffline = role.AllowOffline
+	current.OfflineCreditLimit = role.OfflineCreditLimit
+	normalizeRoleOfflineLimit(&current)
 	current.UpdatedAt = now()
 	return repository.SaveRole(current)
 }
@@ -81,6 +87,15 @@ func GetRoleAllowedModels(roleName string) ([]string, bool) {
 	return role.AllowedModels, true
 }
 
+// GetRoleFreeModels 获取角色可免费使用的模型列表，空列表表示没有免费模型。
+func GetRoleFreeModels(roleName string) ([]string, bool) {
+	role, ok, _ := repository.GetRoleByName(roleName)
+	if !ok {
+		return nil, false
+	}
+	return role.FreeModels, true
+}
+
 // IsModelAllowedForRole 检查角色是否可以使用指定模型。
 func IsModelAllowedForRole(roleName, modelName string) bool {
 	allowed, ok := GetRoleAllowedModels(roleName)
@@ -93,4 +108,39 @@ func IsModelAllowedForRole(roleName, modelName string) bool {
 		}
 	}
 	return false
+}
+
+// IsModelFreeForRole 检查角色是否可免费使用指定模型。
+func IsModelFreeForRole(roleName, modelName string) bool {
+	freeModels, ok := GetRoleFreeModels(roleName)
+	if !ok || len(freeModels) == 0 {
+		return false
+	}
+	for _, m := range freeModels {
+		if m == modelName {
+			return true
+		}
+	}
+	return false
+}
+
+// IsRoleAllowedOffline 检查角色是否允许 App 在服务端断开后继续保留登录和离线扣费。
+func IsRoleAllowedOffline(roleName string) bool {
+	role, ok, _ := repository.GetRoleByName(roleName)
+	return ok && role.AllowOffline
+}
+
+// GetRoleOfflineCreditLimit 获取角色允许离线时可预支的最大算力点；0 表示无限制。
+func GetRoleOfflineCreditLimit(roleName string) int {
+	role, ok, _ := repository.GetRoleByName(roleName)
+	if !ok || !role.AllowOffline || role.OfflineCreditLimit <= 0 {
+		return 0
+	}
+	return role.OfflineCreditLimit
+}
+
+func normalizeRoleOfflineLimit(role *model.Role) {
+	if !role.AllowOffline || role.OfflineCreditLimit < 0 {
+		role.OfflineCreditLimit = 0
+	}
 }

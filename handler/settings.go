@@ -6,6 +6,7 @@ import (
 
 	"github.com/basketikun/infinite-canvas/model"
 	"github.com/basketikun/infinite-canvas/service"
+	"github.com/basketikun/infinite-canvas/ws"
 )
 
 type adminChannelActionRequest struct {
@@ -40,6 +41,23 @@ func AdminSaveSettings(w http.ResponseWriter, r *http.Request) {
 		FailError(w, err)
 		return
 	}
+
+	// 保存后推送渠道变更给所有 WebSocket 客户端
+	rawChannels, channelsErr := service.GetRawPrivateChannels()
+	if channelsErr == nil {
+		var channels []PublicChannelInfo
+		for _, ch := range rawChannels {
+			if !ch.Enabled {
+				continue
+			}
+			channels = append(channels, channelToPublic(ch))
+		}
+		ws.DefaultHub.BroadcastJSON(map[string]any{
+			"type": "channels-changed",
+			"data": channels,
+		})
+	}
+
 	OK(w, result)
 }
 

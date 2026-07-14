@@ -6,7 +6,20 @@ import (
 
 	"github.com/basketikun/infinite-canvas/model"
 	"github.com/basketikun/infinite-canvas/service"
+	"github.com/basketikun/infinite-canvas/ws"
 )
+
+
+func broadcastModelClassificationsChanged() {
+	classifications, err := service.GetAllModelClassificationsList()
+	if err != nil {
+		return
+	}
+	ws.DefaultHub.BroadcastJSON(map[string]any{
+		"type": "model-classifications-changed",
+		"data": classifications,
+	})
+}
 
 func ListModelClassifications(w http.ResponseWriter, r *http.Request) {
 	q := parseQuery(r)
@@ -47,6 +60,7 @@ func CreateModelClassification(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	OK(w, result)
+	broadcastModelClassificationsChanged()
 }
 
 func UpdateModelClassification(w http.ResponseWriter, r *http.Request, id string) {
@@ -73,6 +87,7 @@ func UpdateModelClassification(w http.ResponseWriter, r *http.Request, id string
 		return
 	}
 	OK(w, result)
+	broadcastModelClassificationsChanged()
 }
 
 func DeleteModelClassification(w http.ResponseWriter, r *http.Request, id string) {
@@ -85,6 +100,7 @@ func DeleteModelClassification(w http.ResponseWriter, r *http.Request, id string
 		return
 	}
 	OK(w, true)
+	broadcastModelClassificationsChanged()
 }
 
 func BatchDeleteModelClassifications(w http.ResponseWriter, r *http.Request) {
@@ -103,6 +119,7 @@ func BatchDeleteModelClassifications(w http.ResponseWriter, r *http.Request) {
 		FailError(w, err)
 		return
 	}
+	broadcastModelClassificationsChanged()
 	OK(w, true)
 }
 

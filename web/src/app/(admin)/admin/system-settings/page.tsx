@@ -104,33 +104,34 @@ export default function AdminSystemSettingsPage() {
     const siteLogo = Form.useWatch("siteLogo", form);
 
     return (
-        <div className="min-h-screen p-6">
-            <div className="mx-auto max-w-[1200px]">
+        <div className="admin-config-page min-h-screen p-6">
+            <div className="admin-config-inner mx-auto max-w-[1200px]">
                 {/* 页面标题 */}
-                <div className="mb-6 flex items-center gap-3">
+                <div className="admin-page-title mb-6 flex items-center gap-3">
                     <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-blue-500 to-purple-600 text-white shadow-lg shadow-blue-500/25">
                         <ToolOutlined className="text-lg" />
                     </div>
                     <div>
-                        <Typography.Title level={4} style={{ margin: 0 }}>系统设置</Typography.Title>
-                        <Typography.Text type="secondary" className="text-sm">配置站点信息、注册策略和邮件通知</Typography.Text>
+                        <Typography.Title level={4} style={{ margin: 0 }}>
+                            系统设置
+                        </Typography.Title>
+                        <Typography.Text type="secondary" className="text-sm">
+                            配置站点信息、注册策略和邮件通知
+                        </Typography.Text>
                     </div>
                 </div>
 
                 {/* 固定导航条 */}
-                <div className="sticky top-0 z-50 mb-7 flex items-center justify-between rounded-2xl border border-gray-100 bg-white/95 px-5 py-3 shadow-sm backdrop-blur-sm">
-                    <div ref={navRef} className="relative flex items-center gap-1 rounded-2xl border border-gray-100 bg-gray-50 p-1.5">
-                        <div
-                            className="absolute top-1.5 bottom-1.5 rounded-xl bg-white shadow-sm transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)]"
-                            style={{ left: indicatorStyle.left, width: indicatorStyle.width }}
-                        />
+                <div className="admin-config-toolbar sticky top-0 z-50 mb-7 flex items-center justify-between rounded-2xl border border-gray-100 bg-white/95 px-5 py-3 shadow-sm backdrop-blur-sm">
+                    <div ref={navRef} className="admin-config-tabs relative flex items-center gap-1 rounded-2xl border border-gray-100 bg-gray-50 p-1.5">
+                        <div className="absolute top-1.5 bottom-1.5 rounded-xl bg-white shadow-sm transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)]" style={{ left: indicatorStyle.left, width: indicatorStyle.width }} />
                         {tabs.map((tab) => (
                             <button
                                 key={tab.key}
-                                ref={(el) => { if (el) tabRefs.current.set(tab.key, el); }}
-                                className={`relative z-10 flex items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-medium transition-colors duration-300 ${
-                                    activeTab === tab.key ? "text-gray-800" : "text-gray-400 hover:text-gray-600"
-                                }`}
+                                ref={(el) => {
+                                    if (el) tabRefs.current.set(tab.key, el);
+                                }}
+                                className={`relative z-10 flex items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-medium transition-colors duration-300 ${activeTab === tab.key ? "text-gray-800" : "text-gray-400 hover:text-gray-600"}`}
                                 onClick={() => setActiveTab(tab.key)}
                             >
                                 <span className="text-base">{tab.icon}</span>
@@ -139,7 +140,9 @@ export default function AdminSystemSettingsPage() {
                         ))}
                     </div>
                     <Space>
-                        <Button type="primary" icon={<SaveOutlined />} loading={saving} onClick={() => void handleSave()} className="!rounded-lg">保存设置</Button>
+                        <Button type="primary" icon={<SaveOutlined />} loading={saving} onClick={() => void handleSave()} className="!rounded-lg">
+                            保存设置
+                        </Button>
                     </Space>
                 </div>
 
@@ -198,8 +201,19 @@ export default function AdminSystemSettingsPage() {
                                                 >
                                                     {logoUploading ? <span className="text-xs">...</span> : <UploadOutlined />}
                                                 </button>
-                                                <input ref={fileInputRef} type="file" accept="image/png,image/jpeg,image/svg+xml" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) void handleLogoUpload(f); }} />
-                                                <Typography.Text type="secondary" className="text-xs">支持 PNG、JPG、SVG，最大 300KB</Typography.Text>
+                                                <input
+                                                    ref={fileInputRef}
+                                                    type="file"
+                                                    accept="image/png,image/jpeg,image/svg+xml"
+                                                    className="hidden"
+                                                    onChange={(e) => {
+                                                        const f = e.target.files?.[0];
+                                                        if (f) void handleLogoUpload(f);
+                                                    }}
+                                                />
+                                                <Typography.Text type="secondary" className="text-xs">
+                                                    支持 PNG、JPG、SVG，最大 300KB
+                                                </Typography.Text>
                                             </div>
                                         </Form.Item>
                                     </Col>
@@ -265,6 +279,18 @@ export default function AdminSystemSettingsPage() {
                                     <Col span={6}>
                                         <Form.Item name="videoMaxTimeoutSeconds" label="视频最大超时（秒）" extra="视频生成任务的最长等待时间">
                                             <InputNumber min={60} max={3600} style={{ width: "100%" }} placeholder="600" />
+                                        </Form.Item>
+                                    </Col>
+                                </Row>
+                                <Row gutter={[24, 0]}>
+                                    <Col span={12}>
+                                        <Form.Item name="appErrorMessagePrefix" label="App 错误提示前缀" extra="保存后 App 端画布错误弹窗会自动带上这段文案，可用于统一客服提示。">
+                                            <Input placeholder="例如：生成失败，请检查模型配置或联系管理员：" />
+                                        </Form.Item>
+                                    </Col>
+                                    <Col span={6}>
+                                        <Form.Item name="appErrorShowDetails" label="App 显示错误详情" valuePropName="checked" extra="关闭后用户弹窗只显示简短错误，但详情仍会上报到日志。">
+                                            <Switch checkedChildren="显示" unCheckedChildren="隐藏" />
                                         </Form.Item>
                                     </Col>
                                 </Row>

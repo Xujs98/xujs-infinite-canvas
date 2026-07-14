@@ -1,36 +1,113 @@
 "use client";
 
-import { FileTextOutlined, HomeOutlined, KeyOutlined, LogoutOutlined, PictureOutlined, SafetyOutlined, SettingOutlined, ToolOutlined, TransactionOutlined, UserOutlined, NotificationOutlined, RobotOutlined, AppstoreOutlined, CloudServerOutlined } from "@ant-design/icons";
-import { Flex, Layout, Typography, theme } from "antd";
+import {
+    ApiOutlined,
+    AppstoreOutlined,
+    BarsOutlined,
+    BellOutlined,
+    CloudServerOutlined,
+    DashboardOutlined,
+    FieldTimeOutlined,
+    FileTextOutlined,
+    HomeOutlined,
+    KeyOutlined,
+    LogoutOutlined,
+    MenuUnfoldOutlined,
+    NotificationOutlined,
+    PictureOutlined,
+    RobotOutlined,
+    SafetyOutlined,
+    SettingOutlined,
+    ToolOutlined,
+    TransactionOutlined,
+    UserOutlined,
+} from "@ant-design/icons";
+import { App, Avatar, Button, Drawer, Dropdown, Flex, Grid, Layout, Switch, Tag, Tooltip, Typography } from "antd";
+import type { MenuProps } from "antd";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import type { ReactNode } from "react";
-import { useEffect, useMemo } from "react";
+import type { CSSProperties, ReactNode } from "react";
+import { useEffect, useState } from "react";
 
-import { adminLayoutStyle } from "@/lib/app-theme";
-import { getAdminColors } from "@/lib/canvas-theme";
+import { fetchAdminServerOfflineStatus, setAdminServerOfflineStatus } from "@/services/api/admin";
 import { useConfigStore } from "@/stores/use-config-store";
-import { useThemeStore } from "@/stores/use-theme-store";
 import { useUserStore } from "@/stores/use-user-store";
 
-const adminMenus = [
-    { key: "/admin/users", icon: <UserOutlined />, label: "用户管理" },
-    { key: "/admin/credit-logs", icon: <TransactionOutlined />, label: "算力点日志" },
-    { key: "/admin/redeem-codes", icon: <KeyOutlined />, label: "卡密管理" },
-    { key: "/admin/announcements", icon: <NotificationOutlined />, label: "公告管理" },
-    { key: "/admin/prompts", icon: <FileTextOutlined />, label: "提示词管理" },
-    { key: "/admin/assets", icon: <PictureOutlined />, label: "素材库" },
-    { key: "/admin/model-classifications", icon: <AppstoreOutlined />, label: "模型管理" },
-    { key: "/admin/roles", icon: <SafetyOutlined />, label: "角色管理" },
-    { key: "/admin/agent", icon: <RobotOutlined />, label: "Agent 管理" },
-    { key: "/admin/call-logs", icon: <FileTextOutlined />, label: "日志管理" },
-    { key: "/admin/request-logs", icon: <CloudServerOutlined />, label: "请求管理" },
-    { key: "/admin/settings", icon: <SettingOutlined />, label: "模型设置" },
-    { key: "/admin/system-settings", icon: <ToolOutlined />, label: "系统设置" },
+import "./admin-shell.css";
+
+type AdminMenuItem = {
+    key: string;
+    icon: ReactNode;
+    label: string;
+};
+
+const adminMenuGroups: Array<{ label: string; items: AdminMenuItem[] }> = [
+    {
+        label: "总览",
+        items: [{ key: "/admin/dashboard", icon: <DashboardOutlined />, label: "运营概览" }],
+    },
+    {
+        label: "业务运营",
+        items: [
+            { key: "/admin/users", icon: <UserOutlined />, label: "用户管理" },
+            { key: "/admin/credit-logs", icon: <TransactionOutlined />, label: "算力点流水" },
+            { key: "/admin/redeem-codes", icon: <KeyOutlined />, label: "兑换码管理" },
+            { key: "/admin/announcements", icon: <NotificationOutlined />, label: "公告管理" },
+        ],
+    },
+    {
+        label: "内容与模型",
+        items: [
+            { key: "/admin/prompts", icon: <FileTextOutlined />, label: "提示词管理" },
+            { key: "/admin/prompt-presets", icon: <BarsOutlined />, label: "提示词预设" },
+            { key: "/admin/ai-text-agents", icon: <RobotOutlined />, label: "AI Agent" },
+            { key: "/admin/assets", icon: <PictureOutlined />, label: "素材库" },
+            { key: "/admin/model-classifications", icon: <AppstoreOutlined />, label: "模型分类" },
+        ],
+    },
+    {
+        label: "系统运维",
+        items: [
+            { key: "/admin/roles", icon: <SafetyOutlined />, label: "角色权限" },
+            { key: "/admin/agent", icon: <ApiOutlined />, label: "Agent 服务" },
+            { key: "/admin/call-logs", icon: <FileTextOutlined />, label: "调用日志" },
+            { key: "/admin/request-logs", icon: <CloudServerOutlined />, label: "请求日志" },
+            { key: "/admin/tasks", icon: <FieldTimeOutlined />, label: "任务管理" },
+            { key: "/admin/settings", icon: <SettingOutlined />, label: "模型设置" },
+            { key: "/admin/system-settings", icon: <ToolOutlined />, label: "系统设置" },
+        ],
+    },
 ];
 
+const adminMenus = adminMenuGroups.flatMap((group) => group.items);
+
+const adminPageDescriptions: Record<string, string> = {
+    "/admin/dashboard": "平台运营数据与服务状态总览",
+    "/admin/users": "管理平台用户、角色与账户状态",
+    "/admin/credit-logs": "查看用户算力点变动记录",
+    "/admin/redeem-codes": "生成和管理平台兑换码",
+    "/admin/announcements": "发布和管理平台公告",
+    "/admin/prompts": "维护平台提示词内容",
+    "/admin/prompt-presets": "管理常用提示词预设",
+    "/admin/ai-text-agents": "配置文本智能体与输入来源",
+    "/admin/assets": "管理平台公共素材资源",
+    "/admin/model-classifications": "配置模型类型与能力参数",
+    "/admin/roles": "管理角色权限与模型访问范围",
+    "/admin/agent": "管理画布 Agent 服务与访问控制",
+    "/admin/call-logs": "查看模型调用日志与结果",
+    "/admin/request-logs": "查看服务端 API 请求记录",
+    "/admin/tasks": "跟踪图片与视频生成任务",
+    "/admin/settings": "配置 AI 模型渠道和费用",
+    "/admin/system-settings": "配置站点、注册与通知策略",
+};
+
+function getActiveMenu(pathname: string) {
+    return adminMenus.find((item) => pathname === item.key || pathname.startsWith(`${item.key}/`)) ?? adminMenus[0];
+}
+
 export default function AdminLayout({ children }: { children: ReactNode }) {
-    const { token: antToken } = theme.useToken();
+    const { message } = App.useApp();
+    const screens = Grid.useBreakpoint();
     const router = useRouter();
     const pathname = usePathname();
     const token = useUserStore((state) => state.token);
@@ -38,37 +115,15 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
     const isReady = useUserStore((state) => state.isReady);
     const logout = useUserStore((state) => state.clearSession);
     const publicSystemSettings = useConfigStore((state) => state.publicSystemSettings);
-    const palette = useThemeStore((state) => state.palette);
-    const adminColors = useMemo(() => getAdminColors(palette), [palette]);
+    const [serverOffline, setServerOffline] = useState(false);
+    const [serverOfflineLoading, setServerOfflineLoading] = useState(false);
+    const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+    const isDesktop = Boolean(screens.lg);
     const siteName = publicSystemSettings?.siteName || "无限画布";
     const siteLogo = publicSystemSettings?.siteLogo;
-    const activeKey = pathname.startsWith("/admin/system-settings")
-        ? "/admin/system-settings"
-        : pathname.startsWith("/admin/roles")
-          ? "/admin/roles"
-          : pathname.startsWith("/admin/model-classifications")
-            ? "/admin/model-classifications"
-          : pathname.startsWith("/admin/settings")
-            ? "/admin/settings"
-            : pathname.startsWith("/admin/assets")
-              ? "/admin/assets"
-              : pathname.startsWith("/admin/agent")
-                ? "/admin/agent"
-                : pathname.startsWith("/admin/call-logs")
-                  ? "/admin/call-logs"
-                  : pathname.startsWith("/admin/request-logs")
-                    ? "/admin/request-logs"
-                    : pathname.startsWith("/admin/prompts")
-                    ? "/admin/prompts"
-                    : pathname.startsWith("/admin/redeem-codes")
-                      ? "/admin/redeem-codes"
-                      : pathname.startsWith("/admin/announcements")
-                        ? "/admin/announcements"
-                        : pathname.startsWith("/admin/credit-logs")
-                          ? "/admin/credit-logs"
-                          : pathname.startsWith("/admin/users")
-                            ? "/admin/users"
-                            : "";
+    const activeMenu = getActiveMenu(pathname);
+    const displayName = user?.displayName || user?.username || "管理员";
+    const shellStyle = { "--admin-accent": "#079a87", "--admin-accent-soft": "#e9faf6" } as CSSProperties;
 
     useEffect(() => {
         if (!isReady) return;
@@ -76,142 +131,147 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
             router.replace("/login?redirect=/admin");
             return;
         }
-        if (user?.role !== "admin") {
-            router.replace("/");
-        }
+        if (user?.role !== "admin") router.replace("/");
     }, [isReady, router, token, user?.role]);
 
-    if (!isReady || !token || user?.role !== "admin") {
-        return (
-            <div style={{ display: "flex", minHeight: "100vh", alignItems: "center", justifyContent: "center", background: "#f0f2f5" }}>
-                <span />
-            </div>
-        );
-    }
+    useEffect(() => {
+        if (!token || user?.role !== "admin") return;
+        fetchAdminServerOfflineStatus(token)
+            .then((status) => setServerOffline(Boolean(status.offline)))
+            .catch(() => undefined);
+    }, [token, user?.role]);
 
-    return (
-        <Layout hasSider style={{ height: "100vh", overflow: "hidden", background: "#f0f2f5" }}>
-            {/* 侧边栏 */}
-            <Layout.Sider
-                width={adminLayoutStyle.siderWidth}
-                style={{
-                    height: "100vh",
-                    overflow: "auto",
-                    background: "#ffffff",
-                    borderRight: "1px solid #f0f0f0",
-                    display: "flex",
-                    flexDirection: "column",
-                }}
-            >
-                {/* Logo 区域 */}
-                <Flex align="center" gap={10} style={{ height: adminLayoutStyle.brandHeight, padding: "0 20px", borderBottom: "1px solid #f0f0f0", flexShrink: 0 }}>
-                    {siteLogo ? (
-                        <img src={siteLogo} alt={siteName} style={{ width: 28, height: 28, objectFit: "contain" }} />
-                    ) : (
-                        <span aria-hidden style={{ display: "inline-block", width: 28, height: 28, background: adminColors.primary, WebkitMask: "url(/logo.svg) center / contain no-repeat", mask: "url(/logo.svg) center / contain no-repeat" }} />
-                    )}
-                    <Typography.Text strong style={{ fontSize: 16, color: "#1a1a1a", letterSpacing: -0.3 }}>
-                        {siteName}
-                    </Typography.Text>
-                </Flex>
+    useEffect(() => setMobileMenuOpen(false), [pathname]);
 
-                {/* 菜单 */}
-                <div style={{ flex: 1, overflow: "auto", padding: "8px 0" }}>
-                    {adminMenus.map((item) => {
-                        const isActive = activeKey === item.key;
-                        return (
-                            <Link
-                                key={item.key}
-                                href={item.key}
-                                style={{
-                                    display: "flex",
-                                    alignItems: "center",
-                                    gap: 10,
-                                    padding: "0 20px",
-                                    height: 42,
-                                    margin: "2px 8px",
-                                    borderRadius: 8,
-                                    color: isActive ? adminColors.primary : "#595959",
-                                    background: isActive ? adminColors.light : "transparent",
-                                    fontWeight: isActive ? 500 : 400,
-                                    fontSize: 14,
-                                    textDecoration: "none",
-                                    transition: "all 0.2s",
-                                    borderLeft: isActive ? `3px solid ${adminColors.primary}` : "3px solid transparent",
-                                }}
-                                onMouseEnter={(e) => {
-                                    if (!isActive) {
-                                        e.currentTarget.style.background = adminColors.hover;
-                                        e.currentTarget.style.color = "#1a1a1a";
-                                    }
-                                }}
-                                onMouseLeave={(e) => {
-                                    if (!isActive) {
-                                        e.currentTarget.style.background = "transparent";
-                                        e.currentTarget.style.color = "#595959";
-                                    }
-                                }}
-                            >
-                                <span style={{ fontSize: 16, display: "flex", alignItems: "center" }}>{item.icon}</span>
-                                {item.label}
+    const toggleServerOffline = async (offline: boolean) => {
+        setServerOfflineLoading(true);
+        try {
+            const status = await setAdminServerOfflineStatus(token, offline);
+            setServerOffline(Boolean(status.offline));
+            message.success(status.offline ? "已开启测试离线模式" : "已恢复服务端在线");
+        } catch (error) {
+            message.error(error instanceof Error ? error.message : "切换失败");
+        } finally {
+            setServerOfflineLoading(false);
+        }
+    };
+
+    const accountMenu: MenuProps["items"] = [{ key: "canvas", icon: <HomeOutlined />, label: <Link href="/">返回创作台</Link> }, { type: "divider" }, { key: "logout", icon: <LogoutOutlined />, danger: true, label: "退出登录", onClick: logout }];
+
+    const renderBrand = (collapsed: boolean) => (
+        <div className={`admin-brand ${collapsed ? "is-collapsed" : ""}`}>
+            <Link href="/admin/dashboard" className="admin-brand-link" aria-label={`${siteName} 管理后台`}>
+                <span className="admin-brand-logo">{siteLogo ? <img src={siteLogo} alt="" /> : <span className="admin-brand-logo-mask" />}</span>
+                {!collapsed ? (
+                    <span className="admin-brand-copy">
+                        <strong>{siteName}</strong>
+                        <small>商业管理平台</small>
+                    </span>
+                ) : null}
+            </Link>
+        </div>
+    );
+
+    const renderNavigation = (collapsed: boolean) => (
+        <nav className="admin-navigation" aria-label="后台主导航">
+            {adminMenuGroups.map((group) => (
+                <div className="admin-nav-group" key={group.label}>
+                    {!collapsed ? <div className="admin-nav-group-label">{group.label}</div> : <div className="admin-nav-divider" />}
+                    {group.items.map((item) => {
+                        const active = activeMenu.key === item.key;
+                        const link = (
+                            <Link className={`admin-nav-item ${active ? "is-active" : ""}`} href={item.key} aria-current={active ? "page" : undefined}>
+                                <span className="admin-nav-icon">{item.icon}</span>
+                                {!collapsed ? <span className="admin-nav-label">{item.label}</span> : null}
+                                {!collapsed && active ? <span className="admin-nav-active-dot" /> : null}
                             </Link>
+                        );
+                        return collapsed ? (
+                            <Tooltip title={item.label} placement="right" key={item.key}>
+                                {link}
+                            </Tooltip>
+                        ) : (
+                            <span key={item.key}>{link}</span>
                         );
                     })}
                 </div>
+            ))}
+        </nav>
+    );
 
-                {/* 底部操作 */}
-                <div style={{ padding: "12px 8px", borderTop: "1px solid #f0f0f0", flexShrink: 0 }}>
-                    <Link
-                        href="/"
-                        style={{
-                            display: "flex",
-                            alignItems: "center",
-                            gap: 10,
-                            padding: "0 12px",
-                            height: 38,
-                            borderRadius: 8,
-                            color: "#595959",
-                            textDecoration: "none",
-                            fontSize: 14,
-                            transition: "all 0.2s",
-                        }}
-                        onMouseEnter={(e) => { e.currentTarget.style.background = adminColors.hover; }}
-                        onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
-                    >
-                        <HomeOutlined />
-                        前往画布
-                    </Link>
-                    <button
-                        onClick={logout}
-                        style={{
-                            display: "flex",
-                            alignItems: "center",
-                            gap: 10,
-                            padding: "0 12px",
-                            height: 38,
-                            width: "100%",
-                            borderRadius: 8,
-                            color: "#595959",
-                            background: "none",
-                            border: "none",
-                            cursor: "pointer",
-                            fontSize: 14,
-                            fontFamily: "inherit",
-                            transition: "all 0.2s",
-                        }}
-                        onMouseEnter={(e) => { e.currentTarget.style.background = adminColors.hover; }}
-                        onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
-                    >
-                        <LogoutOutlined />
-                        退出登录
-                    </button>
-                </div>
-            </Layout.Sider>
+    const renderSidebarFooter = (collapsed: boolean) => (
+        <div className="admin-sidebar-footer">
+            <div className={`admin-server-state ${serverOffline ? "is-offline" : ""} ${collapsed ? "is-collapsed" : ""}`}>
+                <span className="admin-server-state-dot" />
+                {!collapsed ? (
+                    <div className="admin-server-state-copy">
+                        <strong>{serverOffline ? "测试离线" : "系统运行正常"}</strong>
+                        <span>{serverOffline ? "客户端服务已暂停" : "API 与实时服务在线"}</span>
+                    </div>
+                ) : null}
+                {!collapsed ? <Switch size="small" checked={serverOffline} loading={serverOfflineLoading} onChange={(checked) => void toggleServerOffline(checked)} aria-label="切换测试离线模式" /> : null}
+            </div>
+        </div>
+    );
 
-            {/* 右侧内容区 */}
-            <Layout style={{ background: "#f0f2f5" }}>
-                <Layout.Content style={{ minHeight: 0, overflow: "auto", padding: 0 }}>
-                    {children}
+    const sidebar = (collapsed: boolean) => (
+        <div className="admin-sidebar-inner">
+            {renderBrand(collapsed)}
+            {renderNavigation(collapsed)}
+            {renderSidebarFooter(collapsed)}
+        </div>
+    );
+
+    if (!isReady || !token || user?.role !== "admin") return <div className="admin-loading-screen" />;
+
+    return (
+        <Layout className="admin-shell" style={shellStyle} hasSider>
+            {isDesktop ? (
+                <Layout.Sider className="admin-sider" width={252} trigger={null} theme="light">
+                    {sidebar(false)}
+                </Layout.Sider>
+            ) : null}
+
+            <Drawer className="admin-mobile-drawer" placement="left" size={280} open={!isDesktop && mobileMenuOpen} onClose={() => setMobileMenuOpen(false)} closable={false} styles={{ body: { padding: 0 } }}>
+                {sidebar(false)}
+            </Drawer>
+
+            <Layout className="admin-main-layout">
+                <Layout.Header className="admin-topbar">
+                    <Flex align="center" gap={12} className="admin-topbar-context">
+                        {!isDesktop ? <Button type="text" icon={<MenuUnfoldOutlined />} aria-label="打开导航" onClick={() => setMobileMenuOpen(true)} /> : null}
+                        <div>
+                            <Typography.Title level={5} className="admin-topbar-title">
+                                {activeMenu.label}
+                            </Typography.Title>
+                            <Typography.Text className="admin-topbar-eyebrow">{adminPageDescriptions[activeMenu.key]}</Typography.Text>
+                        </div>
+                    </Flex>
+                    <Flex align="center" gap={8}>
+                        <Tag className={`admin-live-tag ${serverOffline ? "is-offline" : ""}`}>
+                            <span className="admin-live-dot" />
+                            {serverOffline ? "服务离线" : "服务在线"}
+                        </Tag>
+                        <Tooltip title="公告中心">
+                            <Link href="/admin/announcements" className="admin-icon-action" aria-label="公告中心">
+                                <BellOutlined />
+                            </Link>
+                        </Tooltip>
+                        <Dropdown menu={{ items: accountMenu }} placement="bottomRight" trigger={["click"]}>
+                            <button type="button" className="admin-account-button" aria-label="账户菜单">
+                                <Avatar size={34} src={user.avatarUrl || undefined} icon={<UserOutlined />} />
+                                {isDesktop ? (
+                                    <span className="admin-account-copy">
+                                        <strong>{displayName}</strong>
+                                        <small>超级管理员</small>
+                                    </span>
+                                ) : null}
+                            </button>
+                        </Dropdown>
+                    </Flex>
+                </Layout.Header>
+                <Layout.Content className="admin-content">
+                    <main className="admin-content-inner">{children}</main>
                 </Layout.Content>
             </Layout>
         </Layout>

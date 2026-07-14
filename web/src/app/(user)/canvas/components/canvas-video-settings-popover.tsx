@@ -7,8 +7,9 @@ import { Button } from "antd";
 
 import { VideoSettingsPanel, videoResolutionLabel, videoSecondsLabel, videoSizeLabel } from "@/components/video-settings-panel";
 import { useCanvasTheme } from "@/hooks/use-canvas-theme";
-import { useThemeStore } from "@/stores/use-theme-store";
 import type { AiConfig } from "@/stores/use-config-store";
+import type { CanvasTheme } from "@/lib/canvas-theme";
+import { CanvasMobileSettingsPortal } from "./canvas-mobile-settings-portal";
 
 type CanvasVideoSettingsPopoverProps = {
     config: AiConfig;
@@ -23,6 +24,15 @@ export function CanvasVideoSettingsPopover({ config, onConfigChange, buttonClass
     const panelRef = useRef<HTMLDivElement>(null);
     const [open, setOpen] = useState(false);
     const [buttonRect, setButtonRect] = useState<DOMRect | null>(null);
+    const [mobileFullscreen, setMobileFullscreen] = useState(false);
+
+    useEffect(() => {
+        const query = window.matchMedia("(max-width: 767px), (pointer: coarse)");
+        const update = () => setMobileFullscreen(query.matches);
+        update();
+        query.addEventListener("change", update);
+        return () => query.removeEventListener("change", update);
+    }, []);
 
     useEffect(() => {
         if (!open) return;
@@ -31,7 +41,7 @@ export function CanvasVideoSettingsPopover({ config, onConfigChange, buttonClass
             const target = event.target;
             if (!(target instanceof Node)) return;
             if (buttonRef.current?.contains(target) || panelRef.current?.contains(target)) return;
-            setOpen(false);
+            if (!mobileFullscreen) setOpen(false);
         };
 
         syncPosition();
@@ -43,9 +53,15 @@ export function CanvasVideoSettingsPopover({ config, onConfigChange, buttonClass
             window.removeEventListener("scroll", syncPosition, true);
             window.removeEventListener("pointerdown", closeOnOutsidePointer, true);
         };
-    }, [open]);
+    }, [mobileFullscreen, open]);
 
-    const panel = open && buttonRect ? <VideoSettingsPortal buttonRect={buttonRect} panelRef={panelRef} placement={placement} theme={theme} config={config} onConfigChange={onConfigChange} /> : null;
+    const panel = open ? (
+        mobileFullscreen ? (
+            <MobileVideoSettingsPortal panelRef={panelRef} theme={theme} config={config} onConfigChange={onConfigChange} onClose={() => setOpen(false)} />
+        ) : buttonRect ? (
+            <VideoSettingsPortal buttonRect={buttonRect} panelRef={panelRef} placement={placement} theme={theme} config={config} onConfigChange={onConfigChange} />
+        ) : null
+    ) : null;
 
     return (
         <>
@@ -58,6 +74,26 @@ export function CanvasVideoSettingsPopover({ config, onConfigChange, buttonClass
             </span>
             {panel}
         </>
+    );
+}
+
+function MobileVideoSettingsPortal({
+    panelRef,
+    theme,
+    config,
+    onConfigChange,
+    onClose,
+}: {
+    panelRef: RefObject<HTMLDivElement | null>;
+    theme: CanvasTheme;
+    config: AiConfig;
+    onConfigChange: (key: keyof AiConfig, value: string) => void;
+    onClose: () => void;
+}) {
+    return (
+        <CanvasMobileSettingsPortal panelRef={panelRef} theme={theme} title="视频设置" closeLabel="关闭视频设置" onClose={onClose}>
+            <VideoSettingsPanel config={config} onConfigChange={(key, value) => onConfigChange(key, value)} theme={theme} showTitle={false} className="mobile-image-settings-panel mx-auto w-full max-w-[560px] space-y-6 pb-28" />
+        </CanvasMobileSettingsPortal>
     );
 }
 

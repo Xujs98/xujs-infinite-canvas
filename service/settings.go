@@ -107,17 +107,57 @@ func normalizePublicSettingWithChannels(setting model.PublicSetting, channels []
 }
 
 func ModelCost(modelName string) (int, error) {
-	settings, err := repository.GetSettings()
+	item, err := ModelCostConfig(modelName)
 	if err != nil {
 		return 0, err
+	}
+	return item.Credits, nil
+}
+
+func ModelCostConfig(modelName string) (model.ModelCost, error) {
+	settings, err := repository.GetSettings()
+	if err != nil {
+		return model.ModelCost{}, err
 	}
 	modelName = strings.TrimSpace(modelName)
 	for _, item := range normalizePublicSetting(settings.Public).ModelChannel.ModelCosts {
 		if item.Model == modelName {
-			return item.Credits, nil
+			return item, nil
 		}
 	}
-	return 0, nil
+	return model.ModelCost{Model: modelName}, nil
+}
+
+func CalculateModelCredits(modelName string, quantity int, seconds int, mediaType string) (int, error) {
+	if quantity <= 0 {
+		quantity = 1
+	}
+	if seconds <= 0 {
+		seconds = 1
+	}
+	item, err := ModelCostConfig(modelName)
+	if err != nil {
+		return 0, err
+	}
+	credits := item.Credits * quantity
+	if mediaType == "video" && VideoModelBillingMode(modelName) != "per_call" {
+		credits *= seconds
+	}
+	return credits, nil
+}
+
+func VideoModelBillingMode(modelName string) string {
+	classification, err := GetModelClassificationByModelName(strings.TrimSpace(modelName))
+	if err != nil || classification == nil || classification.VideoConfig == nil {
+		return "per_second"
+	}
+	if classification.Capability != "" && classification.Capability != "video" {
+		return "per_second"
+	}
+	if classification.VideoConfig.BillingMode == "per_call" {
+		return "per_call"
+	}
+	return "per_second"
 }
 
 func normalizePrivateSetting(setting model.PrivateSetting) model.PrivateSetting {
@@ -489,4 +529,14 @@ func modelChannelsForModel(channels []model.ModelChannel, modelName string) []mo
 		}
 	}
 	return result
+}
+
+// GetRawPrivateChannels 直接读取私有渠道配置（含 API Key），不隐藏敏感字段。
+func GetRawPrivateChannels() ([]model.ModelChannel, error) {
+	settings, err := repository.GetSettings()
+	if err != nil {
+		return nil, err
+	}
+	settings = normalizeSettings(settings)
+	return settings.Private.Channels, nil
 }

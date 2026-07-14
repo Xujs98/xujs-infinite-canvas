@@ -9,6 +9,7 @@ import { ImageSettingsPanel, imageQualityLabel, imageSizeLabel } from "@/compone
 import type { CanvasTheme } from "@/lib/canvas-theme";
 import { useCanvasTheme } from "@/hooks/use-canvas-theme";
 import type { AiConfig } from "@/stores/use-config-store";
+import { CanvasMobileSettingsPortal } from "./canvas-mobile-settings-portal";
 
 type CanvasImageSettingsPopoverProps = {
     config: AiConfig;
@@ -27,6 +28,7 @@ export function CanvasImageSettingsPopover({ config, onConfigChange, onOpenChang
     const panelRef = useRef<HTMLDivElement>(null);
     const [open, setOpen] = useState(false);
     const [buttonRect, setButtonRect] = useState<DOMRect | null>(null);
+    const [mobileFullscreen, setMobileFullscreen] = useState(false);
     const quality = config.quality || "auto";
     const count = Math.max(1, Math.min(15, Math.floor(Math.abs(Number(config.count)) || 1)));
     const activeSize = config.size || "auto";
@@ -36,6 +38,14 @@ export function CanvasImageSettingsPopover({ config, onConfigChange, onOpenChang
     };
 
     useEffect(() => {
+        const query = window.matchMedia("(max-width: 767px), (pointer: coarse)");
+        const update = () => setMobileFullscreen(query.matches);
+        update();
+        query.addEventListener("change", update);
+        return () => query.removeEventListener("change", update);
+    }, []);
+
+    useEffect(() => {
         if (!open) return;
         const syncPosition = () => setButtonRect(buttonRef.current?.getBoundingClientRect() || null);
         const closeOnOutsidePointer = (event: PointerEvent) => {
@@ -43,8 +53,7 @@ export function CanvasImageSettingsPopover({ config, onConfigChange, onOpenChang
             if (!(target instanceof Node)) return;
             if (buttonRef.current?.contains(target) || panelRef.current?.contains(target)) return;
             if (document.activeElement instanceof HTMLElement && panelRef.current?.contains(document.activeElement)) document.activeElement.blur();
-            setOpen(false);
-            onOpenChange?.(false);
+            if (!mobileFullscreen) updateOpen(false);
         };
 
         syncPosition();
@@ -56,9 +65,15 @@ export function CanvasImageSettingsPopover({ config, onConfigChange, onOpenChang
             window.removeEventListener("scroll", syncPosition, true);
             window.removeEventListener("pointerdown", closeOnOutsidePointer, true);
         };
-    }, [onOpenChange, open]);
+    }, [mobileFullscreen, onOpenChange, open]);
 
-    const panel = open && buttonRect ? <ImageSettingsPortal buttonRect={buttonRect} panelRef={panelRef} placement={placement} theme={theme} config={config} onConfigChange={onConfigChange} /> : null;
+    const panel = open ? (
+        mobileFullscreen ? (
+            <MobileImageSettingsPortal panelRef={panelRef} theme={theme} config={config} onConfigChange={onConfigChange} onClose={() => updateOpen(false)} />
+        ) : buttonRect ? (
+            <ImageSettingsPortal buttonRect={buttonRect} panelRef={panelRef} placement={placement} theme={theme} config={config} onConfigChange={onConfigChange} />
+        ) : null
+    ) : null;
 
     return (
         <>
@@ -71,6 +86,26 @@ export function CanvasImageSettingsPopover({ config, onConfigChange, onOpenChang
             </span>
             {panel}
         </>
+    );
+}
+
+function MobileImageSettingsPortal({
+    panelRef,
+    theme,
+    config,
+    onConfigChange,
+    onClose,
+}: {
+    panelRef: RefObject<HTMLDivElement | null>;
+    theme: CanvasTheme;
+    config: AiConfig;
+    onConfigChange: (key: keyof AiConfig, value: string) => void;
+    onClose: () => void;
+}) {
+    return (
+        <CanvasMobileSettingsPortal panelRef={panelRef} theme={theme} title="图像设置" closeLabel="关闭图像设置" onClose={onClose}>
+            <ImageSettingsPanel config={config} onConfigChange={(key, value) => onConfigChange(key, value)} theme={theme} showTitle={false} className="mobile-image-settings-panel mx-auto w-full max-w-[560px] space-y-6 pb-28" />
+        </CanvasMobileSettingsPortal>
     );
 }
 

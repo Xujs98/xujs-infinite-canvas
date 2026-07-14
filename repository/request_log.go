@@ -4,7 +4,7 @@ import (
 	"github.com/basketikun/infinite-canvas/model"
 )
 
-func ListRequestLogs(q model.Query, method string) (model.RequestLogList, error) {
+func ListRequestLogs(q model.Query, method string, source string) (model.RequestLogList, error) {
 	var list model.RequestLogList
 	db, err := DB()
 	if err != nil {
@@ -18,6 +18,9 @@ func ListRequestLogs(q model.Query, method string) (model.RequestLogList, error)
 	}
 	if method != "" {
 		db = db.Where("method = ?", method)
+	}
+	if source != "" {
+		db = db.Where("source = ?", source)
 	}
 
 	if err := db.Count(&list.Total).Error; err != nil {

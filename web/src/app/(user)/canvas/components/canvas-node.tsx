@@ -36,10 +36,10 @@ type CanvasNodeProps = {
     batchOpening?: boolean;
     batchRecovering?: boolean;
     batchMotion?: { x: number; y: number; index: number };
-    onMouseDown: (event: React.MouseEvent, nodeId: string) => void;
+    onMouseDown: (event: React.MouseEvent | React.PointerEvent, nodeId: string) => void;
     onHoverStart: (nodeId: string) => void;
     onHoverEnd: (nodeId: string) => void;
-    onConnectStart: (event: React.MouseEvent, nodeId: string, handleType: "source" | "target") => void;
+    onConnectStart: (event: React.MouseEvent | React.PointerEvent, nodeId: string, handleType: "source" | "target") => void;
     onResize: (nodeId: string, width: number, height: number, position?: Position) => void;
     onContentChange: (nodeId: string, content: string) => void;
     onToggleBatch?: (nodeId: string) => void;
@@ -266,6 +266,11 @@ export const CanvasNode = React.memo(function CanvasNode({
                     boxShadow: isActive ? `0 0 0 1px ${selectionBlue}55` : isRelated && !isBatchChild ? `0 0 0 1px ${theme.node.muted}55, 0 18px 48px rgba(0,0,0,.14)` : undefined,
                 }}
                 onMouseDown={(event) => onMouseDown(event, data.id)}
+                onPointerDown={(event) => {
+                    if (event.pointerType !== "touch") return;
+                    event.preventDefault();
+                    onMouseDown(event, data.id);
+                }}
                 onDoubleClick={(event) => {
                     if (isBatchRoot) {
                         event.stopPropagation();
@@ -338,6 +343,7 @@ export const CanvasNode = React.memo(function CanvasNode({
 function NodeContent(props: NodeContentRendererProps) {
     if (props.node.type === CanvasNodeType.Config && props.renderNodeContent) return props.renderNodeContent(props.node);
     if (props.isBatchRoot) return <ImageNodeContent {...props} />;
+    if (props.node.type === CanvasNodeType.Video && props.node.metadata?.content) return <VideoNodeContent {...props} />;
     if (props.node.metadata?.status === "loading") return <LoadingContent theme={props.theme} node={props.node} />;
     if (props.node.metadata?.status === "error") return <ErrorContent node={props.node} theme={props.theme} onRetry={props.onRetry} />;
 
@@ -677,17 +683,22 @@ function ResizeHandle({ corner, onMouseDown }: { corner: ResizeCorner; onMouseDo
     return <div className={`absolute z-50 size-7 ${positionClass}`} onMouseDown={(event) => onMouseDown(event, corner)} />;
 }
 
-function ConnectionHandleDot({ side, visible, onMouseDown }: { side: "left" | "right"; visible: boolean; onMouseDown: (event: React.MouseEvent) => void }) {
+function ConnectionHandleDot({ side, visible, onMouseDown }: { side: "left" | "right"; visible: boolean; onMouseDown: (event: React.MouseEvent | React.PointerEvent) => void }) {
     const theme = useCanvasTheme();
 
     return (
         <div
-            className={`absolute top-1/2 z-30 flex size-12 -translate-y-1/2 cursor-crosshair items-center justify-center transition-opacity duration-150 ${
+            className={`canvas-connection-handle absolute top-1/2 z-30 flex size-12 -translate-y-1/2 cursor-crosshair items-center justify-center transition-opacity duration-150 ${
                 side === "left" ? "-left-6" : "-right-6"
             } ${visible ? "pointer-events-auto opacity-100" : "pointer-events-none opacity-0"}`}
             onMouseDown={onMouseDown}
+            onPointerDown={(event) => {
+                if (event.pointerType !== "touch") return;
+                event.preventDefault();
+                onMouseDown(event);
+            }}
         >
-            <div className="size-3 rounded-full border-2 transition-all hover:scale-125" style={{ background: theme.node.panel, borderColor: theme.node.muted }} />
+            <div className="canvas-connection-handle-dot size-3 rounded-full border-2 transition-all hover:scale-125" style={{ background: theme.node.panel, borderColor: theme.node.muted, boxShadow: visible ? `0 0 12px ${theme.node.activeStroke}66` : undefined }} />
         </div>
     );
 }

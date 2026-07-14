@@ -6,6 +6,9 @@ export type AdminRole = {
     label: string;
     description: string;
     allowedModels: string[];
+    freeModels: string[];
+    allowOffline: boolean;
+    offlineCreditLimit: number;
     isBuiltin: boolean;
     createdAt: string;
     updatedAt: string;

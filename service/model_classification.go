@@ -34,6 +34,7 @@ func UpdateModelClassification(id string, classification model.ModelClassificati
 	existing.VideoConfig = classification.VideoConfig
 	existing.ImageConfig = classification.ImageConfig
 	existing.AudioConfig = classification.AudioConfig
+	existing.ChatConfig = classification.ChatConfig
 	existing.UpdatedAt = time.Now().Format(time.RFC3339)
 	return repository.SaveModelClassification(existing)
 }

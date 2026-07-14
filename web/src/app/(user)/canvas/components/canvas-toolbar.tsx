@@ -1,7 +1,7 @@
 import type { CSSProperties, MouseEvent as ReactMouseEvent, ReactNode, RefObject } from "react";
 import { useEffect, useRef, useState } from "react";
 import { Button, Segmented, Switch } from "antd";
-import { CircleDot, Sparkles, Eraser, FolderOpen, Grid2x2, Hand, Image as ImageIcon, Info, Library, Moon, Music2, Palette, Redo2, Settings2, Square, Sun, Trash2, Type, Undo2, Upload, Video, Clapperboard } from "lucide-react";
+import { CircleDot, Sparkles, Eraser, FolderOpen, Grid2x2, Hand, Image as ImageIcon, Info, Library, Moon, MousePointer2, Music2, Palette, Redo2, Settings2, Square, Sun, Trash2, Type, Undo2, Upload, Video, Clapperboard, X } from "lucide-react";
 
 import { canvasThemes, type CanvasBackgroundMode, type CanvasColorTheme, type CanvasTheme, type ThemePalette, themePaletteLabels, themePalettePreviews } from "@/lib/canvas-theme";
 import { useCanvasTheme } from "@/hooks/use-canvas-theme";
@@ -12,6 +12,7 @@ const allPalettes: ThemePalette[] = ["stone", "blue", "emerald", "rose", "amber"
 
 export function CanvasToolbar({
     selectedCount,
+    selectionMode,
     canUndo,
     canRedo,
     backgroundMode,
@@ -27,6 +28,7 @@ export function CanvasToolbar({
     onDelete,
     onClear,
     onDeselect,
+    onSelectionModeChange,
     onBackgroundModeChange,
     onShowImageInfoChange,
     onOpenAssetLibrary,
@@ -35,6 +37,7 @@ export function CanvasToolbar({
     onOpenTimeline,
 }: {
     selectedCount: number;
+    selectionMode: boolean;
     canUndo: boolean;
     canRedo: boolean;
     backgroundMode: CanvasBackgroundMode;
@@ -50,6 +53,7 @@ export function CanvasToolbar({
     onDelete: () => void;
     onClear: () => void;
     onDeselect: () => void;
+    onSelectionModeChange: (enabled: boolean) => void;
     onBackgroundModeChange: (mode: CanvasBackgroundMode) => void;
     onShowImageInfoChange: (show: boolean) => void;
     onOpenAssetLibrary: () => void;
@@ -66,8 +70,17 @@ export function CanvasToolbar({
     const [hovered, setHovered] = useState<string | null>(null);
     const [tipX, setTipX] = useState(0);
     const [appearanceOpen, setAppearanceOpen] = useState(false);
+    const [isMobile, setIsMobile] = useState(false);
     const [panelX, setPanelX] = useState(0);
     const panelRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        const query = window.matchMedia("(max-width: 767px)");
+        const update = () => setIsMobile(query.matches);
+        update();
+        query.addEventListener("change", update);
+        return () => query.removeEventListener("change", update);
+    }, []);
 
     // 点击工具栏和面板外部时关闭画布外观面板
     useEffect(() => {
@@ -87,9 +100,9 @@ export function CanvasToolbar({
     const tip = hovered ? toolLabel(hovered) : "";
 
     return (
-        <div className="pointer-events-none absolute bottom-5 z-50 flex justify-center" style={{ left: 300, right: 16 }}>
+        <div className={`pointer-events-none absolute bottom-[max(1rem,env(safe-area-inset-bottom))] left-3 right-3 flex justify-center md:left-[300px] md:right-4 ${appearanceOpen && isMobile ? "z-[2000]" : "z-50"}`}>
             {tip ? <DockTip label={tip} x={tipX} theme={theme} /> : null}
-            <div ref={wrapRef} className="thin-scrollbar glass pointer-events-auto flex h-14 max-w-full items-center gap-1 overflow-x-auto rounded-xl border px-2 shadow-lg [&>*]:shrink-0" style={dockStyle}>
+            <div ref={wrapRef} className="thin-scrollbar glass pointer-events-auto flex h-14 max-w-full touch-pan-x items-center gap-1 overflow-x-auto rounded-xl border px-2 shadow-lg [scrollbar-width:none] [&>*]:shrink-0 [&::-webkit-scrollbar]:hidden" style={dockStyle}>
                 <ToolbarButton id="tool-hand" label="移动/选择" active={!selectedCount} hovered={hovered} activeStyle={activeStyle} hoverStyle={hoverStyle} wrapRef={wrapRef} onTipX={setTipX} onHover={setHovered} onClick={onDeselect}>
                     <Hand className="size-4.5" />
                 </ToolbarButton>
@@ -133,6 +146,11 @@ export function CanvasToolbar({
                 <ToolbarButton id="tool-assets" label="我的素材" hovered={hovered} hoverStyle={hoverStyle} wrapRef={wrapRef} onTipX={setTipX} onHover={setHovered} onClick={onOpenMyAssets}>
                     <FolderOpen className="size-4.5" />
                 </ToolbarButton>
+                <div className="md:hidden">
+                    <ToolbarButton id="tool-select" label="选择" active={selectionMode} hovered={hovered} activeStyle={activeStyle} hoverStyle={hoverStyle} wrapRef={wrapRef} onTipX={setTipX} onHover={setHovered} onClick={() => onSelectionModeChange(!selectionMode)}>
+                        <MousePointer2 className="size-4.5" />
+                    </ToolbarButton>
+                </div>
                 <ToolbarButton
                     id="tool-style"
                     label="画布外观"
@@ -167,10 +185,24 @@ export function CanvasToolbar({
             {appearanceOpen ? (
                 <div
                     ref={panelRef}
-                    className="pointer-events-auto glass absolute bottom-[72px] z-30 w-[264px] -translate-x-1/2 rounded-xl border p-2.5 shadow-xl"
-                    style={{ left: panelX || "50%", background: theme.toolbar.panel, borderColor: theme.toolbar.border, color: theme.toolbar.item }}
+                    className={
+                        isMobile
+                            ? "pointer-events-auto fixed inset-0 z-[90] overflow-y-auto border-0 p-4 pt-[max(1rem,env(safe-area-inset-top))] shadow-none"
+                            : "pointer-events-auto glass absolute bottom-[72px] z-30 w-[min(264px,calc(100vw-2rem))] -translate-x-1/2 rounded-xl border p-2.5 shadow-xl"
+                    }
+                    style={{
+                        ...(isMobile ? {} : { left: panelX || "50%" }),
+                        background: isMobile ? theme.canvas.background : theme.toolbar.panel,
+                        borderColor: theme.toolbar.border,
+                        color: theme.toolbar.item,
+                    }}
                 >
-                    <div className="px-1 pb-2 text-sm font-medium opacity-65">画布外观</div>
+                    <div className={isMobile ? "mb-4 flex items-center justify-between border-b pb-3" : "px-1 pb-2 text-sm font-medium opacity-65"} style={isMobile ? { borderColor: theme.toolbar.border } : undefined}>
+                        <span className={isMobile ? "text-base font-semibold" : undefined}>画布外观</span>
+                        {isMobile ? (
+                            <Button type="text" aria-label="关闭" className="!h-9 !w-9 !min-w-9 !rounded-full !p-0" style={{ color: theme.toolbar.item }} icon={<X className="size-5" />} onClick={() => setAppearanceOpen(false)} />
+                        ) : null}
+                    </div>
                     <div className="px-1 pb-1.5 text-[11px] font-medium opacity-50">主题模式</div>
                     <div className="grid grid-cols-2 gap-1 rounded-lg p-1" style={{ background: theme.toolbar.itemHover }}>
                         <CanvasThemeButton colorTheme={colorTheme} targetTheme="light" onThemeChange={setTheme}>
@@ -291,7 +323,7 @@ function ToolbarButton({
         <Button
             type="text"
             aria-label={label}
-            className="!h-8 !w-8 !min-w-8 !p-0"
+            className="!h-10 !w-10 !min-w-10 !p-0 md:!h-8 md:!w-8 md:!min-w-8"
             disabled={disabled}
             style={active ? activeStyle : hovered === id && !disabled ? hoverStyle : { color: danger ? "#f87171" : theme.toolbar.item, opacity: disabled ? 0.35 : 1 }}
             icon={children}
@@ -350,6 +382,7 @@ function toolLabel(id: string) {
     if (id === "tool-upload") return "上传素材";
     if (id === "tool-library") return "素材库";
     if (id === "tool-assets") return "我的素材";
+    if (id === "tool-select") return "选择";
     if (id === "tool-style") return "画布外观";
     if (id === "tool-delete") return "删除选中";
     if (id === "tool-clear") return "清空画布";

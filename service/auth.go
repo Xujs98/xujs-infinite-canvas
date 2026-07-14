@@ -16,11 +16,14 @@ import (
 	"github.com/basketikun/infinite-canvas/config"
 	"github.com/basketikun/infinite-canvas/model"
 	"github.com/basketikun/infinite-canvas/repository"
+	"github.com/basketikun/infinite-canvas/ws"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
 	"golang.org/x/crypto/bcrypt"
 	"gorm.io/gorm"
 )
+
+const displayNameMaxLength = 6
 
 type TokenClaims struct {
 	UserID   string         `json:"userId"`
@@ -146,15 +149,15 @@ func Register(username string, password string, affCode string) (model.AuthSessi
 					"updated_at": now(),
 				})
 				inviter, _, _ := repository.GetUserByID(inviterID)
-			repository.SaveCreditLog(model.CreditLog{
-				ID:        newID("credit"),
-				UserID:    inviterID,
-				Type:      model.CreditLogTypeInviteReward,
-				Amount:    rewardCredits,
-				Balance:   inviter.Credits,
-				Remark:    "邀请新用户 " + username + " 注册",
-				CreatedAt: now(),
-			})
+				repository.SaveCreditLog(model.CreditLog{
+					ID:        newID("credit"),
+					UserID:    inviterID,
+					Type:      model.CreditLogTypeInviteReward,
+					Amount:    rewardCredits,
+					Balance:   inviter.Credits,
+					Remark:    "邀请新用户 " + username + " 注册",
+					CreatedAt: now(),
+				})
 			}
 		} else {
 			db, dbErr := repository.DB()
@@ -302,9 +305,15 @@ func ListUsers(q model.Query) (model.UserList, error) {
 	if err != nil {
 		return model.UserList{}, err
 	}
+	online := ws.DefaultHub.OnlineSnapshot()
 	for i := range users {
 		users[i].Password = ""
 		normalizeUserDefaults(&users[i])
+		if status, ok := online[users[i].ID]; ok {
+			users[i].Online = status.Online
+			users[i].OnlineApp = status.App
+			users[i].OnlineWeb = status.Web
+		}
 	}
 	return model.UserList{Items: users, Total: int(total)}, nil
 }
@@ -381,7 +390,11 @@ func UpdateProfile(userID string, displayName string, password string) (model.Au
 		}
 		return model.AuthUser{}, safeMessageError{message: "用户不存在"}
 	}
+	displayName = strings.TrimSpace(displayName)
 	if displayName != "" {
+		if len([]rune(displayName)) > displayNameMaxLength {
+			return model.AuthUser{}, safeMessageError{message: "昵称最多6个字"}
+		}
 		user.DisplayName = displayName
 	}
 	if password != "" {
@@ -513,17 +526,41 @@ func ConsumeUserCredits(userID string, modelName string, credits int, path strin
 }
 
 func LogMembershipFreeUsage(userID string, modelName string, credits int, path string) {
+	balance := currentUserCredits(userID)
 	extra, _ := json.Marshal(map[string]string{"model": modelName, "path": path})
 	_, _ = repository.SaveCreditLog(model.CreditLog{
 		ID:        newID("credit"),
 		UserID:    userID,
 		Type:      model.CreditLogTypeMembershipFree,
 		Amount:    0,
-		Balance:   0,
+		Balance:   balance,
 		Remark:    "调用模型 " + modelName,
 		Extra:     string(extra),
 		CreatedAt: now(),
 	})
+}
+
+func LogRoleFreeUsage(userID string, roleName string, modelName string, credits int, path string) {
+	balance := currentUserCredits(userID)
+	extra, _ := json.Marshal(map[string]string{"model": modelName, "path": path, "role": roleName})
+	_, _ = repository.SaveCreditLog(model.CreditLog{
+		ID:        newID("credit"),
+		UserID:    userID,
+		Type:      model.CreditLogTypeRoleFree,
+		Amount:    0,
+		Balance:   balance,
+		Remark:    "角色免费调用模型 " + modelName,
+		Extra:     string(extra),
+		CreatedAt: now(),
+	})
+}
+
+func currentUserCredits(userID string) int {
+	user, ok, err := repository.GetUserByID(userID)
+	if err != nil || !ok {
+		return 0
+	}
+	return user.Credits
 }
 
 func RefundUserCredits(userID string, modelName string, credits int, path string) error {
@@ -556,6 +593,8 @@ func ListCreditLogs(q model.Query) (model.CreditLogList, error) {
 	if err != nil {
 		return model.CreditLogList{}, err
 	}
+	normalizeOfflineCreditLogTypes(logs)
+	fillFreeCreditLogBalances(logs)
 	// 收集用户 ID，批量查询用户名。
 	ids := make([]string, 0)
 	for _, l := range logs {
@@ -574,6 +613,41 @@ func ListCreditLogs(q model.Query) (model.CreditLogList, error) {
 		}
 	}
 	return model.CreditLogList{Items: logs, Total: int(total)}, nil
+}
+
+func normalizeOfflineCreditLogTypes(logs []model.CreditLog) {
+	for i := range logs {
+		if !strings.HasPrefix(logs[i].RelatedID, "offline:") {
+			continue
+		}
+		switch logs[i].Type {
+		case model.CreditLogTypeAIConsume:
+			logs[i].Type = model.CreditLogTypeOfflineConsume
+		case model.CreditLogTypeAIRefund:
+			logs[i].Type = model.CreditLogTypeOfflineRefund
+		}
+	}
+}
+
+func fillFreeCreditLogBalances(logs []model.CreditLog) {
+	userCredits := map[string]int{}
+	for i := range logs {
+		if logs[i].Balance != 0 || logs[i].UserID == "" {
+			continue
+		}
+		if logs[i].Type != model.CreditLogTypeMembershipFree && logs[i].Type != model.CreditLogTypeRoleFree {
+			continue
+		}
+		credits, ok := userCredits[logs[i].UserID]
+		if !ok {
+			credits = currentUserCredits(logs[i].UserID)
+			if credits <= 0 {
+				continue
+			}
+			userCredits[logs[i].UserID] = credits
+		}
+		logs[i].Balance = credits
+	}
 }
 
 // IsMembershipActive 判断会员是否在有效期内。

@@ -15,7 +15,10 @@ const creditLogTypeLabels: Record<string, string> = {
     admin_adjust: "后台调整",
     ai_consume: "模型消费",
     ai_refund: "失败返还",
+    offline_consume: "离线消费",
+    offline_refund: "离线返还",
     membership_free: "会员免费",
+    role_free: "角色免费",
     invite_reward: "邀请奖励",
     redeem: "兑换卡密",
     check_in: "签到奖励",
@@ -25,11 +28,21 @@ const tagColorMap: Record<string, string> = {
     admin_adjust: "blue",
     ai_consume: "red",
     ai_refund: "green",
+    offline_consume: "volcano",
+    offline_refund: "green",
     membership_free: "cyan",
+    role_free: "geekblue",
     invite_reward: "purple",
     redeem: "gold",
     check_in: "lime",
 };
+
+function resolveCreditLogType(item: AdminCreditLog): string {
+    if (item.relatedId?.startsWith("offline:") || item.remark?.startsWith("离线结算")) {
+        return item.amount >= 0 ? "offline_refund" : "offline_consume";
+    }
+    return item.type || "";
+}
 
 export default function AdminCreditLogsPage() {
     const { logs, keyword, page, pageSize, total, isLoading, searchLogs, changePage, changePageSize, resetFilters, refreshLogs, saveLog: saveAdminLog, deleteLog, batchDeleteLogs } = useAdminCreditLogs();
@@ -69,18 +82,27 @@ export default function AdminCreditLogsPage() {
             title: "类型",
             dataIndex: "type",
             width: 140,
-            render: (_, item) => <Tag color={tagColorMap[item.type]}>{creditLogTypeLabels[item.type] || item.type || "-"}</Tag>,
+            render: (_, item) => {
+                const displayType = resolveCreditLogType(item);
+                return <Tag color={tagColorMap[displayType]}>{creditLogTypeLabels[displayType] || displayType || "-"}</Tag>;
+            },
         },
         {
             title: "变动",
             dataIndex: "amount",
             width: 100,
-            render: (_, item) => item.type === "membership_free" ? <Typography.Text type="success">会员免费</Typography.Text> : <Typography.Text type={item.amount >= 0 ? "success" : "danger"}>{item.amount}</Typography.Text>,
+            render: (_, item) =>
+                item.type === "membership_free" || item.type === "role_free" ? (
+                    <Typography.Text type="success">{creditLogTypeLabels[item.type]}</Typography.Text>
+                ) : (
+                    <Typography.Text type={item.amount >= 0 ? "success" : "danger"}>{item.amount}</Typography.Text>
+                ),
         },
         {
             title: "余额",
             dataIndex: "balance",
             width: 100,
+            render: (_, item) => <Typography.Text type={item.balance < 0 ? "danger" : undefined}>{item.balance}</Typography.Text>,
         },
         {
             title: "备注",
@@ -113,18 +135,22 @@ export default function AdminCreditLogsPage() {
     ];
 
     return (
-        <div style={{ padding: "24px 28px" }}>
-            <div style={{ marginBottom: 20 }}>
-                <Typography.Title level={4} style={{ margin: 0, fontSize: 20, fontWeight: 600 }}>算力点日志</Typography.Title>
-                <Typography.Text type="secondary" style={{ fontSize: 13 }}>查看和管理用户算力点变动记录</Typography.Text>
+        <div className="admin-data-page">
+            <div className="admin-page-title">
+                <Typography.Title level={4} style={{ margin: 0, fontSize: 20, fontWeight: 600 }}>
+                    算力点日志
+                </Typography.Title>
+                <Typography.Text type="secondary" style={{ fontSize: 13 }}>
+                    查看和管理用户算力点变动记录
+                </Typography.Text>
             </div>
             <Space direction="vertical" size={16} style={{ width: "100%" }}>
-                <Card variant="borderless">
+                <Card className="admin-filter-card" variant="borderless">
                     <Form layout="vertical">
                         <Row gutter={16} align="bottom">
                             <Col flex="360px">
                                 <Form.Item label="关键词">
-                                    <Input.Search value={keywordText} placeholder="搜索用户 ID、类型、备注或关联 ID" allowClear enterButton={<SearchOutlined />} onSearch={() => searchLogs(keywordText)} onChange={(event) => setKeywordText(event.target.value)} />
+                                    <Input value={keywordText} placeholder="搜索用户 ID、类型、备注或关联 ID" allowClear onPressEnter={() => searchLogs(keywordText)} onChange={(event) => setKeywordText(event.target.value)} />
                                 </Form.Item>
                             </Col>
                             <Col flex="none">
@@ -138,7 +164,7 @@ export default function AdminCreditLogsPage() {
                                         >
                                             重置
                                         </Button>
-                                        <Button type="primary" icon={<ReloadOutlined />} onClick={() => searchLogs(keywordText)}>
+                                        <Button type="primary" icon={<SearchOutlined />} onClick={() => searchLogs(keywordText)}>
                                             查询
                                         </Button>
                                     </Space>
@@ -247,15 +273,7 @@ export default function AdminCreditLogsPage() {
                 确定删除这条算力点日志吗？
             </Modal>
 
-            <Modal
-                title="批量删除日志"
-                open={batchDeleteOpen}
-                onCancel={() => setBatchDeleteOpen(false)}
-                onOk={() => void handleBatchDelete()}
-                okText="删除"
-                okButtonProps={{ danger: true }}
-                cancelText="取消"
-            >
+            <Modal title="批量删除日志" open={batchDeleteOpen} onCancel={() => setBatchDeleteOpen(false)} onOk={() => void handleBatchDelete()} okText="删除" okButtonProps={{ danger: true }} cancelText="取消">
                 确定删除已选中的 {selectedIds.length} 条日志吗？
             </Modal>
         </div>

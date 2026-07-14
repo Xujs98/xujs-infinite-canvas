@@ -2,6 +2,7 @@ package handler
 
 import (
 	"bytes"
+	"context"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -12,10 +13,12 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/basketikun/infinite-canvas/model"
 	"github.com/basketikun/infinite-canvas/repository"
 	"github.com/basketikun/infinite-canvas/service"
+	"github.com/basketikun/infinite-canvas/ws"
 )
 
 func AIImagesGenerations(w http.ResponseWriter, r *http.Request) {
@@ -53,6 +56,27 @@ func proxyAIGetRequest(w http.ResponseWriter, r *http.Request, path string) {
 	}
 	isPolling := strings.Contains(path, "/videos/") && !strings.HasSuffix(path, "/content")
 	user, _ := service.UserFromContext(r.Context())
+	var generationTask canvasGenerationTaskContext
+	if isPolling && user.ID != "" {
+		requestedTaskID := strings.TrimPrefix(path, "/videos/")
+		if task, ok := service.GetUserGenerationTask(user.ID, requestedTaskID); ok {
+			modelName = task.Model
+			generationTask = canvasGenerationTaskContext{TaskID: task.ID, CanvasID: task.CanvasID, NodeID: task.NodeID}
+			switch {
+			case task.Status == model.GenerationTaskStatusFailed:
+				OK(w, map[string]any{"id": task.ID, "status": "failed", "error": map[string]any{"message": task.ErrorMsg}})
+				return
+			case task.Status == model.GenerationTaskStatusSucceeded && task.ResultURL != "":
+				OK(w, map[string]any{"id": task.ID, "status": "completed", "url": task.ResultURL})
+				return
+			case task.UpstreamTaskID == "":
+				OK(w, map[string]any{"id": task.ID, "status": "running", "progress": task.Progress})
+				return
+			default:
+				path = "/videos/" + task.UpstreamTaskID
+			}
+		}
+	}
 	channel, err := service.SelectModelChannel(modelName)
 	if err != nil {
 		log.Printf("AI proxy select channel failed: model=%s err=%v", modelName, err)
@@ -102,7 +126,74 @@ func proxyAIGetRequest(w http.ResponseWriter, r *http.Request, path string) {
 	if logID != "" {
 		extraArgs = append(extraArgs, requestLogID(logID))
 	}
+	if isPolling {
+		if generationTask.TaskID == "" {
+			generationTask = canvasGenerationTaskContext{
+				TaskID:   strings.TrimPrefix(path, "/videos/"),
+				CanvasID: r.URL.Query().Get("canvasId"),
+				NodeID:   r.URL.Query().Get("nodeId"),
+			}
+		}
+		extraArgs = append(extraArgs, generationTask)
+	}
 	copyAIResponse(w, request, nil, user.ID, user.Username, modelName, path, 0, extraArgs...)
+}
+
+func CreateVideoGenerationTask(w http.ResponseWriter, r *http.Request) {
+	body, contentType, modelName, err := readAIRequest(r)
+	if err != nil {
+		log.Printf("video task request read failed: %v", err)
+		Fail(w, "调用失败，请联系管理员")
+		return
+	}
+	user, ok := service.UserFromContext(r.Context())
+	if !ok {
+		Fail(w, "未登录或权限不足")
+		return
+	}
+	channel, err := service.SelectModelChannel(modelName)
+	if err != nil {
+		log.Printf("video task select channel failed: model=%s err=%v", modelName, err)
+		Fail(w, "调用失败，请联系管理员")
+		return
+	}
+	credits, err := service.CalculateModelCredits(modelName, 1, readAIRequestVideoSeconds(body, contentType), "video")
+	if err != nil {
+		log.Printf("video task read model cost failed: model=%s err=%v", modelName, err)
+		Fail(w, "调用失败，请联系管理员")
+		return
+	}
+
+	finalBody, finalContentType := prepareVideoTaskRequestBody(body, contentType, modelName, channel)
+	upstreamPath := resolveAIProxyPath(channel.BaseURL, modelName, "/videos", channel.VideoConfig)
+	upstreamURL := service.BuildModelChannelURL(channel, upstreamPath)
+	task := service.CreateGenerationTask(service.GenerationTaskCreate{
+		Type:     model.GenerationTaskTypeVideo,
+		UserID:   user.ID,
+		Username: user.Username,
+		Model:    modelName,
+		Path:     "/videos",
+		CanvasID: r.URL.Query().Get("canvasId"),
+		NodeID:   r.URL.Query().Get("nodeId"),
+	})
+
+	chargedCredits := 0
+	if service.IsMembershipActive(user.MembershipExpiresAt) {
+		service.LogMembershipFreeUsage(user.ID, modelName, credits, "/videos")
+	} else if service.IsModelFreeForRole(string(user.Role), modelName) {
+		service.LogRoleFreeUsage(user.ID, string(user.Role), modelName, credits, "/videos")
+	} else {
+		if err := service.ConsumeUserCredits(user.ID, modelName, credits, "/videos"); err != nil {
+			service.UpdateGenerationTask(task.ID, service.GenerationTaskUpdate{Status: model.GenerationTaskStatusFailed, ErrorMsg: err.Error()})
+			FailError(w, err)
+			return
+		}
+		chargedCredits = credits
+		ws.DefaultHub.SendToUser(user.ID, map[string]any{"type": "credits-changed"})
+	}
+
+	go runVideoGenerationTaskCreate(task.ID, user.ID, user.Username, modelName, upstreamPath, upstreamURL, finalContentType, finalBody, channel.APIKey, channel.ExtraHeaders, channel.BaseURL, channel.VideoConfig, chargedCredits)
+	OK(w, map[string]any{"id": task.ID, "status": "running"})
 }
 
 func proxyAIRequest(w http.ResponseWriter, r *http.Request, path string) {
@@ -126,16 +217,16 @@ func proxyAIRequest(w http.ResponseWriter, r *http.Request, path string) {
 		Fail(w, "调用失败，请联系管理员")
 		return
 	}
-	credits, err := service.ModelCost(modelName)
+	mediaType := "request"
+	if isVideoPath(path, channel.VideoConfig) {
+		mediaType = "video"
+	}
+	credits, err := service.CalculateModelCredits(modelName, readAIRequestCount(body, contentType), readAIRequestVideoSeconds(body, contentType), mediaType)
 	if err != nil {
 		log.Printf("AI proxy read model cost failed: model=%s err=%v", modelName, err)
 		go service.LogCall(user.ID, user.Username, modelName, path, false, err.Error(), 0)
 		Fail(w, "调用失败，请联系管理员")
 		return
-	}
-	credits *= readAIRequestCount(body, contentType)
-	if isVideoPath(path, channel.VideoConfig) {
-		credits *= readAIRequestVideoSeconds(body, contentType)
 	}
 
 	// 合并渠道 ExtraBody 到请求体
@@ -225,9 +316,20 @@ func proxyAIRequest(w http.ResponseWriter, r *http.Request, path string) {
 		request.Header.Set(k, v)
 	}
 	extraArgs := []any{channel.VideoConfig, channel.BaseURL, requestLogID(logID)}
+	if isVideoPath(path, channel.VideoConfig) {
+		extraArgs = append(extraArgs, canvasGenerationTaskContext{
+			CanvasID: r.URL.Query().Get("canvasId"),
+			NodeID:   r.URL.Query().Get("nodeId"),
+		})
+	}
 	// 会员有效期内免扣算力点。
 	if service.IsMembershipActive(user.MembershipExpiresAt) {
 		service.LogMembershipFreeUsage(user.ID, modelName, credits, path)
+		copyAIResponse(w, request, nil, user.ID, user.Username, modelName, path, credits, extraArgs...)
+		return
+	}
+	if service.IsModelFreeForRole(string(user.Role), modelName) {
+		service.LogRoleFreeUsage(user.ID, string(user.Role), modelName, credits, path)
 		copyAIResponse(w, request, nil, user.ID, user.Username, modelName, path, credits, extraArgs...)
 		return
 	}
@@ -236,11 +338,136 @@ func proxyAIRequest(w http.ResponseWriter, r *http.Request, path string) {
 		FailError(w, err)
 		return
 	}
+	ws.DefaultHub.SendToUser(user.ID, map[string]any{"type": "credits-changed"})
 	copyAIResponse(w, request, func() {
 		if err := service.RefundUserCredits(user.ID, modelName, credits, path); err != nil {
 			log.Printf("AI proxy refund credits failed: user=%s model=%s credits=%d err=%v", user.ID, modelName, credits, err)
 		}
 	}, user.ID, user.Username, modelName, path, credits, extraArgs...)
+}
+
+func prepareVideoTaskRequestBody(body []byte, contentType string, modelName string, channel model.ModelChannel) ([]byte, string) {
+	finalBody, finalContentType := prepareAIRequestBody(body, contentType, modelName, channel)
+	if channel.VideoConfig != nil && channel.VideoConfig.RequestFormat == "openai" {
+		if converted, err := convertArkToOpenAIVideoRequest(finalBody); err == nil {
+			finalBody = converted
+		} else {
+			log.Printf("video task convert request failed: %v", err)
+		}
+	}
+	return finalBody, finalContentType
+}
+
+func runVideoGenerationTaskCreate(taskID, userID, username, modelName, path, upstreamURL, contentType string, body []byte, apiKey string, extraHeaders map[string]string, baseURL string, videoConfig *model.ChannelVideoConfig, credits int) {
+	ctx, cancel := context.WithTimeout(context.Background(), aiProxyRequestTimeout("/videos", videoConfig, false))
+	defer cancel()
+	request, err := http.NewRequestWithContext(ctx, http.MethodPost, upstreamURL, bytes.NewReader(body))
+	if err != nil {
+		finishVideoTaskFailed(taskID, userID, modelName, path, credits, err.Error())
+		return
+	}
+	request.Header.Set("Authorization", "Bearer "+apiKey)
+	if contentType != "" {
+		request.Header.Set("Content-Type", contentType)
+	}
+	for k, v := range extraHeaders {
+		request.Header.Set(k, v)
+	}
+
+	reqHeaders := map[string]string{"Authorization": "Bearer " + apiKey[:min(len(apiKey), 8)] + "***"}
+	if contentType != "" {
+		reqHeaders["Content-Type"] = contentType
+	}
+	for k, v := range extraHeaders {
+		reqHeaders[k] = v
+	}
+	logID := service.LogRequest(userID, username, modelName, http.MethodPost, path, upstreamURL, reqHeaders, safeLogBody(body), len(body), extractMediaFromJSON(body))
+	response, err := http.DefaultClient.Do(request)
+	if err != nil {
+		if logID != "" {
+			service.LogRequestResponse(logID, "", 0, false, err.Error())
+		}
+		finishVideoTaskFailed(taskID, userID, modelName, path, credits, err.Error())
+		go service.LogCall(userID, username, modelName, path, false, err.Error(), credits)
+		return
+	}
+	defer response.Body.Close()
+	respBody, _ := io.ReadAll(io.LimitReader(response.Body, 64*1024))
+	respText := string(respBody)
+	if response.StatusCode >= http.StatusBadRequest {
+		if logID != "" {
+			service.LogRequestResponse(logID, respText, response.StatusCode, false, "")
+		}
+		errorMsg := aiUpstreamErrorDetail(respBody)
+		if errorMsg == "" {
+			errorMsg = "视频任务创建失败"
+		}
+		finishVideoTaskFailed(taskID, userID, modelName, path, credits, errorMsg)
+		go service.LogCall(userID, username, modelName, path, false, respText, credits)
+		return
+	}
+	if videoConfig != nil && videoConfig.ResponseFormat == "openai" {
+		if converted, err := convertOpenAIToArkVideoResponse(respBody, videoConfig); err == nil {
+			respBody = converted
+			respText = string(converted)
+		} else {
+			log.Printf("video task convert response failed: %v", err)
+		}
+	}
+	if baseURL != "" {
+		LogChannelResponse(baseURL, respText, response.StatusCode, "")
+	}
+	if logID != "" {
+		service.LogRequestResponse(logID, respText, response.StatusCode, true, "")
+	}
+	var raw map[string]any
+	if err := json.Unmarshal(respBody, &raw); err != nil {
+		finishVideoTaskFailed(taskID, userID, modelName, path, credits, err.Error())
+		return
+	}
+	upstreamTaskID := extractFieldPath(raw, "", "id", "task_id", "data.id", "data.task_id")
+	if upstreamTaskID == "" {
+		finishVideoTaskFailed(taskID, userID, modelName, path, credits, "视频接口没有返回任务 ID")
+		return
+	}
+	update := service.GenerationTaskUpdate{Status: model.GenerationTaskStatusRunning, UpstreamTaskID: upstreamTaskID}
+	if progress := extractProgressNumber(raw); progress >= 0 {
+		update.Progress = &progress
+	}
+	videoURLPaths := []string{"content.video_url", "result.video_url", "result.url", "data.video_url", "data.video_urls", "url", "video_url", "video.url"}
+	if videoConfig != nil && len(videoConfig.VideoURLPaths) > 0 {
+		videoURLPaths = append(videoConfig.VideoURLPaths, videoURLPaths...)
+	}
+	taskDone := isVideoTaskDone(respText) || isVideoTaskCompleted(respText)
+	taskFailed := isVideoTaskFailed(respText)
+	if taskDone {
+		update.Status = model.GenerationTaskStatusSucceeded
+	}
+	if taskFailed {
+		update.Status = model.GenerationTaskStatusFailed
+	}
+	if resultURL := extractVideoURL(raw, videoURLPaths...); resultURL != "" {
+		update.ResultURL = resultURL
+	}
+	if errorMsg := extractFieldPath(raw, "", "error.message", "data.error.message", "data.error", "data.error_message", "data.fail_reason", "fail_reason", "message"); errorMsg != "" {
+		update.ErrorMsg = errorMsg
+	}
+	service.UpdateGenerationTask(taskID, update)
+	emitVideoGenerationTaskUpdate(userID, canvasGenerationTaskContext{TaskID: taskID}, respText, taskDone, taskFailed, videoConfig)
+	if taskDone || taskFailed {
+		go service.LogCall(userID, username, modelName, path, !taskFailed, respText, credits)
+	}
+}
+
+func finishVideoTaskFailed(taskID, userID, modelName, path string, credits int, errorMsg string) {
+	service.UpdateGenerationTask(taskID, service.GenerationTaskUpdate{Status: model.GenerationTaskStatusFailed, ErrorMsg: errorMsg})
+	if credits > 0 {
+		if err := service.RefundUserCredits(userID, modelName, credits, path); err != nil {
+			log.Printf("video task refund failed: user=%s model=%s credits=%d err=%v", userID, modelName, credits, err)
+		}
+	}
+	ws.DefaultHub.SendToUser(userID, map[string]any{"type": "generation-task-updated", "taskId": taskID, "status": "failed", "error": errorMsg})
+	ws.DefaultHub.SendToUser(userID, map[string]any{"type": "credits-changed"})
 }
 
 // requestLogID 用于在 extraArgs 中传递请求日志 ID
@@ -252,6 +479,12 @@ type requestUpstreamURL string
 // requestHeadersMap 用于在 extraArgs 中传递请求头
 type requestHeadersMap map[string]string
 
+type canvasGenerationTaskContext struct {
+	TaskID   string
+	CanvasID string
+	NodeID   string
+}
+
 func copyAIResponse(w http.ResponseWriter, request *http.Request, onFailure func(), userID, username, modelName, path string, credits int, extraArgs ...any) {
 	var isPolling bool
 	var videoConfig *model.ChannelVideoConfig
@@ -259,6 +492,7 @@ func copyAIResponse(w http.ResponseWriter, request *http.Request, onFailure func
 	var logID string
 	var logUpstreamURL string
 	var logReqHeaders map[string]string
+	var generationTask canvasGenerationTaskContext
 	for _, arg := range extraArgs {
 		switch v := arg.(type) {
 		case bool:
@@ -275,7 +509,14 @@ func copyAIResponse(w http.ResponseWriter, request *http.Request, onFailure func
 			logUpstreamURL = string(v)
 		case requestHeadersMap:
 			logReqHeaders = v
+		case canvasGenerationTaskContext:
+			generationTask = v
 		}
+	}
+	if timeout := aiProxyRequestTimeout(path, videoConfig, isPolling); timeout > 0 {
+		ctx, cancel := context.WithTimeout(request.Context(), timeout)
+		defer cancel()
+		request = request.WithContext(ctx)
 	}
 	response, err := http.DefaultClient.Do(request)
 	if err != nil {
@@ -339,6 +580,12 @@ func copyAIResponse(w http.ResponseWriter, request *http.Request, onFailure func
 		// 内容请求始终记录；轮询请求仅在任务完成(SUCCESS/SUBMITTED)或失败(FAILURE)时记录
 		taskDone := isVideoTaskDone(respText) || isVideoTaskCompleted(respText)
 		taskFailed := isVideoTaskFailed(respText)
+		if !isPolling && !isContentRequest {
+			registerVideoGenerationTask(userID, username, modelName, path, respText, generationTask)
+		}
+		if isPolling && generationTask.TaskID != "" {
+			emitVideoGenerationTaskUpdate(userID, generationTask, respText, taskDone, taskFailed, videoConfig)
+		}
 		if isContentRequest || (isPolling && taskDone) {
 			go service.LogCall(userID, username, modelName, path, !taskFailed, respText, credits)
 		}
@@ -400,6 +647,19 @@ func copyAIResponse(w http.ResponseWriter, request *http.Request, onFailure func
 	}
 	w.WriteHeader(response.StatusCode)
 	_, _ = w.Write(respBody)
+}
+
+func aiProxyRequestTimeout(path string, videoConfig *model.ChannelVideoConfig, isPolling bool) time.Duration {
+	if !isVideoPath(path, videoConfig) {
+		return 0
+	}
+	if strings.HasSuffix(path, "/content") {
+		return 2 * time.Minute
+	}
+	if isPolling {
+		return 30 * time.Second
+	}
+	return 60 * time.Second
 }
 
 func readAIRequest(r *http.Request) ([]byte, string, string, error) {
@@ -666,7 +926,7 @@ func truncateBase64InBody(body []byte) []byte {
 		// 查找 ";base64," 标记
 		b64Marker := strings.Index(str[idx:], ";base64,")
 		if b64Marker == -1 {
-			result.WriteString(str[i:idx+5])
+			result.WriteString(str[i : idx+5])
 			i = idx + 5
 			continue
 		}
@@ -764,7 +1024,6 @@ func isVideoTaskFailed(respText string) bool {
 // convertArkToOpenAIVideoRequest 将火山方舟 Ark 格式的视频请求转换为 OpenAI 兼容格式。
 // Ark 格式: { model, content: [{type:"text",text},{type:"image_url",...}], ratio, resolution, duration, ... }
 // OpenAI 格式: { model, prompt, size, n, image_urls, seconds, ... }
-
 
 // applyRequestFields 根据模型级别的 RequestFields 转换 JSON 请求体。
 // 模型级别的字段映射优先于渠道级 FieldMapping。
@@ -1154,11 +1413,11 @@ func convertArkToOpenAIVideoRequest(body []byte) ([]byte, error) {
 			} `json:"audio_url"`
 			Role string `json:"role"`
 		} `json:"content"`
-		Ratio          string `json:"ratio"`
-		Resolution     string `json:"resolution"`
-		Duration       any    `json:"duration"`
-		GenerateAudio  any    `json:"generate_audio"`
-		Watermark      any    `json:"watermark"`
+		Ratio         string `json:"ratio"`
+		Resolution    string `json:"resolution"`
+		Duration      any    `json:"duration"`
+		GenerateAudio any    `json:"generate_audio"`
+		Watermark     any    `json:"watermark"`
 	}
 	if err := json.Unmarshal(body, &req); err != nil {
 		return body, err
@@ -1304,7 +1563,7 @@ func convertOpenAIToArkVideoResponse(body []byte, config *model.ChannelVideoConf
 	// 提取状态
 	status := extractFieldPath(raw, config.StatusField, "status", "data.status")
 	// 提取视频 URL
-	videoURL := extractFieldPath(raw, config.VideoURLField, "data.result_url", "data.result.video_url", "data.video_url", "result_url", "result.video_url", "video_url", "url")
+	videoURL := extractFieldPath(raw, "", config.VideoURLPaths...)
 	// 提取进度
 	progress := extractFieldPath(raw, "", "progress", "data.progress")
 	// 提取错误信息
@@ -1376,6 +1635,151 @@ func normalizeVideoStatus(status string) string {
 	default:
 		return status
 	}
+}
+
+func emitVideoGenerationTaskUpdate(userID string, task canvasGenerationTaskContext, respText string, taskDone bool, taskFailed bool, videoConfig *model.ChannelVideoConfig) {
+	if userID == "" || task.TaskID == "" {
+		return
+	}
+	var raw map[string]any
+	if err := json.Unmarshal([]byte(respText), &raw); err != nil {
+		return
+	}
+	status := normalizeVideoStatus(extractFieldPath(raw, "", "status", "data.status", "result.status"))
+	if status == "" {
+		switch {
+		case taskFailed:
+			status = "failed"
+		case taskDone:
+			status = "completed"
+		default:
+			status = "pending"
+		}
+	}
+	videoURLPaths := []string{"content.video_url", "result.video_url", "result.url", "data.video_url", "data.video_urls", "url", "video_url", "video.url"}
+	if videoConfig != nil && len(videoConfig.VideoURLPaths) > 0 {
+		videoURLPaths = append(videoConfig.VideoURLPaths, videoURLPaths...)
+	}
+	payload := map[string]any{
+		"type":     "generation-task-updated",
+		"taskId":   task.TaskID,
+		"canvasId": task.CanvasID,
+		"nodeId":   task.NodeID,
+		"status":   status,
+	}
+	if progress := extractProgressNumber(raw); progress >= 0 {
+		payload["progress"] = progress
+	}
+	if videoURL := extractVideoURL(raw, videoURLPaths...); videoURL != "" {
+		payload["resultUrl"] = videoURL
+	}
+	if errorMsg := extractFieldPath(raw, "", "error.message", "data.error.message", "data.error", "data.error_message", "data.fail_reason", "fail_reason", "message"); errorMsg != "" {
+		payload["error"] = errorMsg
+	}
+	ws.DefaultHub.SendToUser(userID, payload)
+	taskStatus := model.GenerationTaskStatusRunning
+	if payload["status"] == "completed" {
+		taskStatus = model.GenerationTaskStatusSucceeded
+	} else if payload["status"] == "failed" {
+		taskStatus = model.GenerationTaskStatusFailed
+	}
+	progress := -1
+	if value, ok := payload["progress"].(int); ok {
+		progress = value
+	}
+	update := service.GenerationTaskUpdate{Status: taskStatus}
+	if upstreamTaskID := extractFieldPath(raw, "", "id", "task_id", "data.id", "data.task_id"); upstreamTaskID != "" {
+		update.UpstreamTaskID = upstreamTaskID
+	}
+	if progress >= 0 {
+		update.Progress = &progress
+	}
+	if resultURL, ok := payload["resultUrl"].(string); ok {
+		update.ResultURL = resultURL
+	}
+	if errorMsg, ok := payload["error"].(string); ok {
+		update.ErrorMsg = errorMsg
+	}
+	service.UpdateGenerationTaskByIDOrUpstreamID(task.TaskID, update)
+}
+
+func registerVideoGenerationTask(userID, username, modelName, path, respText string, task canvasGenerationTaskContext) {
+	if userID == "" {
+		return
+	}
+	var raw map[string]any
+	if err := json.Unmarshal([]byte(respText), &raw); err != nil {
+		return
+	}
+	upstreamTaskID := extractFieldPath(raw, "", "id", "task_id", "data.id", "data.task_id")
+	if upstreamTaskID == "" {
+		return
+	}
+	service.CreateGenerationTask(service.GenerationTaskCreate{
+		UpstreamTaskID: upstreamTaskID,
+		Type:           model.GenerationTaskTypeVideo,
+		UserID:         userID,
+		Username:       username,
+		Model:          modelName,
+		Path:           path,
+		CanvasID:       task.CanvasID,
+		NodeID:         task.NodeID,
+	})
+}
+
+func extractProgressNumber(raw map[string]any) int {
+	progress := extractFieldPath(raw, "", "progress", "data.progress", "result.progress")
+	if progress == "" {
+		return -1
+	}
+	percent := strings.TrimSuffix(strings.TrimSpace(progress), "%")
+	n, err := strconv.Atoi(percent)
+	if err != nil || n < 0 || n > 100 {
+		return -1
+	}
+	return n
+}
+
+func extractVideoURL(raw map[string]any, paths ...string) string {
+	for _, path := range paths {
+		if val := resolveDottedPathValue(raw, path); val != nil {
+			switch v := val.(type) {
+			case string:
+				if strings.TrimSpace(v) != "" {
+					return v
+				}
+			case []any:
+				for _, item := range v {
+					if s, ok := item.(string); ok && strings.TrimSpace(s) != "" {
+						return s
+					}
+				}
+			case []string:
+				for _, s := range v {
+					if strings.TrimSpace(s) != "" {
+						return s
+					}
+				}
+			}
+		}
+	}
+	return ""
+}
+
+func resolveDottedPathValue(obj map[string]any, path string) any {
+	if path == "" {
+		return nil
+	}
+	parts := strings.Split(path, ".")
+	var current any = obj
+	for _, part := range parts {
+		m, ok := current.(map[string]any)
+		if !ok {
+			return nil
+		}
+		current = m[part]
+	}
+	return current
 }
 
 // isVideoTaskDone 检测视频轮询任务是否已完成（SUCCESS 或 FAILURE），用于停止轮询

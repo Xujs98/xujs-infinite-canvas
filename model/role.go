@@ -8,14 +8,17 @@ import (
 
 // Role 角色定义。
 type Role struct {
-	ID            string         `json:"id" gorm:"primaryKey"`
-	Name          string         `json:"name" gorm:"uniqueIndex"`
-	Label         string         `json:"label"`
-	Description   string         `json:"description"`
-	AllowedModels []string       `json:"allowedModels" gorm:"serializer:json"`
-	IsBuiltin     bool           `json:"isBuiltin" gorm:"default:false"`
-	CreatedAt     string         `json:"createdAt"`
-	UpdatedAt     string         `json:"updatedAt"`
+	ID                 string   `json:"id" gorm:"primaryKey"`
+	Name               string   `json:"name" gorm:"uniqueIndex"`
+	Label              string   `json:"label"`
+	Description        string   `json:"description"`
+	AllowedModels      []string `json:"allowedModels" gorm:"serializer:json"`
+	FreeModels         []string `json:"freeModels" gorm:"serializer:json"`
+	AllowOffline       bool     `json:"allowOffline" gorm:"default:false"`
+	OfflineCreditLimit int      `json:"offlineCreditLimit" gorm:"default:0"`
+	IsBuiltin          bool     `json:"isBuiltin" gorm:"default:false"`
+	CreatedAt          string   `json:"createdAt"`
+	UpdatedAt          string   `json:"updatedAt"`
 }
 
 type RoleList struct {

@@ -5,7 +5,7 @@ import { ArrowUp, LoaderCircle } from "lucide-react";
 import { Button } from "antd";
 
 import { ModelPicker } from "@/components/model-picker";
-import { defaultConfig, getModelClassificationDetail, useConfigStore, useEffectiveConfig, type AiConfig } from "@/stores/use-config-store";
+import { defaultConfig, getModelClassificationDetail, getVideoModelBillingMode, useConfigStore, useEffectiveConfig, useModelClassificationsVersion, type AiConfig } from "@/stores/use-config-store";
 import { CreditSymbol, requestCreditCost } from "@/constant/credits";
 import { useCanvasTheme } from "@/hooks/use-canvas-theme";
 import { CanvasImageSettingsPopover } from "./canvas-image-settings-popover";
@@ -32,6 +32,7 @@ export function CanvasNodePromptPanel({ node, isRunning, onPromptChange, onConfi
     const globalConfig = useEffectiveConfig();
     const modelCosts = useConfigStore((state) => state.publicSettings?.modelChannel.modelCosts);
     const openConfigDialog = useConfigStore((state) => state.openConfigDialog);
+    useModelClassificationsVersion();
     const theme = useCanvasTheme();
     const mode = defaultMode(node.type);
     const config = buildNodeConfig(globalConfig, node, mode);
@@ -39,10 +40,12 @@ export function CanvasNodePromptPanel({ node, isRunning, onPromptChange, onConfi
     const hasImageContent = node.type === CanvasNodeType.Image && Boolean(node.metadata?.content);
     const isEditingExistingContent = hasTextContent || hasImageContent;
     const [prompt, setPrompt] = useState(isEditingExistingContent ? "" : node.metadata?.prompt || "");
-    const credits = requestCreditCost({ channelMode: config.channelMode, modelCosts, model: config.model, count: mode === "image" ? config.count : 1, seconds: mode === "video" ? Number(config.videoSeconds) || 1 : 1 });
+    const credits = requestCreditCost({ channelMode: config.channelMode, modelCosts, model: config.model, count: mode === "image" ? config.count : 1, seconds: mode === "video" ? Number(config.videoSeconds) || 1 : 1, billingMode: mode === "video" ? getVideoModelBillingMode(config.model) : undefined });
     const textareaRef = useRef<HTMLTextAreaElement>(null);
 
     useEffect(() => {
+        const mobileQuery = window.matchMedia("(max-width: 767px), (pointer: coarse)");
+        if (mobileQuery.matches) return;
         textareaRef.current?.focus();
     }, []);
 

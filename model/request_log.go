@@ -20,6 +20,7 @@ type RequestLog struct {
 	Success        bool      `json:"success"`
 	ErrorMsg       string    `json:"errorMsg" gorm:"type:text"`
 	IsPolling      bool      `json:"isPolling"`
+	Source         string    `json:"source" gorm:"index;default:'web'"` // "web" | "app"
 	CreatedAt      time.Time `json:"createdAt" gorm:"index"`
 }
 

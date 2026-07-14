@@ -1,6 +1,6 @@
 "use client";
 
-import { CopyOutlined, DeleteOutlined, DownloadOutlined, EditOutlined, ExportOutlined, EyeOutlined, PlusOutlined, ReloadOutlined, SearchOutlined, SyncOutlined, UploadOutlined } from "@ant-design/icons";
+import { DeleteOutlined, DownloadOutlined, EditOutlined, ExportOutlined, EyeOutlined, PlusOutlined, ReloadOutlined, SearchOutlined, SyncOutlined, UploadOutlined } from "@ant-design/icons";
 import { ProTable, type ProColumns } from "@ant-design/pro-components";
 import { App, Button, Card, Col, Flex, Form, Image, Input, Modal, Row, Select, Space, Table, Tag, Tooltip, Typography, Upload } from "antd";
 import { useEffect, useState } from "react";
@@ -157,18 +157,22 @@ export default function AdminPromptsPage() {
     };
 
     return (
-        <div style={{ padding: "24px 28px" }}>
-            <div style={{ marginBottom: 20 }}>
-                <Typography.Title level={4} style={{ margin: 0, fontSize: 20, fontWeight: 600 }}>提示词管理</Typography.Title>
-                <Typography.Text type="secondary" style={{ fontSize: 13 }}>管理 AI 创作提示词模板</Typography.Text>
+        <div className="admin-data-page">
+            <div className="admin-page-title">
+                <Typography.Title level={4} style={{ margin: 0, fontSize: 20, fontWeight: 600 }}>
+                    提示词管理
+                </Typography.Title>
+                <Typography.Text type="secondary" style={{ fontSize: 13 }}>
+                    管理 AI 创作提示词模板
+                </Typography.Text>
             </div>
             <Flex vertical gap={16}>
-                <Card variant="borderless">
+                <Card className="admin-filter-card" variant="borderless">
                     <Form layout="vertical">
                         <Row gutter={16} align="bottom">
                             <Col flex="360px">
                                 <Form.Item label="关键词">
-                                    <Input.Search value={keywordText} placeholder="搜索标题或提示词" allowClear enterButton={<SearchOutlined />} onSearch={() => searchPrompts(keywordText)} onChange={(event) => setKeywordText(event.target.value)} />
+                                    <Input value={keywordText} placeholder="搜索标题或提示词" allowClear onPressEnter={() => searchPrompts(keywordText)} onChange={(event) => setKeywordText(event.target.value)} />
                                 </Form.Item>
                             </Col>
                             <Col flex="220px">
@@ -192,7 +196,7 @@ export default function AdminPromptsPage() {
                                         >
                                             重置
                                         </Button>
-                                        <Button type="primary" icon={<ReloadOutlined />} onClick={() => searchPrompts(keywordText)}>
+                                        <Button type="primary" icon={<SearchOutlined />} onClick={() => searchPrompts(keywordText)}>
                                             查询
                                         </Button>
                                     </Space>
@@ -254,7 +258,7 @@ export default function AdminPromptsPage() {
                             <Form.Item name="coverUrl" noStyle>
                                 <Input placeholder="输入图片 URL 或上传图片" style={{ flex: 1 }} />
                             </Form.Item>
-<Tooltip title="下载远程图片到本地">
+                            <Tooltip title="下载远程图片到本地">
                                 <Button icon={<DownloadOutlined />} loading={downloading} onClick={() => void handleDownloadCover()} disabled={!coverUrl?.startsWith("http")}>
                                     下载
                                 </Button>
@@ -274,9 +278,7 @@ export default function AdminPromptsPage() {
                                 <Button icon={<UploadOutlined />}>上传</Button>
                             </Upload>
                         </Flex>
-                        {coverUrl ? (
-                            <Image src={coverUrl} alt="封面预览" width={120} height={80} style={{ objectFit: "cover", borderRadius: 6, marginTop: 8 }} preview={{ mask: "放大" }} fallback="/logo.svg" />
-                        ) : null}
+                        {coverUrl ? <Image src={coverUrl} alt="封面预览" width={120} height={80} style={{ objectFit: "cover", borderRadius: 6, marginTop: 8 }} preview={{ mask: "放大" }} fallback="/logo.svg" /> : null}
                     </Form.Item>
                     <Form.Item name="tagText" label="标签，用逗号分隔">
                         <Input />
@@ -311,9 +313,7 @@ export default function AdminPromptsPage() {
                         ) : null}
                         <Input.TextArea value={detailPrompt.prompt} rows={8} readOnly />
                         <Space>
-                            <Button icon={<CopyOutlined />} onClick={() => copyText(detailPrompt.prompt)}>
-                                复制提示词
-                            </Button>
+                            <Button onClick={() => copyText(detailPrompt.prompt)}>复制提示词</Button>
                             {detailPrompt.githubUrl ? (
                                 <Button icon={<ExportOutlined />} href={detailPrompt.githubUrl} target="_blank">
                                     远程源

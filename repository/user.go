@@ -5,6 +5,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/basketikun/infinite-canvas/config"
 	"github.com/basketikun/infinite-canvas/model"
 	"gorm.io/gorm"
 )
@@ -150,12 +151,30 @@ func ListCreditLogs(q model.Query) ([]model.CreditLog, int64, error) {
 		like := "%" + keyword + "%"
 		tx = tx.Where("user_id LIKE ? OR type LIKE ? OR remark LIKE ? OR related_id LIKE ?", like, like, like, like)
 	}
+	if logType := strings.TrimSpace(q.Type); logType != "" {
+		switch logType {
+		case string(model.CreditLogTypeOfflineConsume):
+			tx = tx.Where("type = ? OR (type = ? AND related_id LIKE ?)", logType, model.CreditLogTypeAIConsume, "offline:%")
+		case string(model.CreditLogTypeOfflineRefund):
+			tx = tx.Where("type = ? OR (type = ? AND related_id LIKE ?)", logType, model.CreditLogTypeAIRefund, "offline:%")
+		case string(model.CreditLogTypeAIConsume):
+			tx = tx.Where("type = ? AND (related_id = '' OR related_id NOT LIKE ?)", logType, "offline:%")
+		case string(model.CreditLogTypeAIRefund):
+			tx = tx.Where("type = ? AND (related_id = '' OR related_id NOT LIKE ?)", logType, "offline:%")
+		default:
+			tx = tx.Where("type = ?", logType)
+		}
+	}
 	var total int64
 	if err := tx.Count(&total).Error; err != nil {
 		return nil, 0, err
 	}
 	var logs []model.CreditLog
-	err = tx.Order("created_at desc").Offset(q.Offset()).Limit(q.PageSize).Find(&logs).Error
+	orderExpr := "created_at desc"
+	if strings.EqualFold(strings.TrimSpace(config.Cfg.StorageDriver), "sqlite") || strings.TrimSpace(config.Cfg.StorageDriver) == "" {
+		orderExpr = "datetime(created_at) desc, created_at desc"
+	}
+	err = tx.Order(orderExpr).Offset(q.Offset()).Limit(q.PageSize).Find(&logs).Error
 	return logs, total, err
 }
 
