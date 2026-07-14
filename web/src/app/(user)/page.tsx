@@ -5,6 +5,7 @@ import { type ReactNode, useEffect, useState } from "react";
 import { App, Button, Image, Tag } from "antd";
 
 import { fetchPrompts, type Prompt } from "@/services/api/prompts";
+import { DEFAULT_SITE_NAME } from "@/constant/brand";
 import { navigationTools } from "@/constant/navigation-tools";
 import { useConfigStore } from "@/stores/use-config-store";
 import { cn } from "@/lib/utils";
@@ -24,7 +25,7 @@ function Highlighter({ action, color, children }: { action: "highlight" | "under
 
 export default function IndexPage() {
     const { message } = App.useApp();
-    const siteName = useConfigStore((state) => state.publicSystemSettings?.siteName) || "小松鼠画布";
+    const siteName = useConfigStore((state) => state.publicSystemSettings?.siteName) || DEFAULT_SITE_NAME;
     const [primaryTool] = navigationTools;
     const [promptShowcase, setPromptShowcase] = useState<Prompt[]>([]);
     const [previewIndex, setPreviewIndex] = useState(0);

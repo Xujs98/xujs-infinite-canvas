@@ -2,6 +2,7 @@ package service
 
 import (
 	"strconv"
+	"strings"
 
 	"github.com/basketikun/infinite-canvas/model"
 	"github.com/basketikun/infinite-canvas/repository"
@@ -19,6 +20,14 @@ func GetSystemSettings() (model.SystemSettings, error) {
 	checkInRewardMax, _ := strconv.Atoi(m[model.SettingCheckInRewardMax])
 	videoMaxTimeoutSeconds, _ := strconv.Atoi(m[model.SettingVideoMaxTimeoutSeconds])
 	smtpPort, _ := strconv.Atoi(m[model.SettingSMTPPort])
+	siteName := strings.TrimSpace(m[model.SettingSiteName])
+	if siteName == "" {
+		siteName = model.DefaultSiteName
+	}
+	siteLogo := strings.TrimSpace(m[model.SettingSiteLogo])
+	if siteLogo == "" {
+		siteLogo = model.DefaultSiteLogo
+	}
 	// 如果 system_settings 中没有这两个字段，则从 public settings 读取。
 	allowCustomChannel := m[model.SettingAllowCustomChannel] == "true"
 	allowRegister := m[model.SettingAllowRegister] == "true"
@@ -34,9 +43,9 @@ func GetSystemSettings() (model.SystemSettings, error) {
 		}
 	}
 	return model.SystemSettings{
-		SiteName:               m[model.SettingSiteName],
+		SiteName:               siteName,
 		SiteSubtitle:           m[model.SettingSiteSubtitle],
-		SiteLogo:               m[model.SettingSiteLogo],
+		SiteLogo:               siteLogo,
 		ServiceContact:         m[model.SettingServiceContact],
 		RegisterGiftCredits:    giftCredits,
 		InviteRewardCredits:    inviteRewardCredits,

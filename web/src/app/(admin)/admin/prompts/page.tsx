@@ -83,7 +83,7 @@ export default function AdminPromptsPage() {
             title: "封面",
             dataIndex: "coverUrl",
             width: 88,
-            render: (_, item) => <Image src={item.coverUrl || "/logo.svg"} alt={item.title} width={56} height={42} style={{ objectFit: "cover", borderRadius: 6 }} preview={{ mask: "放大" }} fallback="/logo.svg" />,
+            render: (_, item) => <Image src={item.coverUrl || "/logo.png"} alt={item.title} width={56} height={42} style={{ objectFit: "cover", borderRadius: 6 }} preview={{ mask: "放大" }} fallback="/logo.png" />,
         },
         {
             title: "标题",
@@ -278,7 +278,7 @@ export default function AdminPromptsPage() {
                                 <Button icon={<UploadOutlined />}>上传</Button>
                             </Upload>
                         </Flex>
-                        {coverUrl ? <Image src={coverUrl} alt="封面预览" width={120} height={80} style={{ objectFit: "cover", borderRadius: 6, marginTop: 8 }} preview={{ mask: "放大" }} fallback="/logo.svg" /> : null}
+                        {coverUrl ? <Image src={coverUrl} alt="封面预览" width={120} height={80} style={{ objectFit: "cover", borderRadius: 6, marginTop: 8 }} preview={{ mask: "放大" }} fallback="/logo.png" /> : null}
                     </Form.Item>
                     <Form.Item name="tagText" label="标签，用逗号分隔">
                         <Input />
@@ -293,7 +293,7 @@ export default function AdminPromptsPage() {
                 {detailPrompt ? (
                     <Flex vertical gap={14}>
                         <Flex gap={14} align="start">
-                            <Image src={detailPrompt.coverUrl || "/logo.svg"} alt={detailPrompt.title} width={116} height={84} style={{ objectFit: "cover", borderRadius: 8 }} preview={{ mask: "放大" }} fallback="/logo.svg" />
+                            <Image src={detailPrompt.coverUrl || "/logo.png"} alt={detailPrompt.title} width={116} height={84} style={{ objectFit: "cover", borderRadius: 8 }} preview={{ mask: "放大" }} fallback="/logo.png" />
                             <Flex vertical gap={8} style={{ minWidth: 0 }}>
                                 <Typography.Title level={5} style={{ margin: 0 }}>
                                     {detailPrompt.title}

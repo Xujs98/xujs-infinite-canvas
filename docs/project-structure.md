@@ -524,10 +524,10 @@ canvas-agent
 
 ```bash
 # 拉取镜像
-docker pull ghcr.io/Xujs98/infinite-canvas:latest
+docker pull qq1371446705/julong-canvas:latest
 
 # 启动
-docker-compose up -d
+docker compose up -d
 ```
 
 容器内部：Go 后端监听 `:8080`（仅容器内部），Next.js 监听 `:3000`（对外暴露）。数据目录挂载到 `./data`。

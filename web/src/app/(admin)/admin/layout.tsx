@@ -30,6 +30,7 @@ import type { CSSProperties, ReactNode } from "react";
 import { useEffect, useState } from "react";
 
 import { fetchAdminServerOfflineStatus, setAdminServerOfflineStatus } from "@/services/api/admin";
+import { DEFAULT_SITE_LOGO, DEFAULT_SITE_NAME } from "@/constant/brand";
 import { useConfigStore } from "@/stores/use-config-store";
 import { useUserStore } from "@/stores/use-user-store";
 
@@ -119,8 +120,8 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
     const [serverOfflineLoading, setServerOfflineLoading] = useState(false);
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
     const isDesktop = Boolean(screens.lg);
-    const siteName = publicSystemSettings?.siteName || "无限画布";
-    const siteLogo = publicSystemSettings?.siteLogo;
+    const siteName = publicSystemSettings?.siteName || DEFAULT_SITE_NAME;
+    const siteLogo = publicSystemSettings?.siteLogo || DEFAULT_SITE_LOGO;
     const activeMenu = getActiveMenu(pathname);
     const displayName = user?.displayName || user?.username || "管理员";
     const shellStyle = { "--admin-accent": "#079a87", "--admin-accent-soft": "#e9faf6" } as CSSProperties;
@@ -161,7 +162,9 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
     const renderBrand = (collapsed: boolean) => (
         <div className={`admin-brand ${collapsed ? "is-collapsed" : ""}`}>
             <Link href="/admin/dashboard" className="admin-brand-link" aria-label={`${siteName} 管理后台`}>
-                <span className="admin-brand-logo">{siteLogo ? <img src={siteLogo} alt="" /> : <span className="admin-brand-logo-mask" />}</span>
+                <span className="admin-brand-logo">
+                    <img src={siteLogo} alt="" />
+                </span>
                 {!collapsed ? (
                     <span className="admin-brand-copy">
                         <strong>{siteName}</strong>

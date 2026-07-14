@@ -4,6 +4,7 @@ import { DeleteOutlined, GlobalOutlined, MailOutlined, SaveOutlined, ToolOutline
 import { App, Button, Col, Form, Input, InputNumber, Row, Space, Switch, Typography } from "antd";
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import { DEFAULT_SITE_NAME } from "@/constant/brand";
 import { removeAdminLogo, uploadAdminLogo } from "@/services/api/admin";
 import { useUserStore } from "@/stores/use-user-store";
 import { useSystemSettings } from "./use-system-settings";
@@ -163,7 +164,7 @@ export default function AdminSystemSettingsPage() {
                                 <Row gutter={[24, 0]}>
                                     <Col span={8}>
                                         <Form.Item name="siteName" label="站点名称">
-                                            <Input placeholder="无限画布" />
+                                            <Input placeholder={DEFAULT_SITE_NAME} />
                                         </Form.Item>
                                     </Col>
                                     <Col span={8}>

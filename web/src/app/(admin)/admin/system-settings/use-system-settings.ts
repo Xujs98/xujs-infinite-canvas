@@ -1,12 +1,13 @@
 import { useEffect, useState } from "react";
 
+import { DEFAULT_SITE_LOGO, DEFAULT_SITE_NAME } from "@/constant/brand";
 import { fetchAdminSystemSettings, saveAdminSystemSettings, type AdminSystemSettings } from "@/services/api/admin";
 import { useUserStore } from "@/stores/use-user-store";
 
 const defaultSettings: AdminSystemSettings = {
-    siteName: "",
+    siteName: DEFAULT_SITE_NAME,
     siteSubtitle: "",
-    siteLogo: "",
+    siteLogo: DEFAULT_SITE_LOGO,
     serviceContact: "",
     registerGiftCredits: 0,
     inviteRewardCredits: 50,

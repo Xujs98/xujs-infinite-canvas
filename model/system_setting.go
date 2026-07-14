@@ -39,6 +39,11 @@ const (
 	SettingAppErrorShowDetails    = "app_error_show_details"
 )
 
+const (
+	DefaultSiteName = "矩龙画布"
+	DefaultSiteLogo = "/logo.png"
+)
+
 // SystemSettings 所有配置的聚合结构，方便前端一次性读取。
 type SystemSettings struct {
 	SiteName               string `json:"siteName"`

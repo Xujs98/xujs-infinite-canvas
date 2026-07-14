@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
 
 import { fetchCurrentUser } from "@/services/api/auth";
+import { DEFAULT_SITE_LOGO, DEFAULT_SITE_NAME } from "@/constant/brand";
 import { useConfigStore, type PublicSystemSettings } from "@/stores/use-config-store";
 import { useUserStore } from "@/stores/use-user-store";
 
@@ -45,8 +46,8 @@ function LoginContent() {
     const linuxDoEnabled = useConfigStore((state) => state.publicSettings?.auth?.linuxDo?.enabled === true);
     const allowRegister = useConfigStore((state) => state.publicSettings?.auth?.allowRegister !== false);
     const publicSystemSettings = useConfigStore((state) => state.publicSystemSettings);
-    const siteName = publicSystemSettings?.siteName || "无限画布";
-    const siteLogo = publicSystemSettings?.siteLogo;
+    const siteName = publicSystemSettings?.siteName || DEFAULT_SITE_NAME;
+    const siteLogo = publicSystemSettings?.siteLogo || DEFAULT_SITE_LOGO;
     const [mode, setMode] = useState<"login" | "register">("login");
     const redirect = safeRedirect(searchParams.get("redirect"));
     const inviteCodeFromUrl = searchParams.get("inviteCode") || "";
@@ -79,7 +80,7 @@ function LoginContent() {
                 return;
             }
             const action = mode === "register" ? register : login;
-            const affCode = mode === "register" ? (values.inviteCode || inviteCodeFromUrl) : undefined;
+            const affCode = mode === "register" ? values.inviteCode || inviteCodeFromUrl : undefined;
             const user = await action({ username: values.username, password: values.password, affCode });
             message.success(mode === "register" ? "注册成功" : "登录成功");
             router.replace(redirect);
@@ -94,18 +95,7 @@ function LoginContent() {
         <main className="flex h-full min-h-0 items-center justify-center overflow-y-auto bg-background bg-[radial-gradient(#e5e7eb_1px,transparent_1px)] px-6 py-10 [background-size:16px_16px] dark:bg-[radial-gradient(rgba(245,245,244,.16)_1px,transparent_1px)]">
             <section className="w-full max-w-[420px]">
                 <div className="mb-7 text-center">
-                    {siteLogo ? (
-                        <img src={siteLogo} alt={siteName} className="mx-auto mb-4 block size-12 object-contain" />
-                    ) : (
-                        <span
-                            className="mx-auto mb-4 block size-12 bg-stone-950 dark:bg-stone-100"
-                            style={{
-                                mask: "url(/logo.svg) center / contain no-repeat",
-                                WebkitMask: "url(/logo.svg) center / contain no-repeat",
-                            }}
-                            aria-label={siteName}
-                        />
-                    )}
+                    <img src={siteLogo} alt={siteName} className="mx-auto mb-4 block size-12 object-contain" />
                     <h1 className="text-3xl font-semibold tracking-normal text-stone-950 dark:text-stone-100">账号登录</h1>
                     <p className="mt-3 text-base leading-7 text-stone-500 dark:text-stone-400">支持账号密码和 Linux.do 登录。</p>
                 </div>
@@ -116,7 +106,14 @@ function LoginContent() {
                             block
                             value={mode}
                             onChange={(value) => setMode(value as "login" | "register")}
-                            options={allowRegister ? [{ label: "登录", value: "login" }, { label: "注册", value: "register" }] : [{ label: "登录", value: "login" }]}
+                            options={
+                                allowRegister
+                                    ? [
+                                          { label: "登录", value: "login" },
+                                          { label: "注册", value: "register" },
+                                      ]
+                                    : [{ label: "登录", value: "login" }]
+                            }
                         />
                     </Form.Item>
                     <Form.Item name="username" label={<span className="font-medium text-stone-800 dark:text-stone-200">用户名</span>} rules={[{ required: true, message: "请输入用户名" }]}>

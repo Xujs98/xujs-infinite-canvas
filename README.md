@@ -1,8 +1,8 @@
 <p align="center">
-  <img src="web/public/logo.svg" width="96" alt="infinite-canvas logo">
+  <img src="web/public/logo.png" width="96" alt="矩龙画布 Logo">
 </p>
 
-<h1 align="center">无限画布 (infinite-canvas)</h1>
+<h1 align="center">矩龙画布 (Julong Canvas)</h1>
 
 <p align="center">
   <a href="https://linux.do/"><img src="https://img.shields.io/badge/Linux.do-Community-2b6de8?style=flat-square" alt="Linux.do"></a>
@@ -45,8 +45,8 @@
 git clone git@github.com:Xujs98/xujs-infinite-canvas.git
 cd xujs-infinite-canvas
 cp .env.example .env
-# 修改默认账号密码等信息
-docker-compose up -d
+# 必须修改 ADMIN_PASSWORD、JWT_SECRET，并按需填写 PUBLIC_BASE_URL
+docker compose up -d
 ```
 
 本地源码构建运行：
@@ -56,25 +56,39 @@ cp .env.example .env
 docker compose -f docker-compose.local.yml up -d --build
 ```
 
-运行后默认端口3000，可访问 `http://localhost:3000`。
+运行后默认映射宿主机 `3001` 端口，可访问 `http://localhost:3001`。
 
-如需要拉取提示词，可前往：`http://localhost:3000/admin/prompts`
+如需要拉取提示词，可前往：`http://localhost:3001/admin/prompts`
 
 ## Docker 镜像
 
-本项目通过 GitHub Actions 自动构建 Docker 镜像，推送到 GitHub Container Registry。
+主服务由本仓库自行维护，默认在本地使用 Docker Buildx 构建 `linux/amd64` 和 `linux/arm64` 镜像并推送到 Docker Hub。GitHub Actions 发布流程作为可选备用。
+
+Docker Hub 公开仓库已创建：[qq1371446705/julong-canvas](https://hub.docker.com/r/qq1371446705/julong-canvas)。
 
 拉取方式：
 
 ```bash
-# 应用镜像
-docker pull ghcr.io/Xujs98/infinite-canvas:latest
+# 主服务镜像
+docker pull qq1371446705/julong-canvas:latest
 
-# 文档镜像
+# 文档镜像仍使用独立发布流程
 docker pull ghcr.io/Xujs98/infinite-canvas-docs:latest
 ```
 
-发版后会自动构建，镜像版本与 Git tag 对应（如 `v0.3.0`）。
+本地构建并推送：
+
+```bash
+# 密码提示中输入 Docker Hub Access Token，不要把 Token 写进命令或仓库。
+docker login --username qq1371446705
+
+# 同时发布 amd64/arm64 的 v0.3.1 和 latest。
+./scripts/docker-publish.sh v0.3.1
+```
+
+推送 `v*` Git tag 也可触发 GitHub Actions 发布同名版本、提交 SHA 标签和 `latest`。启用该方式时，GitHub 仓库需要配置 Actions Secret `DOCKERHUB_TOKEN`。
+
+服务器部署、升级、回滚和备份步骤见 [Docker 部署文档](docs/content/docs/overview/docker.mdx)。
 
 ## 效果展示
 

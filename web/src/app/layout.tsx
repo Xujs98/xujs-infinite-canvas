@@ -3,13 +3,19 @@ import Script from "next/script";
 import { AntdRegistry } from "@ant-design/nextjs-registry";
 import { AppProviders } from "@/components/layout/app-providers";
 import { DynamicTitle } from "@/components/layout/dynamic-title";
+import { DEFAULT_SITE_ICON, DEFAULT_SITE_NAME } from "@/constant/brand";
 import "antd/dist/reset.css";
 import "./globals.css";
 import React from "react";
 
 export const metadata: Metadata = {
-    title: "小松鼠画布",
+    title: DEFAULT_SITE_NAME,
     description: "一个无限画布创作工具",
+    icons: {
+        icon: DEFAULT_SITE_ICON,
+        shortcut: DEFAULT_SITE_ICON,
+        apple: "/apple-icon.png?v=julong-canvas-20260714",
+    },
 };
 
 export default function RootLayout({
