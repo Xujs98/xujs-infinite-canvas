@@ -21,8 +21,10 @@ type ConsumeCreditsRequest struct {
 
 // ConsumeCreditsResponse 预扣算力点响应。
 type ConsumeCreditsResponse struct {
-	RequiredCredits int `json:"requiredCredits"`
-	Balance         int `json:"balance"`
+	RequiredCredits     int    `json:"requiredCredits"`
+	Balance             int    `json:"balance"`
+	SubscriptionBalance int    `json:"subscriptionBalance"`
+	ChargeID            string `json:"chargeId"`
 }
 
 // ConsumeCredits App端调用：在生成前预扣算力点。
@@ -56,27 +58,28 @@ func ConsumeCredits(w http.ResponseWriter, r *http.Request) {
 	}
 	if credits <= 0 {
 		// 无费用模型，直接返回
-		OK(w, ConsumeCreditsResponse{RequiredCredits: 0, Balance: user.Credits})
+		OK(w, ConsumeCreditsResponse{RequiredCredits: 0, Balance: user.Credits, SubscriptionBalance: user.SubscriptionCredits})
 		return
 	}
 
 	// 会员免扣
 	if service.IsMembershipActive(user.MembershipExpiresAt) {
 		service.LogMembershipFreeUsage(user.ID, req.Model, credits, "app:"+req.MediaType)
-		OK(w, ConsumeCreditsResponse{RequiredCredits: 0, Balance: user.Credits})
+		OK(w, ConsumeCreditsResponse{RequiredCredits: 0, Balance: user.Credits, SubscriptionBalance: user.SubscriptionCredits})
 		return
 	}
 	if service.IsModelFreeForRole(string(user.Role), req.Model) {
 		service.LogRoleFreeUsage(user.ID, string(user.Role), req.Model, credits, "app:"+req.MediaType)
-		OK(w, ConsumeCreditsResponse{RequiredCredits: 0, Balance: user.Credits})
+		OK(w, ConsumeCreditsResponse{RequiredCredits: 0, Balance: user.Credits, SubscriptionBalance: user.SubscriptionCredits})
 		return
 	}
 
 	// 扣除算力点
 	path := "app:" + req.MediaType
-	if err := service.ConsumeUserCredits(user.ID, req.Model, credits, path); err != nil {
-		log.Printf("[credits] ConsumeUserCredits failed: user=%s model=%s credits=%d err=%v", user.ID, req.Model, credits, err)
-		FailError(w, err)
+	charge, chargeErr := service.ChargeUserCredits(user.ID, req.Model, credits, path)
+	if chargeErr != nil {
+		log.Printf("[credits] ChargeUserCredits failed: user=%s model=%s credits=%d err=%v", user.ID, req.Model, credits, chargeErr)
+		FailError(w, chargeErr)
 		return
 	}
 
@@ -85,17 +88,15 @@ func ConsumeCredits(w http.ResponseWriter, r *http.Request) {
 
 	// 查询扣除后余额
 	refreshedUser, _, _ := repository.GetUserByID(user.ID)
-	balance := user.Credits - credits
-	if refreshedUser.Credits > 0 {
-		balance = refreshedUser.Credits
-	}
-	OK(w, ConsumeCreditsResponse{RequiredCredits: credits, Balance: balance})
+	subscription, _, _ := repository.GetActiveUserSubscription(user.ID)
+	OK(w, ConsumeCreditsResponse{RequiredCredits: credits, Balance: refreshedUser.Credits, SubscriptionBalance: subscription.QuotaRemaining, ChargeID: charge.ID})
 }
 
 // RefundCreditsRequest App端退还算力点请求。
 type RefundCreditsRequest struct {
-	Model  string `json:"model"`
-	Amount int    `json:"amount"`
+	Model    string `json:"model"`
+	Amount   int    `json:"amount"`
+	ChargeID string `json:"chargeId"`
 }
 
 // RefundCredits App端调用：生成失败时退还算力点。
@@ -118,17 +119,20 @@ func RefundCredits(w http.ResponseWriter, r *http.Request) {
 	}
 
 	path := "app:refund"
-	if err := service.RefundUserCredits(user.ID, req.Model, req.Amount, path); err != nil {
-		FailError(w, err)
+	var refundErr error
+	if req.ChargeID != "" {
+		refundErr = service.RefundCreditCharge(user.ID, req.ChargeID, req.Model, path)
+	} else {
+		refundErr = service.RefundUserCredits(user.ID, req.Model, req.Amount, path)
+	}
+	if refundErr != nil {
+		FailError(w, refundErr)
 		return
 	}
 
 	ws.DefaultHub.SendToUser(user.ID, map[string]any{"type": "credits-changed"})
 
 	refreshedUser, _, _ := repository.GetUserByID(user.ID)
-	balance := user.Credits + req.Amount
-	if refreshedUser.Credits > 0 {
-		balance = refreshedUser.Credits
-	}
-	OK(w, ConsumeCreditsResponse{RequiredCredits: 0, Balance: balance})
+	subscription, _, _ := repository.GetActiveUserSubscription(user.ID)
+	OK(w, ConsumeCreditsResponse{RequiredCredits: 0, Balance: refreshedUser.Credits, SubscriptionBalance: subscription.QuotaRemaining, ChargeID: req.ChargeID})
 }

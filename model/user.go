@@ -51,19 +51,23 @@ type UserList struct {
 
 // AuthUser 用户公开信息。
 type AuthUser struct {
-	ID                  string   `json:"id"`
-	Username            string   `json:"username"`
-	DisplayName         string   `json:"displayName"`
-	AvatarURL           string   `json:"avatarUrl"`
-	Role                UserRole `json:"role"`
-	Credits             int      `json:"credits"`
-	AffCode             string   `json:"affCode"`
-	AffCount            int      `json:"affCount"`
-	InviterID           string   `json:"inviterId"`
-	MembershipExpiresAt string   `json:"membershipExpiresAt"`
-	LastLoginAt         string   `json:"lastLoginAt"`
-	CreatedAt           string   `json:"createdAt"`
-	UpdatedAt           string   `json:"updatedAt"`
+	ID                              string   `json:"id"`
+	Username                        string   `json:"username"`
+	DisplayName                     string   `json:"displayName"`
+	AvatarURL                       string   `json:"avatarUrl"`
+	Role                            UserRole `json:"role"`
+	Credits                         int      `json:"credits"`
+	SubscriptionCredits             int      `json:"subscriptionCredits"`
+	HasActiveSubscription           bool     `json:"hasActiveSubscription"`
+	SubscriptionAllowWalletFallback bool     `json:"subscriptionAllowWalletFallback"`
+	AffCode                         string   `json:"affCode"`
+	AffCount                        int      `json:"affCount"`
+	InviterID                       string   `json:"inviterId"`
+	MembershipExpiresAt             string   `json:"membershipExpiresAt"`
+	EnableTasks                     bool     `json:"enableTasks"`
+	LastLoginAt                     string   `json:"lastLoginAt"`
+	CreatedAt                       string   `json:"createdAt"`
+	UpdatedAt                       string   `json:"updatedAt"`
 }
 
 // AuthSession 登录会话信息。
@@ -103,6 +107,7 @@ const (
 	CreditLogTypeRoleFree       CreditLogType = "role_free"
 	CreditLogTypeInviteReward   CreditLogType = "invite_reward"
 	CreditLogTypeCheckIn        CreditLogType = "check_in"
+	CreditLogTypeSubscription   CreditLogType = "subscription_purchase"
 )
 
 // CreditLog 用户算力点变更流水。

@@ -40,6 +40,10 @@ func New() *gin.Engine {
 	v1.GET("/generation-tasks/:id", func(c *gin.Context) {
 		handler.GetGenerationTask(c.Writer, c.Request, c.Param("id"))
 	})
+	v1.GET("/generation-tasks", gin.WrapF(handler.UserGenerationTasks))
+	v1.GET("/subscription-plans", gin.WrapF(handler.PublicSubscriptionPlans))
+	v1.GET("/subscriptions", gin.WrapF(handler.UserSubscriptions))
+	v1.POST("/subscriptions/purchase", gin.WrapF(handler.PurchaseSubscription))
 	v1.POST("/chat/completions", gin.WrapF(handler.AIChatCompletions))
 	v1.POST("/audio/speech", gin.WrapF(handler.AIAudioSpeech))
 	v1.POST("/videos", gin.WrapF(handler.AIVideos))
@@ -180,6 +184,32 @@ func New() *gin.Engine {
 		handler.DeleteRole(c.Writer, c.Request, c.Param("id"))
 	})
 	admin.POST("/roles/batch-delete", gin.WrapF(handler.BatchDeleteRoles))
+	admin.GET("/subscription-plans", gin.WrapF(handler.AdminSubscriptionPlans))
+	admin.POST("/subscription-plans", gin.WrapF(handler.CreateSubscriptionPlan))
+	admin.PUT("/subscription-plans/:id", func(c *gin.Context) {
+		handler.UpdateSubscriptionPlan(c.Writer, c.Request, c.Param("id"))
+	})
+	admin.DELETE("/subscription-plans/:id", func(c *gin.Context) {
+		handler.DeleteSubscriptionPlan(c.Writer, c.Request, c.Param("id"))
+	})
+	admin.GET("/subscription-plans/:id/users", func(c *gin.Context) {
+		handler.AdminSubscriptionPlanUsers(c.Writer, c.Request, c.Param("id"))
+	})
+	admin.GET("/users/:id/subscriptions", func(c *gin.Context) {
+		handler.AdminUserSubscriptions(c.Writer, c.Request, c.Param("id"))
+	})
+	admin.POST("/users/:id/subscriptions", func(c *gin.Context) {
+		handler.GrantUserSubscription(c.Writer, c.Request, c.Param("id"))
+	})
+	admin.POST("/user-subscriptions/:id/reset", func(c *gin.Context) {
+		handler.ResetUserSubscription(c.Writer, c.Request, c.Param("id"))
+	})
+	admin.POST("/user-subscriptions/:id/void", func(c *gin.Context) {
+		handler.VoidUserSubscription(c.Writer, c.Request, c.Param("id"))
+	})
+	admin.DELETE("/user-subscriptions/:id", func(c *gin.Context) {
+		handler.DeleteUserSubscription(c.Writer, c.Request, c.Param("id"))
+	})
 	api.GET("/roles", gin.WrapF(handler.GetAllRoles))
 	api.GET("/proxy-image", gin.WrapF(handler.ProxyImage))
 	api.GET("/model-classifications/map", gin.WrapF(handler.GetModelClassificationsMap))

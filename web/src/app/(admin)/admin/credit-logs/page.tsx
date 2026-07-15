@@ -22,6 +22,7 @@ const creditLogTypeLabels: Record<string, string> = {
     invite_reward: "邀请奖励",
     redeem: "兑换卡密",
     check_in: "签到奖励",
+    subscription_purchase: "订阅购买",
 };
 
 const tagColorMap: Record<string, string> = {
@@ -35,6 +36,7 @@ const tagColorMap: Record<string, string> = {
     invite_reward: "purple",
     redeem: "gold",
     check_in: "lime",
+    subscription_purchase: "cyan",
 };
 
 function resolveCreditLogType(item: AdminCreditLog): string {

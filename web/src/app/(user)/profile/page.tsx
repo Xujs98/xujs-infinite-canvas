@@ -8,6 +8,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { bindAffCode, dailyCheckIn, fetchCheckInMonth, fetchUserCreditLogs, redeemCode, updateProfile, type CheckIn, type CreditLog } from "@/services/api/auth";
 import { useConfigStore } from "@/stores/use-config-store";
 import { useUserStore } from "@/stores/use-user-store";
+import SubscriptionsPage from "@/app/(user)/subscriptions/page";
 
 function useProfileMobile() {
     const [isMobile, setIsMobile] = useState(false);
@@ -68,6 +69,7 @@ const creditLogTypeLabels: Record<string, string> = {
     invite_reward: "邀请奖励",
     redeem: "兑换卡密",
     check_in: "签到奖励",
+    subscription_purchase: "订阅购买",
 };
 
 const tagColorMap: Record<string, string> = {
@@ -81,6 +83,7 @@ const tagColorMap: Record<string, string> = {
     invite_reward: "purple",
     redeem: "gold",
     check_in: "lime",
+    subscription_purchase: "cyan",
 };
 
 function resolveCreditLogType(item: CreditLog): string {
@@ -154,11 +157,7 @@ function ProfileTab() {
             {/* 统计卡片 */}
             <div className="mt-5 grid grid-cols-2 gap-3 sm:mt-6 sm:grid-cols-3">
                 <StatCard icon={<WalletOutlined />} label="算力点余额" value={`⚡ ${credits}`} valueClassName={credits < 0 ? "text-red-500" : "text-stone-800 dark:text-stone-100"} />
-                <StatCard
-                    icon={<CrownOutlined />}
-                    label="会员状态"
-                    value={membershipActive ? `有效至 ${dayjs(user.membershipExpiresAt).format("MM-DD HH:mm")}` : "无会员"}
-                />
+                <StatCard icon={<CrownOutlined />} label="会员状态" value={membershipActive ? `有效至 ${dayjs(user.membershipExpiresAt).format("MM-DD HH:mm")}` : "无会员"} />
                 <StatCard icon={<ClockCircleOutlined />} label="注册时间" value={dayjs(user.createdAt).format("YYYY-MM-DD HH:mm")} />
             </div>
 
@@ -181,13 +180,7 @@ function ProfileTab() {
                         <span className="mr-1 text-red-500">*</span>补填邀请人邀请码
                     </div>
                     <div className="flex flex-col gap-2 sm:flex-row">
-                        <Input
-                            placeholder="注册时忘记填写可在这里补填"
-                            value={affCodeInput}
-                            onChange={(e) => setAffCodeInput(e.target.value)}
-                            onPressEnter={() => void handleBindAffCode()}
-                            className="sm:flex-1"
-                        />
+                        <Input placeholder="注册时忘记填写可在这里补填" value={affCodeInput} onChange={(e) => setAffCodeInput(e.target.value)} onPressEnter={() => void handleBindAffCode()} className="sm:flex-1" />
                         <Button type="primary" loading={binding} onClick={() => void handleBindAffCode()}>
                             绑定邀请码
                         </Button>
@@ -198,16 +191,11 @@ function ProfileTab() {
             {/* 兑换码 */}
             <div className="mt-6 border-t border-stone-200 pt-6 dark:border-stone-800">
                 <div className="mb-3 text-sm font-medium text-stone-700 dark:text-stone-200">
-                    <GiftOutlined className="mr-1" />兑换码
+                    <GiftOutlined className="mr-1" />
+                    兑换码
                 </div>
                 <div className="flex flex-col gap-2 sm:flex-row">
-                    <Input
-                        placeholder="输入兑换码充值算力点"
-                        value={redeemInput}
-                        onChange={(e) => setRedeemInput(e.target.value)}
-                        onPressEnter={() => void handleRedeem()}
-                        className="sm:flex-1"
-                    />
+                    <Input placeholder="输入兑换码充值算力点" value={redeemInput} onChange={(e) => setRedeemInput(e.target.value)} onPressEnter={() => void handleRedeem()} className="sm:flex-1" />
                     <Button type="primary" loading={redeeming} onClick={() => void handleRedeem()}>
                         立即兑换
                     </Button>
@@ -261,7 +249,8 @@ function CreditLogsTab() {
             width: 100,
             render: (amount: number) => (
                 <span className={amount >= 0 ? "text-green-500" : "text-red-500"}>
-                    {amount >= 0 ? "+" : ""}{amount} 点
+                    {amount >= 0 ? "+" : ""}
+                    {amount} 点
                 </span>
             ),
         },
@@ -281,7 +270,7 @@ function CreditLogsTab() {
             title: "时间",
             dataIndex: "createdAt",
             width: 180,
-            render: (time: string) => time ? dayjs(time).format("YYYY-MM-DD HH:mm:ss") : "-",
+            render: (time: string) => (time ? dayjs(time).format("YYYY-MM-DD HH:mm:ss") : "-"),
         },
     ];
 
@@ -291,7 +280,10 @@ function CreditLogsTab() {
                 <span className="text-sm leading-5 text-stone-500 dark:text-stone-400">查看模型消费、失败返还、兑换码和后台调整记录。</span>
                 <select
                     value={typeFilter}
-                    onChange={(e) => { setTypeFilter(e.target.value); setPage(1); }}
+                    onChange={(e) => {
+                        setTypeFilter(e.target.value);
+                        setPage(1);
+                    }}
                     className="h-10 rounded-lg border border-stone-200 bg-white px-3 text-sm dark:border-stone-700 dark:bg-stone-800"
                 >
                     <option value="">全部类型</option>
@@ -304,17 +296,11 @@ function CreditLogsTab() {
                     <option value="admin_adjust">后台调整</option>
                     <option value="invite_reward">邀请奖励</option>
                     <option value="check_in">签到奖励</option>
+                    <option value="subscription_purchase">订阅购买</option>
                 </select>
             </div>
             <div className="hidden sm:block">
-                <Table
-                    dataSource={logs}
-                    columns={columns}
-                    rowKey="id"
-                    loading={loading}
-                    pagination={false}
-                    size="small"
-                />
+                <Table dataSource={logs} columns={columns} rowKey="id" loading={loading} pagination={false} size="small" />
             </div>
             <div className="space-y-3 sm:hidden">
                 {loading ? (
@@ -328,7 +314,8 @@ function CreditLogsTab() {
                                     return <Tag color={tagColorMap[displayType]}>{creditLogTypeLabels[displayType] || displayType}</Tag>;
                                 })()}
                                 <span className={`shrink-0 text-base font-semibold ${item.amount >= 0 ? "text-green-500" : "text-red-500"}`}>
-                                    {item.amount >= 0 ? "+" : ""}{item.amount} 点
+                                    {item.amount >= 0 ? "+" : ""}
+                                    {item.amount} 点
                                 </span>
                             </div>
                             <div className="mt-3 grid grid-cols-2 gap-2 text-xs text-stone-500 dark:text-stone-400">
@@ -353,7 +340,10 @@ function CreditLogsTab() {
                     showQuickJumper={!isMobile}
                     responsive
                     showTotal={(t) => `共 ${t} 条`}
-                    onChange={(p, ps) => { setPage(p); setPageSize(ps); }}
+                    onChange={(p, ps) => {
+                        setPage(p);
+                        setPageSize(ps);
+                    }}
                 />
             </div>
         </div>
@@ -458,15 +448,11 @@ function CheckInTab() {
                     <div className="flex items-center gap-2 text-lg font-medium text-stone-800 dark:text-stone-100">
                         <CalendarOutlined /> 每日签到
                     </div>
-                    <div className="text-sm text-stone-500 dark:text-stone-400">今日签到可随机获得 {checkInRewardMin}~{checkInRewardMax} 点普通算力点。</div>
+                    <div className="text-sm text-stone-500 dark:text-stone-400">
+                        今日签到可随机获得 {checkInRewardMin}~{checkInRewardMax} 点普通算力点。
+                    </div>
                 </div>
-                <Button
-                    type="primary"
-                    loading={loading}
-                    disabled={todayChecked}
-                    onClick={() => void handleCheckIn()}
-                    className="w-full sm:w-auto"
-                >
+                <Button type="primary" loading={loading} disabled={todayChecked} onClick={() => void handleCheckIn()} className="w-full sm:w-auto">
                     {todayChecked ? "今日已签到" : "立即签到"}
                 </Button>
             </div>
@@ -482,19 +468,11 @@ function CheckInTab() {
             <div className="rounded-lg border border-stone-200 p-3 sm:p-4 dark:border-stone-700">
                 {/* 月份导航 */}
                 <div className="mb-4 flex items-center justify-between">
-                    <Button
-                        type="text"
-                        onClick={() => setCurrentMonth(currentMonth.subtract(1, "month"))}
-                    >
+                    <Button type="text" onClick={() => setCurrentMonth(currentMonth.subtract(1, "month"))}>
                         {"<"}
                     </Button>
-                    <span className="font-medium text-stone-800 dark:text-stone-100">
-                        {currentMonth.format("YYYY-MM")}
-                    </span>
-                    <Button
-                        type="text"
-                        onClick={() => setCurrentMonth(currentMonth.add(1, "month"))}
-                    >
+                    <span className="font-medium text-stone-800 dark:text-stone-100">{currentMonth.format("YYYY-MM")}</span>
+                    <Button type="text" onClick={() => setCurrentMonth(currentMonth.add(1, "month"))}>
                         {">"}
                     </Button>
                 </div>
@@ -516,17 +494,11 @@ function CheckInTab() {
                         <div
                             key={index}
                             className={`relative flex min-h-12 flex-col items-center justify-center rounded-lg p-1.5 text-xs sm:p-2 sm:text-sm ${
-                                !item.isCurrentMonth
-                                    ? "text-stone-300 dark:text-stone-600"
-                                    : item.checkIn
-                                    ? "bg-green-50 text-green-600 dark:bg-green-900/30 dark:text-green-400"
-                                    : "text-stone-700 dark:text-stone-200"
+                                !item.isCurrentMonth ? "text-stone-300 dark:text-stone-600" : item.checkIn ? "bg-green-50 text-green-600 dark:bg-green-900/30 dark:text-green-400" : "text-stone-700 dark:text-stone-200"
                             }`}
                         >
                             <span>{item.day}</span>
-                            {item.checkIn && (
-                                <span className="text-[10px] text-green-500">+{item.checkIn.reward}</span>
-                            )}
+                            {item.checkIn && <span className="text-[10px] text-green-500">+{item.checkIn.reward}</span>}
                         </div>
                     ))}
                 </div>
@@ -609,13 +581,7 @@ function SecurityTab() {
             <div className="rounded-lg border border-stone-200 p-4 dark:border-stone-700">
                 <div className="mb-3 text-sm font-medium text-stone-700 dark:text-stone-300">修改昵称</div>
                 <div className="flex flex-col gap-2 sm:flex-row">
-                    <Input
-                        value={displayName}
-                        onChange={(e) => setDisplayName(limitDisplayName(e.target.value))}
-                        maxLength={DISPLAY_NAME_MAX_LENGTH}
-                        placeholder="请输入新昵称"
-                        className="flex-1"
-                    />
+                    <Input value={displayName} onChange={(e) => setDisplayName(limitDisplayName(e.target.value))} maxLength={DISPLAY_NAME_MAX_LENGTH} placeholder="请输入新昵称" className="flex-1" />
                     <Button type="primary" onClick={handleUpdateDisplayName} loading={loading} className="sm:w-auto">
                         保存
                     </Button>
@@ -627,21 +593,9 @@ function SecurityTab() {
             <div className="rounded-lg border border-stone-200 p-4 dark:border-stone-700">
                 <div className="mb-3 text-sm font-medium text-stone-700 dark:text-stone-300">修改密码</div>
                 <div className="space-y-3">
-                    <Input.Password
-                        value={oldPassword}
-                        onChange={(e) => setOldPassword(e.target.value)}
-                        placeholder="当前密码"
-                    />
-                    <Input.Password
-                        value={newPassword}
-                        onChange={(e) => setNewPassword(e.target.value)}
-                        placeholder="新密码（至少6位）"
-                    />
-                    <Input.Password
-                        value={confirmPassword}
-                        onChange={(e) => setConfirmPassword(e.target.value)}
-                        placeholder="确认新密码"
-                    />
+                    <Input.Password value={oldPassword} onChange={(e) => setOldPassword(e.target.value)} placeholder="当前密码" />
+                    <Input.Password value={newPassword} onChange={(e) => setNewPassword(e.target.value)} placeholder="新密码（至少6位）" />
+                    <Input.Password value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} placeholder="确认新密码" />
                     <Button type="primary" onClick={handleChangePassword} loading={loading} className="w-full sm:w-auto">
                         修改密码
                     </Button>
@@ -661,6 +615,7 @@ export default function ProfilePage() {
 
     const tabs = [
         { key: "profile", icon: <UserOutlined />, label: "个人中心" },
+        { key: "subscriptions", icon: <CrownOutlined />, label: "订阅套餐" },
         { key: "credits", icon: <ProfileOutlined />, label: "算力点明细" },
         ...(checkInEnabled ? [{ key: "checkin", icon: <CalendarOutlined />, label: "每日签到" }] : []),
         { key: "security", icon: <SafetyOutlined />, label: "安全中心" },
@@ -686,19 +641,16 @@ export default function ProfilePage() {
             {/* 导航标签栏 */}
             <div className="thin-scrollbar relative mb-3 flex gap-1 overflow-x-auto rounded-xl border border-stone-200 bg-stone-50 p-1 dark:border-stone-700 dark:bg-stone-800/50 sm:mb-4 sm:overflow-visible">
                 {/* 滑动指示器 */}
-                <div
-                    className="absolute top-1 bottom-1 rounded-md bg-white shadow-sm transition-all duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] dark:bg-stone-700"
-                    style={{ left: indicatorStyle.left, width: indicatorStyle.width }}
-                />
+                <div className="absolute top-1 bottom-1 rounded-md bg-white shadow-sm transition-all duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] dark:bg-stone-700" style={{ left: indicatorStyle.left, width: indicatorStyle.width }} />
                 {tabs.map((tab) => (
                     <button
                         key={tab.key}
-                        ref={(el) => { tabsRef.current[tab.key] = el; }}
+                        ref={(el) => {
+                            tabsRef.current[tab.key] = el;
+                        }}
                         onClick={() => setActiveTab(tab.key)}
                         className={`relative z-10 flex min-w-max flex-none items-center justify-center gap-2 rounded-md px-3 py-2.5 text-sm font-medium transition-colors sm:flex-1 sm:px-4 ${
-                            activeTab === tab.key
-                                ? "text-blue-600 dark:text-blue-400"
-                                : "text-stone-600 hover:text-stone-800 dark:text-stone-400 dark:hover:text-stone-200"
+                            activeTab === tab.key ? "text-blue-600 dark:text-blue-400" : "text-stone-600 hover:text-stone-800 dark:text-stone-400 dark:hover:text-stone-200"
                         }`}
                     >
                         {tab.icon}
@@ -707,25 +659,22 @@ export default function ProfilePage() {
                 ))}
             </div>
 
-            <div className="rounded-xl border border-stone-200 bg-white p-4 dark:border-stone-800 dark:bg-stone-900/50 sm:p-6">
+            <div className={activeTab === "subscriptions" ? "" : "rounded-xl border border-stone-200 bg-white p-4 dark:border-stone-800 dark:bg-stone-900/50 sm:p-6"}>
                 {/* 用户信息头部 */}
-                <div className="flex items-center gap-3 sm:gap-4">
+                {activeTab !== "subscriptions" ? <div className="flex items-center gap-3 sm:gap-4">
                     <div className="flex size-12 shrink-0 items-center justify-center rounded-full bg-stone-200 text-xl text-stone-500 dark:bg-stone-700 dark:text-stone-300 sm:size-14">
-                        {user.avatarUrl ? (
-                            <img src={user.avatarUrl} alt="" className="size-12 rounded-full object-cover sm:size-14" />
-                        ) : (
-                            <UserOutlined />
-                        )}
+                        {user.avatarUrl ? <img src={user.avatarUrl} alt="" className="size-12 rounded-full object-cover sm:size-14" /> : <UserOutlined />}
                     </div>
                     <div className="min-w-0">
                         <div className="truncate text-lg font-medium text-stone-800 dark:text-stone-100">{user.displayName || user.username}</div>
                         <div className="text-sm text-stone-400 dark:text-stone-500">@{user.username}</div>
                     </div>
-                </div>
+                </div> : null}
 
                 {/* 根据选中的标签显示内容 */}
                 <div key={activeTab} className="animate-fadeIn">
                     {activeTab === "profile" && <ProfileTab />}
+                    {activeTab === "subscriptions" && <SubscriptionsPage />}
                     {activeTab === "credits" && <CreditLogsTab />}
                     {activeTab === "checkin" && <CheckInTab />}
                     {activeTab === "security" && <SecurityTab />}

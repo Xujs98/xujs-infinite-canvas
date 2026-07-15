@@ -146,7 +146,7 @@ func RedeemCode(userID string, code string) (model.AuthUser, error) {
 		return model.AuthUser{}, err
 	}
 
-	return model.PublicUser(user), nil
+	return publicUser(user), nil
 }
 
 func generateCode(length int) string {

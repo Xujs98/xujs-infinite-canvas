@@ -160,7 +160,7 @@ export default function AdminTasksPage() {
                     任务管理
                 </Typography.Title>
                 <Typography.Text type="secondary" style={{ fontSize: 13 }}>
-                    查看当前服务端图片和视频生成任务
+                    仅展示已开启“任务功能”角色的持久化图片和视频任务
                 </Typography.Text>
             </div>
             <Card className="admin-filter-card" variant="borderless">

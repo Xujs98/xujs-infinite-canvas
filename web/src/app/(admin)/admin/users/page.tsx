@@ -1,6 +1,6 @@
 "use client";
 
-import { DeleteOutlined, DesktopOutlined, EditOutlined, MobileOutlined, PlusOutlined, ReloadOutlined, SearchOutlined } from "@ant-design/icons";
+import { CrownOutlined, DeleteOutlined, DesktopOutlined, EditOutlined, MobileOutlined, PlusOutlined, ReloadOutlined, SearchOutlined } from "@ant-design/icons";
 import { ProTable, type ProColumns } from "@ant-design/pro-components";
 import { Avatar, Button, Card, Col, DatePicker, Divider, Flex, Form, Input, InputNumber, Modal, Row, Select, Space, Tag, Tooltip, Typography } from "antd";
 import dayjs, { type Dayjs } from "dayjs";
@@ -12,6 +12,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useAdminUsers } from "./use-admin-users";
 import { fetchAllRoles, type AdminRole } from "@/services/api/role";
 import { useUserStore } from "@/stores/use-user-store";
+import { UserSubscriptionsModal } from "./user-subscriptions-modal";
 
 type UserFormValues = Omit<Partial<AdminUser>, "membershipExpiresAt"> & { password?: string; membershipExpiresAt?: Dayjs | string };
 
@@ -64,6 +65,7 @@ export default function AdminUsersPage() {
     const [keywordText, setKeywordText] = useState(keyword);
     const [editingUser, setEditingUser] = useState<Partial<AdminUser> | null>(null);
     const [deletingUser, setDeletingUser] = useState<AdminUser | null>(null);
+    const [subscriptionUser, setSubscriptionUser] = useState<AdminUser | null>(null);
     const [selectedIds, setSelectedIds] = useState<string[]>([]);
     const [batchDeleteOpen, setBatchDeleteOpen] = useState(false);
     const [batchStatusOpen, setBatchStatusOpen] = useState(false);
@@ -197,10 +199,15 @@ export default function AdminUsersPage() {
         {
             title: "操作",
             key: "actions",
-            width: 96,
+            width: 132,
             align: "right",
             render: (_, item) => (
                 <Space size={4}>
+                    {item.role !== "admin" && (
+                        <Tooltip title="管理订阅">
+                            <Button type="text" size="small" icon={<CrownOutlined />} onClick={() => setSubscriptionUser(item)} />
+                        </Tooltip>
+                    )}
                     <Tooltip title="编辑">
                         <Button type="text" size="small" icon={<EditOutlined />} onClick={() => setEditingUser(item)} />
                     </Tooltip>
@@ -271,9 +278,9 @@ export default function AdminUsersPage() {
                     search={false}
                     defaultSize="middle"
                     tableLayout="fixed"
-                    scroll={{ x: 1210 }}
+                    scroll={{ x: 1250 }}
                     cardProps={{ variant: "borderless", style: { width: "100%", maxWidth: "100%", minWidth: 0, overflow: "hidden" } }}
-                    tableStyle={{ minWidth: 1210 }}
+                    tableStyle={{ minWidth: 1250 }}
                     rowSelection={{
                         selectedRowKeys: selectedIds,
                         onChange: (keys) => setSelectedIds(keys.map(String)),
@@ -308,6 +315,8 @@ export default function AdminUsersPage() {
                     }}
                 />
             </Flex>
+
+            <UserSubscriptionsModal user={subscriptionUser} open={Boolean(subscriptionUser)} onClose={() => setSubscriptionUser(null)} onChanged={() => void refreshUsers()} />
 
             <Modal title={editingUser?.id ? "编辑用户" : "新增用户"} open={Boolean(editingUser)} width="min(720px, calc(100vw - 32px))" onCancel={() => setEditingUser(null)} onOk={() => void saveUser()} okText="保存" cancelText="取消" destroyOnHidden>
                 <Form form={form} layout="vertical" requiredMark={false}>

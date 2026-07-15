@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/basketikun/infinite-canvas/model"
+	"github.com/basketikun/infinite-canvas/repository"
 	"github.com/google/uuid"
 )
 
@@ -15,9 +16,12 @@ type GenerationTaskCreate struct {
 	UserID         string
 	Username       string
 	Model          string
+	Prompt         string
 	Path           string
 	CanvasID       string
 	NodeID         string
+	Persistent     bool
+	CreditChargeID string
 }
 
 type GenerationTaskUpdate struct {
@@ -27,6 +31,7 @@ type GenerationTaskUpdate struct {
 	ResultURL      string
 	ResultImages   []string
 	ErrorMsg       string
+	CreditChargeID string
 }
 
 var generationTasks = struct {
@@ -46,23 +51,29 @@ func CreateGenerationTask(input GenerationTaskCreate) model.GenerationTask {
 		UserID:         input.UserID,
 		Username:       input.Username,
 		Model:          input.Model,
+		Prompt:         input.Prompt,
 		Path:           input.Path,
 		CanvasID:       input.CanvasID,
 		NodeID:         input.NodeID,
+		Persistent:     input.Persistent,
+		CreditChargeID: input.CreditChargeID,
 		CreatedAt:      now,
 		UpdatedAt:      now,
 	}
 	generationTasks.Lock()
 	generationTasks.items[task.ID] = task
 	generationTasks.Unlock()
+	if task.Persistent {
+		_ = repository.SaveGenerationTask(task)
+	}
 	return task
 }
 
 func UpdateGenerationTask(id string, update GenerationTaskUpdate) (model.GenerationTask, bool) {
 	generationTasks.Lock()
-	defer generationTasks.Unlock()
 	task, ok := generationTasks.items[id]
 	if !ok {
+		generationTasks.Unlock()
 		return model.GenerationTask{}, false
 	}
 	if update.UpstreamTaskID != "" {
@@ -83,12 +94,19 @@ func UpdateGenerationTask(id string, update GenerationTaskUpdate) (model.Generat
 	if update.ErrorMsg != "" {
 		task.ErrorMsg = update.ErrorMsg
 	}
+	if update.CreditChargeID != "" {
+		task.CreditChargeID = update.CreditChargeID
+	}
 	task.UpdatedAt = time.Now()
 	if task.Status == model.GenerationTaskStatusSucceeded || task.Status == model.GenerationTaskStatusFailed {
 		completedAt := task.UpdatedAt
 		task.CompletedAt = &completedAt
 	}
 	generationTasks.items[id] = task
+	generationTasks.Unlock()
+	if task.Persistent {
+		_ = repository.SaveGenerationTask(task)
+	}
 	return task, true
 }
 
@@ -106,6 +124,12 @@ func UpdateGenerationTaskByUpstreamID(upstreamTaskID string, update GenerationTa
 	}
 	generationTasks.RUnlock()
 	if id == "" {
+		if task, ok, _ := repository.GetGenerationTask(upstreamTaskID); ok {
+			generationTasks.Lock()
+			generationTasks.items[task.ID] = task
+			generationTasks.Unlock()
+			return UpdateGenerationTask(task.ID, update)
+		}
 		return model.GenerationTask{}, false
 	}
 	return UpdateGenerationTask(id, update)
@@ -123,31 +147,48 @@ func UpdateGenerationTaskByIDOrUpstreamID(taskID string, update GenerationTaskUp
 
 func GetGenerationTask(id string) (model.GenerationTask, bool) {
 	generationTasks.RLock()
-	defer generationTasks.RUnlock()
 	if task, ok := generationTasks.items[id]; ok {
+		generationTasks.RUnlock()
 		return task, true
 	}
 	for _, task := range generationTasks.items {
 		if task.UpstreamTaskID == id {
+			generationTasks.RUnlock()
 			return task, true
 		}
+	}
+	generationTasks.RUnlock()
+	if task, ok, _ := repository.GetGenerationTask(id); ok {
+		generationTasks.Lock()
+		generationTasks.items[task.ID] = task
+		generationTasks.Unlock()
+		return task, true
 	}
 	return model.GenerationTask{}, false
 }
 
-func GetUserGenerationTask(userID, id string) (model.GenerationTask, bool) {
+func GetUserGenerationTask(userID, roleName, id string) (model.GenerationTask, bool) {
 	task, ok := GetGenerationTask(id)
-	if !ok || task.UserID != userID {
+	if !ok || task.UserID != userID || !isUserVisibleGenerationTask(task, IsRoleTasksEnabled(roleName)) {
 		return model.GenerationTask{}, false
 	}
 	return task, true
+}
+
+func isUserVisibleGenerationTask(task model.GenerationTask, enableTasks bool) bool {
+	return !task.Persistent || enableTasks
 }
 
 func ListGenerationTasks(q model.Query) model.GenerationTaskList {
 	q.Normalize()
 	generationTasks.RLock()
 	all := make([]model.GenerationTask, 0, len(generationTasks.items))
+	seen := make(map[string]struct{}, len(generationTasks.items))
 	for _, task := range generationTasks.items {
+		if !isAdminVisibleGenerationTask(task) {
+			continue
+		}
+		seen[task.ID] = struct{}{}
 		if q.Type != "" && string(task.Type) != q.Type {
 			continue
 		}
@@ -164,6 +205,16 @@ func ListGenerationTasks(q model.Query) model.GenerationTaskList {
 		all = append(all, task)
 	}
 	generationTasks.RUnlock()
+	persistedQuery := q
+	persistedQuery.Page = 1
+	persistedQuery.PageSize = model.MaxPageSize
+	if persisted, err := repository.ListGenerationTasks(persistedQuery, ""); err == nil {
+		for _, task := range persisted.Items {
+			if _, ok := seen[task.ID]; !ok {
+				all = append(all, task)
+			}
+		}
+	}
 
 	sortGenerationTasks(all)
 	total := len(all)
@@ -176,6 +227,17 @@ func ListGenerationTasks(q model.Query) model.GenerationTaskList {
 		end = total
 	}
 	return model.GenerationTaskList{Items: all[start:end], Total: total}
+}
+
+func isAdminVisibleGenerationTask(task model.GenerationTask) bool {
+	return task.Persistent
+}
+
+func ListUserGenerationTasks(userID, roleName string, q model.Query) (model.GenerationTaskList, error) {
+	if !IsRoleTasksEnabled(roleName) {
+		return model.GenerationTaskList{}, safeMessageError{message: "当前角色未启用任务功能"}
+	}
+	return repository.ListGenerationTasks(q, userID)
 }
 
 func sortGenerationTasks(items []model.GenerationTask) {

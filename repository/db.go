@@ -79,6 +79,11 @@ func DB() (*gorm.DB, error) {
 			&model.ModelClassification{},
 			&model.RequestLog{},
 			&model.Role{},
+			&model.SubscriptionPlan{},
+			&model.UserSubscription{},
+			&model.SubscriptionUsageLog{},
+			&model.CreditCharge{},
+			&model.GenerationTask{},
 		)
 		if dbErr != nil {
 			return

@@ -19,6 +19,7 @@ import { resolveImageUrl, uploadImage } from "@/services/image-storage";
 import { createVideoGenerationTask, pollVideoGenerationTask, storeGeneratedVideo, type VideoGenerationTask } from "@/services/api/video";
 import { useAssetStore } from "@/stores/use-asset-store";
 import { useConfigStore, useEffectiveConfig, type AiConfig } from "@/stores/use-config-store";
+import { useUserStore } from "@/stores/use-user-store";
 import type { ReferenceImage } from "@/types/image";
 import type { ReferenceAudio, ReferenceVideo } from "@/types/media";
 
@@ -72,6 +73,8 @@ export default function VideoPage() {
     const { message } = App.useApp();
     const fileInputRef = useRef<HTMLInputElement>(null);
     const activeLogIdsRef = useRef<Set<string>>(new Set());
+    const taskRecoveryUserRef = useRef("");
+    const user = useUserStore((state) => state.user);
     const config = useConfigStore((state) => state.config);
     const effectiveConfig = useEffectiveConfig();
     const updateConfig = useConfigStore((state) => state.updateConfig);
@@ -105,8 +108,12 @@ export default function VideoPage() {
     }, [running, startedAt]);
 
     useEffect(() => {
-        void refreshLogs();
-    }, []);
+        if (!user) return;
+        const recoveryKey = `${user.id}:${user.enableTasks}`;
+        if (taskRecoveryUserRef.current === recoveryKey) return;
+        taskRecoveryUserRef.current = recoveryKey;
+        void initializeLogs(user.enableTasks);
+    }, [user?.enableTasks, user?.id]);
 
     const addReferences = async (files?: FileList | null) => {
         const selectedFiles = Array.from(files || []);
@@ -267,15 +274,27 @@ export default function VideoPage() {
     };
 
     const saveLog = async (log: GenerationLog) => {
-        await logStore.setItem(log.id, serializeLog(log));
+        const persistedLog = user?.enableTasks ? log : { ...log, task: undefined };
+        await logStore.setItem(log.id, serializeLog(persistedLog));
         await refreshLogs();
     };
 
     const refreshLogs = async () => {
         const nextLogs = await readStoredLogs();
         setLogs(nextLogs);
-        resumePendingLogs(nextLogs);
         return nextLogs;
+    };
+
+    const initializeLogs = async (enableTasks: boolean) => {
+        const storedLogs = await readStoredLogs();
+        if (enableTasks) {
+            setLogs(storedLogs);
+            resumePendingLogs(storedLogs);
+            return;
+        }
+        const nextLogs = storedLogs.map(interruptPendingLog);
+        await Promise.all(nextLogs.filter((log, index) => log !== storedLogs[index]).map((log) => logStore.setItem(log.id, serializeLog(log))));
+        setLogs(nextLogs);
     };
 
     const resumePendingLogs = (items: GenerationLog[]) => {
@@ -730,6 +749,17 @@ function serializeLog(log: GenerationLog): GenerationLog {
         videoReferences: log.videoReferences.map((item) => (item.storageKey ? { ...item, url: "" } : item)),
         audioReferences: log.audioReferences.map((item) => (item.storageKey ? { ...item, url: "" } : item)),
         video: log.video?.storageKey ? { ...log.video, url: "" } : log.video,
+    };
+}
+
+function interruptPendingLog(log: GenerationLog): GenerationLog {
+    if (log.status !== "生成中") return log;
+    return {
+        ...log,
+        status: "失败",
+        task: undefined,
+        durationMs: Math.max(log.durationMs, Date.now() - log.createdAt),
+        error: "页面已刷新，当前角色未开启任务恢复",
     };
 }
 

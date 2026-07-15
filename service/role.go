@@ -65,6 +65,7 @@ func UpdateRole(id string, role model.Role) (model.Role, error) {
 	current.FreeModels = role.FreeModels
 	current.AllowOffline = role.AllowOffline
 	current.OfflineCreditLimit = role.OfflineCreditLimit
+	current.EnableTasks = role.EnableTasks
 	normalizeRoleOfflineLimit(&current)
 	current.UpdatedAt = now()
 	return repository.SaveRole(current)
@@ -128,6 +129,17 @@ func IsModelFreeForRole(roleName, modelName string) bool {
 func IsRoleAllowedOffline(roleName string) bool {
 	role, ok, _ := repository.GetRoleByName(roleName)
 	return ok && role.AllowOffline
+}
+
+// IsRoleTasksEnabled 检查角色是否启用服务端任务持久化。
+func IsRoleTasksEnabled(roleName string) bool {
+	role, ok, _ := repository.GetRoleByName(roleName)
+	return ok && role.EnableTasks
+}
+
+func IsUserTasksEnabled(userID string) bool {
+	user, ok, _ := repository.GetUserByID(userID)
+	return ok && IsRoleTasksEnabled(string(user.Role))
 }
 
 // GetRoleOfflineCreditLimit 获取角色允许离线时可预支的最大算力点；0 表示无限制。

@@ -59,9 +59,9 @@ func proxyAIGetRequest(w http.ResponseWriter, r *http.Request, path string) {
 	var generationTask canvasGenerationTaskContext
 	if isPolling && user.ID != "" {
 		requestedTaskID := strings.TrimPrefix(path, "/videos/")
-		if task, ok := service.GetUserGenerationTask(user.ID, requestedTaskID); ok {
+		if task, ok := service.GetUserGenerationTask(user.ID, string(user.Role), requestedTaskID); ok {
 			modelName = task.Model
-			generationTask = canvasGenerationTaskContext{TaskID: task.ID, CanvasID: task.CanvasID, NodeID: task.NodeID}
+			generationTask = canvasGenerationTaskContext{TaskID: task.ID, CanvasID: task.CanvasID, NodeID: task.NodeID, CreditChargeID: task.CreditChargeID}
 			switch {
 			case task.Status == model.GenerationTaskStatusFailed:
 				OK(w, map[string]any{"id": task.ID, "status": "failed", "error": map[string]any{"message": task.ErrorMsg}})
@@ -168,13 +168,15 @@ func CreateVideoGenerationTask(w http.ResponseWriter, r *http.Request) {
 	upstreamPath := resolveAIProxyPath(channel.BaseURL, modelName, "/videos", channel.VideoConfig)
 	upstreamURL := service.BuildModelChannelURL(channel, upstreamPath)
 	task := service.CreateGenerationTask(service.GenerationTaskCreate{
-		Type:     model.GenerationTaskTypeVideo,
-		UserID:   user.ID,
-		Username: user.Username,
-		Model:    modelName,
-		Path:     "/videos",
-		CanvasID: r.URL.Query().Get("canvasId"),
-		NodeID:   r.URL.Query().Get("nodeId"),
+		Type:       model.GenerationTaskTypeVideo,
+		UserID:     user.ID,
+		Username:   user.Username,
+		Model:      modelName,
+		Prompt:     generationTaskPrompt(finalBody),
+		Path:       "/videos",
+		CanvasID:   r.URL.Query().Get("canvasId"),
+		NodeID:     r.URL.Query().Get("nodeId"),
+		Persistent: service.IsRoleTasksEnabled(string(user.Role)),
 	})
 
 	chargedCredits := 0
@@ -183,11 +185,13 @@ func CreateVideoGenerationTask(w http.ResponseWriter, r *http.Request) {
 	} else if service.IsModelFreeForRole(string(user.Role), modelName) {
 		service.LogRoleFreeUsage(user.ID, string(user.Role), modelName, credits, "/videos")
 	} else {
-		if err := service.ConsumeUserCredits(user.ID, modelName, credits, "/videos"); err != nil {
-			service.UpdateGenerationTask(task.ID, service.GenerationTaskUpdate{Status: model.GenerationTaskStatusFailed, ErrorMsg: err.Error()})
-			FailError(w, err)
+		charge, chargeErr := service.ChargeUserCredits(user.ID, modelName, credits, "/videos")
+		if chargeErr != nil {
+			service.UpdateGenerationTask(task.ID, service.GenerationTaskUpdate{Status: model.GenerationTaskStatusFailed, ErrorMsg: chargeErr.Error()})
+			FailError(w, chargeErr)
 			return
 		}
+		service.UpdateGenerationTask(task.ID, service.GenerationTaskUpdate{CreditChargeID: charge.ID})
 		chargedCredits = credits
 		ws.DefaultHub.SendToUser(user.ID, map[string]any{"type": "credits-changed"})
 	}
@@ -333,14 +337,16 @@ func proxyAIRequest(w http.ResponseWriter, r *http.Request, path string) {
 		copyAIResponse(w, request, nil, user.ID, user.Username, modelName, path, credits, extraArgs...)
 		return
 	}
-	if err := service.ConsumeUserCredits(user.ID, modelName, credits, path); err != nil {
-		go service.LogCall(user.ID, user.Username, modelName, path, false, err.Error(), credits)
-		FailError(w, err)
+	charge, chargeErr := service.ChargeUserCredits(user.ID, modelName, credits, path)
+	if chargeErr != nil {
+		go service.LogCall(user.ID, user.Username, modelName, path, false, chargeErr.Error(), credits)
+		FailError(w, chargeErr)
 		return
 	}
+	extraArgs = append(extraArgs, canvasGenerationTaskContext{CreditChargeID: charge.ID})
 	ws.DefaultHub.SendToUser(user.ID, map[string]any{"type": "credits-changed"})
 	copyAIResponse(w, request, func() {
-		if err := service.RefundUserCredits(user.ID, modelName, credits, path); err != nil {
+		if err := service.RefundCreditCharge(user.ID, charge.ID, modelName, path); err != nil {
 			log.Printf("AI proxy refund credits failed: user=%s model=%s credits=%d err=%v", user.ID, modelName, credits, err)
 		}
 	}, user.ID, user.Username, modelName, path, credits, extraArgs...)
@@ -462,7 +468,8 @@ func runVideoGenerationTaskCreate(taskID, userID, username, modelName, path, ups
 func finishVideoTaskFailed(taskID, userID, modelName, path string, credits int, errorMsg string) {
 	service.UpdateGenerationTask(taskID, service.GenerationTaskUpdate{Status: model.GenerationTaskStatusFailed, ErrorMsg: errorMsg})
 	if credits > 0 {
-		if err := service.RefundUserCredits(userID, modelName, credits, path); err != nil {
+		task, _ := service.GetGenerationTask(taskID)
+		if err := service.RefundCreditCharge(userID, task.CreditChargeID, modelName, path); err != nil {
 			log.Printf("video task refund failed: user=%s model=%s credits=%d err=%v", userID, modelName, credits, err)
 		}
 	}
@@ -480,9 +487,10 @@ type requestUpstreamURL string
 type requestHeadersMap map[string]string
 
 type canvasGenerationTaskContext struct {
-	TaskID   string
-	CanvasID string
-	NodeID   string
+	TaskID         string
+	CanvasID       string
+	NodeID         string
+	CreditChargeID string
 }
 
 func copyAIResponse(w http.ResponseWriter, request *http.Request, onFailure func(), userID, username, modelName, path string, credits int, extraArgs ...any) {
@@ -510,7 +518,18 @@ func copyAIResponse(w http.ResponseWriter, request *http.Request, onFailure func
 		case requestHeadersMap:
 			logReqHeaders = v
 		case canvasGenerationTaskContext:
-			generationTask = v
+			if v.TaskID != "" {
+				generationTask.TaskID = v.TaskID
+			}
+			if v.CanvasID != "" {
+				generationTask.CanvasID = v.CanvasID
+			}
+			if v.NodeID != "" {
+				generationTask.NodeID = v.NodeID
+			}
+			if v.CreditChargeID != "" {
+				generationTask.CreditChargeID = v.CreditChargeID
+			}
 		}
 	}
 	if timeout := aiProxyRequestTimeout(path, videoConfig, isPolling); timeout > 0 {
@@ -591,7 +610,7 @@ func copyAIResponse(w http.ResponseWriter, request *http.Request, onFailure func
 		}
 		// 轮询中遇到 FAILURE 时退还算力点
 		if isPolling && taskFailed && credits > 0 {
-			if err := service.RefundUserCredits(userID, modelName, credits, path); err != nil {
+			if err := service.RefundCreditCharge(userID, generationTask.CreditChargeID, modelName, path); err != nil {
 				log.Printf("AI proxy refund credits on video failure: user=%s model=%s credits=%d err=%v", userID, modelName, credits, err)
 			} else {
 				log.Printf("AI proxy refunded %d credits for failed video task: user=%s model=%s", credits, userID, modelName)
@@ -1724,6 +1743,8 @@ func registerVideoGenerationTask(userID, username, modelName, path, respText str
 		Path:           path,
 		CanvasID:       task.CanvasID,
 		NodeID:         task.NodeID,
+		Persistent:     service.IsUserTasksEnabled(userID),
+		CreditChargeID: task.CreditChargeID,
 	})
 }
 

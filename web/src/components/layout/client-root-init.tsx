@@ -140,6 +140,9 @@ export function ClientRootInit({ children }: { children: ReactNode }) {
                 if (payload.type === "online-status-changed") {
                     window.dispatchEvent(new CustomEvent("online-status-changed"));
                 }
+                if (payload.type === "credits-changed") {
+                    void hydrateUser();
+                }
             };
         };
 
@@ -149,7 +152,7 @@ export function ClientRootInit({ children }: { children: ReactNode }) {
             if (reconnectTimer) window.clearTimeout(reconnectTimer);
             socket?.close();
         };
-    }, [loadModelClassifications, loadPublicSettings, token]);
+    }, [hydrateUser, loadModelClassifications, loadPublicSettings, token]);
 
     useEffect(() => {
         if (!isLoginPage) void hydrateUser();

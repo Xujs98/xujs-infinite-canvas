@@ -1,6 +1,6 @@
 "use client";
 
-import { DeleteOutlined, GlobalOutlined, MailOutlined, SaveOutlined, ToolOutlined, UploadOutlined } from "@ant-design/icons";
+import { ControlOutlined, DeleteOutlined, GiftOutlined, GlobalOutlined, MailOutlined, SaveOutlined, ToolOutlined, UploadOutlined, UserAddOutlined } from "@ant-design/icons";
 import { App, Button, Col, Form, Input, InputNumber, Row, Space, Switch, Typography } from "antd";
 import { useCallback, useEffect, useRef, useState } from "react";
 
@@ -11,6 +11,7 @@ import { useSystemSettings } from "./use-system-settings";
 
 const tabs = [
     { key: "general", label: "通用设置", icon: <ToolOutlined /> },
+    { key: "registration", label: "注册与积分", icon: <UserAddOutlined /> },
     { key: "email", label: "邮件设置", icon: <MailOutlined /> },
 ] as const;
 
@@ -221,77 +222,102 @@ export default function AdminSystemSettingsPage() {
                                 </Row>
                             </div>
 
-                            {/* 注册与积分 */}
                             <div className="rounded-xl border border-gray-100 bg-white p-6 shadow-sm">
                                 <div className="mb-5 flex items-center gap-3">
-                                    <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-50 text-emerald-500">
-                                        <ToolOutlined />
+                                    <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-50 text-emerald-600">
+                                        <ControlOutlined />
                                     </div>
                                     <div>
-                                        <div className="text-sm font-semibold text-gray-800">注册与积分</div>
-                                        <div className="mt-0.5 text-xs text-gray-400">配置注册策略、赠送积分和签到奖励</div>
+                                        <div className="text-sm font-semibold text-gray-800">运行与错误处理</div>
+                                        <div className="mt-0.5 text-xs text-gray-400">配置任务等待时间和 App 端统一错误提示</div>
                                     </div>
                                 </div>
                                 <Row gutter={[24, 0]}>
-                                    <Col span={6}>
-                                        <Form.Item name="allowRegister" label="开放注册" valuePropName="checked">
-                                            <Switch checkedChildren="开启" unCheckedChildren="关闭" />
-                                        </Form.Item>
-                                    </Col>
-                                    <Col span={6}>
-                                        <Form.Item name="assistantEnabled" label="助手功能" valuePropName="checked">
-                                            <Switch checkedChildren="开启" unCheckedChildren="关闭" />
-                                        </Form.Item>
-                                    </Col>
-                                    <Col span={6}>
-                                        <Form.Item name="allowCustomChannel" label="自定义渠道" valuePropName="checked" extra="允许用户在前端配置自己的 API Key">
-                                            <Switch checkedChildren="开启" unCheckedChildren="关闭" />
-                                        </Form.Item>
-                                    </Col>
-                                    <Col span={6}>
-                                        <Form.Item name="registerGiftCredits" label="注册赠送算力点">
-                                            <InputNumber min={0} style={{ width: "100%" }} />
-                                        </Form.Item>
-                                    </Col>
-                                </Row>
-                                <Row gutter={[24, 0]}>
-                                    <Col span={6}>
-                                        <Form.Item name="inviteRewardCredits" label="邀请奖励算力点" rules={[{ required: true, message: "请输入邀请奖励算力点" }]}>
-                                            <InputNumber min={0} style={{ width: "100%" }} />
-                                        </Form.Item>
-                                    </Col>
-                                    <Col span={6}>
-                                        <Form.Item name="checkInEnabled" label="每日签到" valuePropName="checked">
-                                            <Switch checkedChildren="开启" unCheckedChildren="关闭" />
-                                        </Form.Item>
-                                    </Col>
-                                    <Col span={6}>
-                                        <Form.Item name="checkInRewardMin" label="签到最少算力点">
-                                            <InputNumber min={0} style={{ width: "100%" }} />
-                                        </Form.Item>
-                                    </Col>
-                                    <Col span={6}>
-                                        <Form.Item name="checkInRewardMax" label="签到最多算力点">
-                                            <InputNumber min={0} style={{ width: "100%" }} />
-                                        </Form.Item>
-                                    </Col>
-                                </Row>
-                                <Row gutter={[24, 0]}>
-                                    <Col span={6}>
+                                    <Col xs={24} md={8}>
                                         <Form.Item name="videoMaxTimeoutSeconds" label="视频最大超时（秒）" extra="视频生成任务的最长等待时间">
                                             <InputNumber min={60} max={3600} style={{ width: "100%" }} placeholder="600" />
                                         </Form.Item>
                                     </Col>
-                                </Row>
-                                <Row gutter={[24, 0]}>
-                                    <Col span={12}>
+                                    <Col xs={24} md={16}>
                                         <Form.Item name="appErrorMessagePrefix" label="App 错误提示前缀" extra="保存后 App 端画布错误弹窗会自动带上这段文案，可用于统一客服提示。">
                                             <Input placeholder="例如：生成失败，请检查模型配置或联系管理员：" />
                                         </Form.Item>
                                     </Col>
-                                    <Col span={6}>
+                                </Row>
+                            </div>
+                        </div>
+                    )}
+
+                    {activeTab === "registration" && (
+                        <div className="space-y-5">
+                            <div className="rounded-xl border border-gray-100 bg-white p-6 shadow-sm">
+                                <div className="mb-5 flex items-center gap-3">
+                                    <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-50 text-emerald-500">
+                                        <UserAddOutlined />
+                                    </div>
+                                    <div>
+                                        <div className="text-sm font-semibold text-gray-800">注册策略</div>
+                                        <div className="mt-0.5 text-xs text-gray-400">管理用户注册及客户端功能权限</div>
+                                    </div>
+                                </div>
+                                <Row gutter={[24, 8]}>
+                                    <Col xs={24} sm={12} xl={6}>
+                                        <Form.Item name="allowRegister" label="开放注册" valuePropName="checked">
+                                            <Switch checkedChildren="开启" unCheckedChildren="关闭" />
+                                        </Form.Item>
+                                    </Col>
+                                    <Col xs={24} sm={12} xl={6}>
+                                        <Form.Item name="assistantEnabled" label="助手功能" valuePropName="checked">
+                                            <Switch checkedChildren="开启" unCheckedChildren="关闭" />
+                                        </Form.Item>
+                                    </Col>
+                                    <Col xs={24} sm={12} xl={6}>
+                                        <Form.Item name="allowCustomChannel" label="自定义渠道" valuePropName="checked" extra="允许用户在前端配置自己的 API Key">
+                                            <Switch checkedChildren="开启" unCheckedChildren="关闭" />
+                                        </Form.Item>
+                                    </Col>
+                                    <Col xs={24} sm={12} xl={6}>
                                         <Form.Item name="appErrorShowDetails" label="App 显示错误详情" valuePropName="checked" extra="关闭后用户弹窗只显示简短错误，但详情仍会上报到日志。">
                                             <Switch checkedChildren="显示" unCheckedChildren="隐藏" />
+                                        </Form.Item>
+                                    </Col>
+                                </Row>
+                            </div>
+
+                            <div className="rounded-xl border border-gray-100 bg-white p-6 shadow-sm">
+                                <div className="mb-5 flex items-center gap-3">
+                                    <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-amber-50 text-amber-600">
+                                        <GiftOutlined />
+                                    </div>
+                                    <div>
+                                        <div className="text-sm font-semibold text-gray-800">积分与签到</div>
+                                        <div className="mt-0.5 text-xs text-gray-400">设置新用户、邀请和每日签到奖励</div>
+                                    </div>
+                                </div>
+                                <Row gutter={[24, 8]}>
+                                    <Col xs={24} md={12} xl={8}>
+                                        <Form.Item name="registerGiftCredits" label="注册赠送算力点">
+                                            <InputNumber min={0} style={{ width: "100%" }} />
+                                        </Form.Item>
+                                    </Col>
+                                    <Col xs={24} md={12} xl={8}>
+                                        <Form.Item name="inviteRewardCredits" label="邀请奖励算力点" rules={[{ required: true, message: "请输入邀请奖励算力点" }]}>
+                                            <InputNumber min={0} style={{ width: "100%" }} />
+                                        </Form.Item>
+                                    </Col>
+                                    <Col xs={24} md={12} xl={8}>
+                                        <Form.Item name="checkInEnabled" label="每日签到" valuePropName="checked">
+                                            <Switch checkedChildren="开启" unCheckedChildren="关闭" />
+                                        </Form.Item>
+                                    </Col>
+                                    <Col xs={24} md={12} xl={8}>
+                                        <Form.Item name="checkInRewardMin" label="签到最少算力点">
+                                            <InputNumber min={0} style={{ width: "100%" }} />
+                                        </Form.Item>
+                                    </Col>
+                                    <Col xs={24} md={12} xl={8}>
+                                        <Form.Item name="checkInRewardMax" label="签到最多算力点">
+                                            <InputNumber min={0} style={{ width: "100%" }} />
                                         </Form.Item>
                                     </Col>
                                 </Row>

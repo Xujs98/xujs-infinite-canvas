@@ -16,6 +16,7 @@ type Role struct {
 	FreeModels         []string `json:"freeModels" gorm:"serializer:json"`
 	AllowOffline       bool     `json:"allowOffline" gorm:"default:false"`
 	OfflineCreditLimit int      `json:"offlineCreditLimit" gorm:"default:0"`
+	EnableTasks        bool     `json:"enableTasks" gorm:"default:false"`
 	IsBuiltin          bool     `json:"isBuiltin" gorm:"default:false"`
 	CreatedAt          string   `json:"createdAt"`
 	UpdatedAt          string   `json:"updatedAt"`

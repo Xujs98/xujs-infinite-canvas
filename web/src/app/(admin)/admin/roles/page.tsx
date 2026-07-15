@@ -81,6 +81,7 @@ export default function AdminRolesPage() {
                     freeModels: values.freeModels || [],
                     allowOffline: Boolean(values.allowOffline),
                     offlineCreditLimit: Boolean(values.allowOffline) ? Math.max(0, Math.floor(Number(values.offlineCreditLimit) || 0)) : 0,
+                    enableTasks: Boolean(values.enableTasks),
                 });
                 message.success("更新成功");
             } else {
@@ -92,6 +93,7 @@ export default function AdminRolesPage() {
                     freeModels: values.freeModels || [],
                     allowOffline: Boolean(values.allowOffline),
                     offlineCreditLimit: Boolean(values.allowOffline) ? Math.max(0, Math.floor(Number(values.offlineCreditLimit) || 0)) : 0,
+                    enableTasks: Boolean(values.enableTasks),
                 });
                 message.success("创建成功");
             }
@@ -130,7 +132,7 @@ export default function AdminRolesPage() {
     const openCreate = () => {
         setEditingItem(null);
         form.resetFields();
-        form.setFieldsValue({ allowedModels: [], freeModels: [], allowOffline: false, offlineCreditLimit: 0 });
+        form.setFieldsValue({ allowedModels: [], freeModels: [], allowOffline: false, offlineCreditLimit: 0, enableTasks: false });
         setModalOpen(true);
     };
 
@@ -144,6 +146,7 @@ export default function AdminRolesPage() {
             freeModels: item.freeModels || [],
             allowOffline: Boolean(item.allowOffline),
             offlineCreditLimit: item.offlineCreditLimit ?? 0,
+            enableTasks: Boolean(item.enableTasks),
         });
         setModalOpen(true);
     };
@@ -258,6 +261,12 @@ export default function AdminRolesPage() {
             },
         },
         {
+            title: "任务功能",
+            dataIndex: "enableTasks",
+            width: 120,
+            render: (_: unknown, item: AdminRole) => <Tag color={item.enableTasks ? "green" : "default"}>{item.enableTasks ? "已启用" : "未启用"}</Tag>,
+        },
+        {
             title: "允许离线",
             dataIndex: "allowOffline",
             width: 120,
@@ -366,7 +375,7 @@ export default function AdminRolesPage() {
                         dataSource={items}
                         columns={columns}
                         tableLayout="fixed"
-                        scroll={{ x: 1242 }}
+                        scroll={{ x: 1362 }}
                         rowSelection={{
                             selectedRowKeys: selectedIds,
                             onChange: (keys) => setSelectedIds(keys as string[]),
@@ -474,6 +483,9 @@ export default function AdminRolesPage() {
                             <InputNumber min={0} precision={0} style={{ width: "100%" }} addonAfter="点" placeholder="不填或 0 表示无限制" />
                         </Form.Item>
                     ) : null}
+                    <Form.Item name="enableTasks" label="任务功能" valuePropName="checked" tooltip="开启后，该角色在 Web 端创建的图片和视频任务会持久化到服务端，刷新页面或服务重启后仍可按任务记录恢复。">
+                        <Switch checkedChildren="开启" unCheckedChildren="关闭" />
+                    </Form.Item>
                 </Form>
             </Modal>
 

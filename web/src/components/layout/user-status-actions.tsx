@@ -3,7 +3,7 @@
 import type { CSSProperties, RefObject } from "react";
 import { useState } from "react";
 import { App, Avatar, Dropdown, Input, Modal, Tooltip } from "antd";
-import { BookOpen, Headset, Keyboard, KeyRound, LogOut, Settings2, Shield } from "lucide-react";
+import { BookOpen, Crown, Headset, Keyboard, KeyRound, LogOut, Settings2, Shield } from "lucide-react";
 import type { ItemType } from "antd/es/menu/interface";
 import Link from "next/link";
 
@@ -46,6 +46,7 @@ export function UserStatusActions({ showConfig = true, variant = "default", onOp
     const canvasTheme = useCanvasTheme();
     const userName = user?.displayName || user?.username || "";
     const credits = user?.credits ?? 0;
+    const subscriptionCredits = user?.subscriptionCredits ?? 0;
     const isNegativeCredits = credits < 0;
     const avatarUrl = user?.avatarUrl?.trim();
     const avatarText = (userName.trim()[0] || "U").toUpperCase();
@@ -78,6 +79,7 @@ export function UserStatusActions({ showConfig = true, variant = "default", onOp
     const menuItems: ItemType[] = [
         { key: "user", disabled: true, label: <span className="font-medium text-current">{userName}</span> },
         { key: "profile", icon: <BookOpen className="size-4" />, label: <Link href="/profile">个人中心</Link> },
+        { key: "subscriptions", icon: <Crown className="size-4" />, label: <Link href="/subscriptions">订阅套餐</Link> },
         ...(user?.role === "admin" ? [{ key: "admin", icon: <Shield className="size-4" />, label: <Link href="/admin">管理后台</Link> }] : []),
         { key: "redeem", icon: <KeyRound className="size-4" />, label: "兑换卡密", onClick: () => setRedeemOpen(true) },
         ...(onOpenShortcuts ? [{ key: "shortcuts", icon: <Keyboard className="size-4" />, label: "快捷键", onClick: onOpenShortcuts }] : []),
@@ -119,10 +121,10 @@ export function UserStatusActions({ showConfig = true, variant = "default", onOp
             ) : null}
             <AnnouncementBell />
             {variant === "canvas" && user ? (
-                <Tooltip title="当前算力点余额" placement="bottom">
-                    <div className="flex h-8 shrink-0 items-center gap-1.5 px-1.5 text-xs font-medium tabular-nums opacity-75 transition hover:opacity-100" style={{ color: isNegativeCredits ? "#ef4444" : canvasTheme.node.text }}>
-                        <CreditSymbol className="text-sm leading-none" />
-                        <span>{credits.toLocaleString()}</span>
+                <Tooltip title={user.hasActiveSubscription ? `订阅额度 ${subscriptionCredits.toLocaleString()}，钱包余额 ${credits.toLocaleString()}` : "钱包算力点余额"} placement="bottom">
+                    <div className="flex h-8 shrink-0 items-center gap-2 px-1.5 text-xs font-medium tabular-nums opacity-75 transition hover:opacity-100" style={{ color: isNegativeCredits ? "#ef4444" : canvasTheme.node.text }}>
+                        {user.hasActiveSubscription ? <span className="inline-flex items-center gap-1 text-emerald-600"><Crown className="size-3.5" />{subscriptionCredits.toLocaleString()}</span> : null}
+                        <span className="inline-flex items-center gap-1"><CreditSymbol className="text-sm leading-none" />{credits.toLocaleString()}</span>
                     </div>
                 </Tooltip>
             ) : null}
@@ -166,13 +168,7 @@ export function UserStatusActions({ showConfig = true, variant = "default", onOp
                 confirmLoading={redeemLoading}
                 destroyOnHidden
             >
-                <Input
-                    value={redeemValue}
-                    onChange={(e) => setRedeemValue(e.target.value)}
-                    placeholder="请输入卡密"
-                    onPressEnter={() => void handleRedeem()}
-                    autoFocus
-                />
+                <Input value={redeemValue} onChange={(e) => setRedeemValue(e.target.value)} placeholder="请输入卡密" onPressEnter={() => void handleRedeem()} autoFocus />
             </Modal>
         </div>
     );

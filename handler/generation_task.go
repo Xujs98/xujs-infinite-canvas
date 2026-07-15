@@ -17,6 +17,20 @@ func AdminGenerationTasks(w http.ResponseWriter, r *http.Request) {
 	OK(w, service.ListGenerationTasks(parseQuery(r)))
 }
 
+func UserGenerationTasks(w http.ResponseWriter, r *http.Request) {
+	user, ok := service.UserFromContext(r.Context())
+	if !ok {
+		Fail(w, "未登录")
+		return
+	}
+	result, err := service.ListUserGenerationTasks(user.ID, string(user.Role), parseQuery(r))
+	if err != nil {
+		FailError(w, err)
+		return
+	}
+	OK(w, result)
+}
+
 func CreateImageGenerationTask(w http.ResponseWriter, r *http.Request) {
 	createImageTask(w, r, "/images/generations")
 }
@@ -31,7 +45,7 @@ func GetGenerationTask(w http.ResponseWriter, r *http.Request, id string) {
 		Fail(w, "未登录或权限不足")
 		return
 	}
-	task, ok := service.GetUserGenerationTask(user.ID, id)
+	task, ok := service.GetUserGenerationTask(user.ID, string(user.Role), id)
 	if !ok {
 		Fail(w, "任务不存在")
 		return
@@ -65,28 +79,41 @@ func createImageTask(w http.ResponseWriter, r *http.Request, path string) {
 	upstreamPath := resolveAIProxyPath(channel.BaseURL, modelName, path, channel.VideoConfig)
 	upstreamURL := service.BuildModelChannelURL(channel, upstreamPath)
 	task := service.CreateGenerationTask(service.GenerationTaskCreate{
-		Type:     model.GenerationTaskTypeImage,
-		UserID:   user.ID,
-		Username: user.Username,
-		Model:    modelName,
-		Path:     path,
-		CanvasID: r.URL.Query().Get("canvasId"),
-		NodeID:   r.URL.Query().Get("nodeId"),
+		Type:       model.GenerationTaskTypeImage,
+		UserID:     user.ID,
+		Username:   user.Username,
+		Model:      modelName,
+		Prompt:     generationTaskPrompt(finalBody),
+		Path:       path,
+		CanvasID:   r.URL.Query().Get("canvasId"),
+		NodeID:     r.URL.Query().Get("nodeId"),
+		Persistent: service.IsRoleTasksEnabled(string(user.Role)),
 	})
 
 	chargedCredits := 0
 	if !service.IsMembershipActive(user.MembershipExpiresAt) && !service.IsModelFreeForRole(string(user.Role), modelName) {
-		if err := service.ConsumeUserCredits(user.ID, modelName, credits, path); err != nil {
-			service.UpdateGenerationTask(task.ID, service.GenerationTaskUpdate{Status: model.GenerationTaskStatusFailed, ErrorMsg: err.Error()})
-			FailError(w, err)
+		charge, chargeErr := service.ChargeUserCredits(user.ID, modelName, credits, path)
+		if chargeErr != nil {
+			service.UpdateGenerationTask(task.ID, service.GenerationTaskUpdate{Status: model.GenerationTaskStatusFailed, ErrorMsg: chargeErr.Error()})
+			FailError(w, chargeErr)
 			return
 		}
+		service.UpdateGenerationTask(task.ID, service.GenerationTaskUpdate{CreditChargeID: charge.ID})
 		chargedCredits = credits
 		ws.DefaultHub.SendToUser(user.ID, map[string]any{"type": "credits-changed"})
 	}
 
 	go runImageGenerationTask(task.ID, user.ID, user.Username, modelName, path, upstreamURL, finalContentType, finalBody, channel.APIKey, channel.ExtraHeaders, chargedCredits)
 	OK(w, task)
+}
+
+func generationTaskPrompt(body []byte) string {
+	var payload map[string]any
+	if err := json.Unmarshal(body, &payload); err != nil {
+		return ""
+	}
+	prompt, _ := payload["prompt"].(string)
+	return prompt
 }
 
 func prepareAIRequestBody(body []byte, contentType string, modelName string, channel model.ModelChannel) ([]byte, string) {
@@ -168,7 +195,8 @@ func runImageGenerationTask(taskID, userID, username, modelName, path, upstreamU
 func finishImageTaskFailed(taskID, userID, modelName, path string, credits int, errorMsg string) {
 	service.UpdateGenerationTask(taskID, service.GenerationTaskUpdate{Status: model.GenerationTaskStatusFailed, ErrorMsg: errorMsg})
 	if credits > 0 {
-		if err := service.RefundUserCredits(userID, modelName, credits, path); err != nil {
+		task, _ := service.GetGenerationTask(taskID)
+		if err := service.RefundCreditCharge(userID, task.CreditChargeID, modelName, path); err != nil {
 			log.Printf("image task refund failed: user=%s model=%s credits=%d err=%v", userID, modelName, credits, err)
 		}
 	}

@@ -1,17 +1,17 @@
 "use client";
 
 import { AudioOutlined, CameraOutlined, CheckCircleFilled, EditOutlined, FileTextOutlined, PlayCircleOutlined, SearchOutlined, SettingOutlined, SyncOutlined } from "@ant-design/icons";
-import { App, Button, Card, Col, Form, Input, InputNumber, Modal, Row, Select, Space, Switch, Tag, Typography, Empty, Spin, Tooltip } from "antd";
+import { App, Button, Card, Col, Empty, Form, Input, InputNumber, Modal, Row, Select, Spin, Switch, Tooltip, Typography } from "antd";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { useUserStore } from "@/stores/use-user-store";
 import { type AdminModelClassification, createAdminModelClassification, fetchAdminModelClassifications, fetchAllChannelModels, updateAdminModelClassification } from "@/services/api/admin";
 
 const capabilityConfig = {
-    text: { label: "文本", icon: <FileTextOutlined />, color: "#1890ff", bg: "linear-gradient(135deg, #e6f7ff 0%, #bae7ff 100%)" },
-    image: { label: "图片", icon: <CameraOutlined />, color: "#52c41a", bg: "linear-gradient(135deg, #f6ffed 0%, #d9f7be 100%)" },
-    video: { label: "视频", icon: <PlayCircleOutlined />, color: "#722ed1", bg: "linear-gradient(135deg, #f9f0ff 0%, #efdbff 100%)" },
-    audio: { label: "音频", icon: <AudioOutlined />, color: "#fa8c16", bg: "linear-gradient(135deg, #fff7e6 0%, #ffe7ba 100%)" },
+    text: { label: "文本", icon: <FileTextOutlined />, color: "#2563eb", tone: "blue" },
+    image: { label: "图片", icon: <CameraOutlined />, color: "#15803d", tone: "green" },
+    video: { label: "视频", icon: <PlayCircleOutlined />, color: "#7c3aed", tone: "violet" },
+    audio: { label: "音频", icon: <AudioOutlined />, color: "#c2410c", tone: "amber" },
 };
 
 const allResolutionOptions = ["480p", "720p", "1080p"];
@@ -45,9 +45,6 @@ export default function AdminModelClassificationsPage() {
     const token = useUserStore((s) => s.token);
     const [items, setItems] = useState<AdminModelClassification[]>([]);
     const [channelModels, setChannelModels] = useState<string[]>([]);
-    const [total, setTotal] = useState(0);
-    const [page, setPage] = useState(1);
-    const [pageSize, setPageSize] = useState(50);
     const [keyword, setKeyword] = useState("");
     const [loading, setLoading] = useState(false);
     const [modalOpen, setModalOpen] = useState(false);
@@ -59,15 +56,14 @@ export default function AdminModelClassificationsPage() {
     const fetchItems = useCallback(async () => {
         setLoading(true);
         try {
-            const res = await fetchAdminModelClassifications(token, { keyword, page, pageSize: 500 });
+            const res = await fetchAdminModelClassifications(token, { page: 1, pageSize: 500 });
             setItems(res.items);
-            setTotal(res.total);
         } catch {
             // handled by api layer
         } finally {
             setLoading(false);
         }
-    }, [token, keyword, page]);
+    }, [token]);
 
     const fetchChannelModels = useCallback(async () => {
         try {
@@ -319,239 +315,160 @@ export default function AdminModelClassificationsPage() {
         return s;
     }, [allModels]);
 
-    const renderConfigSummary = (item: AdminModelClassification) => {
+    const getConfigSummary = (item: AdminModelClassification) => {
         if (item.capability === "video" && item.videoConfig) {
-            return (
-                <div className="mt-2 flex flex-wrap gap-1">
-                    {item.videoConfig.resolutions?.map((r) => (
-                        <Tag key={r} color="purple" className="text-xs">
-                            {r}
-                        </Tag>
-                    ))}
-                    {item.videoConfig.ratios?.map((r) => (
-                        <Tag key={r} color="purple" className="text-xs">
-                            {r}
-                        </Tag>
-                    ))}
-                    {item.videoConfig.durations?.map((d) => (
-                        <Tag key={d} color="purple" className="text-xs">
-                            {d}s
-                        </Tag>
-                    ))}
-                    <Tag color="purple" className="text-xs">
-                        {item.videoConfig.billingMode === "per_call" ? "按次数计费" : "按秒计费"}
-                    </Tag>
-                </div>
-            );
+            return [...(item.videoConfig.resolutions || []), ...(item.videoConfig.ratios || []), ...(item.videoConfig.durations || []).map((duration) => `${duration}s`), item.videoConfig.billingMode === "per_call" ? "按次数计费" : "按秒计费"];
         }
         if (item.capability === "image" && item.imageConfig) {
-            return (
-                <div className="mt-2 flex flex-wrap gap-1">
-                    {item.imageConfig.qualities?.map((q) => (
-                        <Tag key={q} color="green" className="text-xs">
-                            {q}
-                        </Tag>
-                    ))}
-                    {item.imageConfig.aspectRatios?.map((r) => (
-                        <Tag key={r} color="green" className="text-xs">
-                            {r}
-                        </Tag>
-                    ))}
-                </div>
-            );
+            return [...(item.imageConfig.qualities || []), ...(item.imageConfig.aspectRatios || []), `最多 ${item.imageConfig.maxCount || 1} 张`];
         }
         if (item.capability === "audio" && item.audioConfig) {
-            return (
-                <div className="mt-2 flex flex-wrap gap-1">
-                    {item.audioConfig.voices?.map((v) => (
-                        <Tag key={v} color="orange" className="text-xs">
-                            {v}
-                        </Tag>
-                    ))}
-                    {item.audioConfig.formats?.map((f) => (
-                        <Tag key={f} color="orange" className="text-xs">
-                            {f}
-                        </Tag>
-                    ))}
-                </div>
-            );
+            return [...(item.audioConfig.formats || []), ...(item.audioConfig.voices || [])];
         }
         if ((item.capability === "text" || item.capability === "chat") && item.chatConfig) {
-            return (
-                <div className="mt-2 flex flex-wrap gap-1">
-                    <Tag color="blue" className="text-xs">
-                        上下文 {item.chatConfig.contextWindow?.toLocaleString() ?? "-"} tokens
-                    </Tag>
-                    <Tag color="blue" className="text-xs">
-                        最大输出 {item.chatConfig.maxOutputTokens?.toLocaleString() ?? "-"} tokens
-                    </Tag>
-                    {item.chatConfig.supportsMultimodal && (
-                        <Tag color="blue" className="text-xs">
-                            多模态
-                        </Tag>
-                    )}
-                    {item.chatConfig.description && (
-                        <Tag color="blue" className="text-xs">
-                            {item.chatConfig.description}
-                        </Tag>
-                    )}
-                </div>
-            );
+            return [`上下文 ${(item.chatConfig.contextWindow || 0).toLocaleString("zh-CN")}`, `输出 ${(item.chatConfig.maxOutputTokens || 0).toLocaleString("zh-CN")}`, ...(item.chatConfig.supportsMultimodal ? ["多模态"] : [])];
         }
-        return null;
+        return [];
     };
 
     return (
-        <div className="admin-config-page admin-model-page min-h-screen p-6">
-            {/* 页面标题 */}
-            <div className="admin-page-title mb-6 flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-blue-500 to-purple-600 text-white shadow-lg shadow-blue-500/25">
-                        <SettingOutlined className="text-lg" />
+        <div className="admin-config-page admin-model-page">
+            <section className="admin-model-overview" aria-label="模型资源概览">
+                <div className="admin-model-overview-main">
+                    <span className="admin-model-kicker">MODEL CATALOG</span>
+                    <div className="admin-model-overview-title">
+                        <Typography.Title level={3}>模型资源</Typography.Title>
+                        <span>{stats.total} 个</span>
                     </div>
-                    <div>
-                        <Typography.Title level={4} style={{ margin: 0 }}>
-                            模型管理
-                        </Typography.Title>
-                        <Typography.Text type="secondary" className="text-sm">
-                            管理已配置渠道中的模型，设置其参数
-                        </Typography.Text>
-                    </div>
-                </div>
-                <Button
-                    icon={<SyncOutlined />}
-                    onClick={() => {
-                        fetchItems();
-                        fetchChannelModels();
-                    }}
-                >
-                    刷新
-                </Button>
-            </div>
-
-            {/* 统计卡片 */}
-            <div className="mb-5 grid grid-cols-5 gap-3">
-                <div className="group relative cursor-pointer overflow-hidden rounded-xl border border-gray-100 bg-white p-4 shadow-sm transition-all duration-200 hover:border-blue-200 hover:shadow-md" onClick={() => setActiveTab("all")}>
-                    <div className="flex items-center justify-between">
-                        <div>
-                            <div className="text-2xl font-bold text-gray-800">{stats.total}</div>
-                            <div className="mt-1 text-xs text-gray-500">全部模型</div>
+                    <Typography.Paragraph>集中维护渠道模型的能力分类与生成参数。</Typography.Paragraph>
+                    <div className="admin-model-coverage">
+                        <div className="admin-model-coverage-copy">
+                            <span>参数配置覆盖率</span>
+                            <strong>{stats.total ? Math.round((stats.configured / stats.total) * 100) : 0}%</strong>
                         </div>
-                        <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-gray-50 text-gray-400 group-hover:bg-blue-50 group-hover:text-blue-500 transition-colors">
-                            <SettingOutlined />
+                        <div className="admin-model-progress" aria-hidden="true">
+                            <span style={{ width: `${stats.total ? (stats.configured / stats.total) * 100 : 0}%` }} />
                         </div>
                     </div>
-                    {activeTab === "all" && <div className="absolute bottom-0 left-0 h-0.5 w-full bg-gradient-to-r from-blue-500 to-purple-500" />}
                 </div>
-                {Object.entries(capabilityConfig).map(([key, config]) => (
-                    <div
-                        key={key}
-                        className="group relative cursor-pointer overflow-hidden rounded-xl border border-gray-100 bg-white p-4 shadow-sm transition-all duration-200 hover:shadow-md"
-                        style={{ borderColor: activeTab === key ? config.color + "40" : undefined }}
-                        onClick={() => setActiveTab(key)}
-                    >
-                        <div className="flex items-center justify-between">
+                <div className="admin-model-stat-list">
+                    {Object.entries(capabilityConfig).map(([key, config]) => (
+                        <div key={key} className="admin-model-stat-item">
+                            <span className={`admin-model-type-icon is-${config.tone}`}>{config.icon}</span>
                             <div>
-                                <div className="text-2xl font-bold text-gray-800">{(stats as Record<string, number>)[key]}</div>
-                                <div className="mt-1 text-xs text-gray-500">{config.label}模型</div>
-                            </div>
-                            <div className="flex h-10 w-10 items-center justify-center rounded-lg transition-colors" style={{ background: config.bg, color: config.color }}>
-                                {config.icon}
+                                <strong>{(stats as Record<string, number>)[key]}</strong>
+                                <span>{config.label}模型</span>
                             </div>
                         </div>
-                        {activeTab === key && <div className="absolute bottom-0 left-0 h-0.5 w-full" style={{ background: `linear-gradient(to right, ${config.color}, ${config.color}80)` }} />}
+                    ))}
+                </div>
+            </section>
+
+            <section className="admin-model-catalog" aria-label="模型目录">
+                <div className="admin-model-toolbar">
+                    <div className="admin-model-tabs" role="group" aria-label="按模型类型筛选">
+                        <button type="button" className={activeTab === "all" ? "is-active" : ""} aria-pressed={activeTab === "all"} onClick={() => setActiveTab("all")}>
+                            全部 <span>{stats.total}</span>
+                        </button>
+                        {Object.entries(capabilityConfig).map(([key, config]) => (
+                            <button key={key} type="button" className={activeTab === key ? "is-active" : ""} aria-pressed={activeTab === key} onClick={() => setActiveTab(key)}>
+                                {config.label} <span>{(stats as Record<string, number>)[key]}</span>
+                            </button>
+                        ))}
                     </div>
-                ))}
-            </div>
-
-            {/* 搜索栏 */}
-            <div className="admin-inline-filter mb-5 flex items-center justify-between">
-                <Input placeholder="搜索模型名称..." prefix={<SearchOutlined className="text-gray-400" />} value={keyword} onChange={(e) => setKeyword(e.target.value)} style={{ width: 320 }} allowClear className="!rounded-lg" />
-                <span className="text-xs text-gray-400">
-                    已配置 <span className="font-medium text-gray-600">{stats.configured}</span>/{stats.total} 个模型
-                </span>
-            </div>
-
-            {/* 模型列表 */}
-            {loading ? (
-                <div className="flex items-center justify-center py-20">
-                    <Spin size="large" />
+                    <div className="admin-model-toolbar-actions">
+                        <Input placeholder="搜索模型名称" prefix={<SearchOutlined />} value={keyword} onChange={(event) => setKeyword(event.target.value)} allowClear aria-label="搜索模型名称" />
+                        <Tooltip title="刷新模型目录">
+                            <Button
+                                aria-label="刷新模型目录"
+                                icon={<SyncOutlined spin={loading} />}
+                                onClick={() => {
+                                    void fetchItems();
+                                    void fetchChannelModels();
+                                }}
+                            />
+                        </Tooltip>
+                    </div>
                 </div>
-            ) : filteredModels.length === 0 ? (
-                <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-gray-200 bg-white py-20">
-                    <Empty description="暂无模型" image={Empty.PRESENTED_IMAGE_SIMPLE}>
-                        <Typography.Text type="secondary">请先在「模型设置」中配置渠道和模型</Typography.Text>
-                    </Empty>
+                <div className="admin-model-result-meta">
+                    <span>模型目录</span>
+                    <span>
+                        显示 {filteredModels.length} 个，已配置 {stats.configured}/{stats.total}
+                    </span>
                 </div>
-            ) : (
-                <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-                    {filteredModels.map((m) => {
-                        const cap = m.configured?.capability || guessCapability(m.modelName);
-                        const config = capabilityConfig[cap as keyof typeof capabilityConfig] || capabilityConfig.text;
-                        const isConfigured = !!m.configured;
-                        return (
-                            <div
-                                key={m.modelName}
-                                className={`group relative overflow-hidden rounded-xl border border-gray-100 bg-white p-4 shadow-sm transition-all duration-200 hover:border-gray-200 hover:shadow-md cursor-pointer ${!isConfigured ? "border-dashed" : ""}`}
-                                onClick={() => handleOpenModal(m.configured || undefined, m.modelName)}
-                            >
-                                <div className="flex items-start justify-between">
-                                    <div className="flex items-center gap-3 min-w-0">
-                                        <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl transition-transform duration-200 group-hover:scale-105" style={{ background: config.bg, color: config.color }}>
-                                            {config.icon}
-                                        </div>
-                                        <div className="min-w-0">
+
+                {loading ? (
+                    <div className="admin-model-loading">
+                        <Spin size="large" />
+                    </div>
+                ) : filteredModels.length === 0 ? (
+                    <div className="admin-model-empty">
+                        <Empty description="暂无匹配模型" image={Empty.PRESENTED_IMAGE_SIMPLE}>
+                            <Typography.Text type="secondary">请调整筛选条件，或先在模型设置中配置渠道。</Typography.Text>
+                        </Empty>
+                    </div>
+                ) : (
+                    <div className="admin-model-grid">
+                        {filteredModels.map((m) => {
+                            const cap = m.configured?.capability || guessCapability(m.modelName);
+                            const config = capabilityConfig[cap as keyof typeof capabilityConfig] || capabilityConfig.text;
+                            const isConfigured = !!m.configured;
+                            const summary = m.configured ? getConfigSummary(m.configured) : [];
+                            return (
+                                <button type="button" key={m.modelName} className={`admin-model-card ${!isConfigured ? "is-unconfigured" : ""}`} onClick={() => handleOpenModal(m.configured || undefined, m.modelName)}>
+                                    <div className="admin-model-card-head">
+                                        <span className={`admin-model-type-icon is-${config.tone}`}>{config.icon}</span>
+                                        <div className="admin-model-card-title">
                                             <Tooltip title={m.modelName}>
-                                                <div className="truncate font-medium text-gray-800 text-sm">{m.modelName}</div>
+                                                <strong>{m.modelName}</strong>
                                             </Tooltip>
-                                            <div className="mt-1 flex items-center gap-1.5">
-                                                <span className="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium" style={{ background: config.bg, color: config.color }}>
-                                                    {config.label}
-                                                </span>
-                                                {isConfigured && (
-                                                    <span className="inline-flex items-center gap-0.5 rounded-full bg-green-50 px-2 py-0.5 text-xs font-medium text-green-600">
-                                                        <CheckCircleFilled className="text-xs" />
-                                                        已配置
-                                                    </span>
-                                                )}
-                                            </div>
+                                            <span>{m.inChannel ? "渠道模型" : "历史配置"}</span>
                                         </div>
+                                        <span className="admin-model-edit" aria-hidden="true">
+                                            <EditOutlined />
+                                        </span>
                                     </div>
-                                    <Tooltip title={isConfigured ? "编辑参数" : "配置参数"}>
-                                        <Button
-                                            type="text"
-                                            size="small"
-                                            icon={<EditOutlined />}
-                                            className="!text-gray-400 hover:!text-gray-600"
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                handleOpenModal(m.configured || undefined, m.modelName);
-                                            }}
-                                        />
-                                    </Tooltip>
-                                </div>
-                                {isConfigured ? (
-                                    renderConfigSummary(m.configured!)
-                                ) : (
-                                    <div className="mt-3 flex items-center gap-1.5 text-xs text-gray-400">
-                                        <span className="inline-block h-1 w-1 rounded-full bg-gray-300" />
-                                        未配置参数
+                                    <div className="admin-model-card-status">
+                                        <span className={`admin-model-capability is-${config.tone}`}>{config.label}</span>
+                                        {isConfigured ? (
+                                            <span className="admin-model-configured">
+                                                <CheckCircleFilled /> 已配置
+                                            </span>
+                                        ) : (
+                                            <span className="admin-model-pending">待配置</span>
+                                        )}
                                     </div>
-                                )}
-                            </div>
-                        );
-                    })}
-                </div>
-            )}
+                                    <div className="admin-model-card-body">
+                                        {summary.length ? (
+                                            <div className="admin-model-attributes">
+                                                {summary.slice(0, 4).map((value, index) => (
+                                                    <span key={`${value}-${index}`}>{value}</span>
+                                                ))}
+                                                {summary.length > 4 ? <span>+{summary.length - 4}</span> : null}
+                                            </div>
+                                        ) : (
+                                            <span className="admin-model-no-config">尚未设置能力参数</span>
+                                        )}
+                                    </div>
+                                    <span className="admin-model-card-action">{isConfigured ? "编辑参数" : "开始配置"}</span>
+                                </button>
+                            );
+                        })}
+                    </div>
+                )}
+            </section>
 
-            {/* 编辑弹窗 */}
             <Modal
+                className="admin-model-modal"
                 title={
-                    <div className="flex items-center gap-2">
-                        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-blue-500 to-purple-600 text-white">
+                    <div className="admin-model-modal-title">
+                        <div>
                             <SettingOutlined />
                         </div>
-                        <span>{editingItem ? "编辑模型参数" : "配置模型参数"}</span>
+                        <span>
+                            <strong>{editingItem ? "编辑模型参数" : "配置模型参数"}</strong>
+                            <small>设置模型能力与请求参数</small>
+                        </span>
                     </div>
                 }
                 open={modalOpen}

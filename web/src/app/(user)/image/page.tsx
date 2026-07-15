@@ -16,9 +16,11 @@ import { useConfigStore, useEffectiveConfig, type AiConfig } from "@/stores/use-
 import { useThemeStore } from "@/stores/use-theme-store";
 import { nanoid } from "nanoid";
 import { formatBytes, formatDuration, getDataUrlByteSize, readImageMeta } from "@/lib/image-utils";
-import { requestEdit, requestGeneration } from "@/services/api/image";
+import { createImageEditTask, createImageGenerationTask, pollImageGenerationTask, requestEdit, requestGeneration } from "@/services/api/image";
+import { fetchUserGenerationTasks, type UserGenerationTask } from "@/services/api/tasks";
 import { deleteStoredImages, resolveImageUrl, uploadImage } from "@/services/image-storage";
 import { useAssetStore } from "@/stores/use-asset-store";
+import { useUserStore } from "@/stores/use-user-store";
 import type { ReferenceImage } from "@/types/image";
 
 type GeneratedImage = {
@@ -30,6 +32,7 @@ type GeneratedImage = {
     height: number;
     bytes: number;
     mimeType?: string;
+    serverTaskId?: string;
 };
 
 type GenerationResult = {
@@ -57,6 +60,7 @@ type GenerationLog = {
     status: "成功" | "失败";
     images: GeneratedImage[];
     thumbnails: string[];
+    serverTaskIds: string[];
 };
 
 type GenerationLogConfig = Pick<AiConfig, "model" | "imageModel" | "quality" | "size" | "count">;
@@ -70,6 +74,9 @@ const logStore = localforage.createInstance({ name: "infinite-canvas", storeName
 export default function ImagePage() {
     const { message } = App.useApp();
     const fileInputRef = useRef<HTMLInputElement>(null);
+    const taskRecoveryStartedRef = useRef(false);
+    const user = useUserStore((state) => state.user);
+    const token = useUserStore((state) => state.token);
     const config = useConfigStore((state) => state.config);
     const effectiveConfig = useEffectiveConfig();
     const updateConfig = useConfigStore((state) => state.updateConfig);
@@ -102,8 +109,12 @@ export default function ImagePage() {
     }, [running, startedAt]);
 
     useEffect(() => {
-        void refreshLogs();
-    }, []);
+        void refreshLogs().then((storedLogs) => {
+            if (!user?.enableTasks || taskRecoveryStartedRef.current) return;
+            taskRecoveryStartedRef.current = true;
+            void recoverServerTasks(storedLogs);
+        });
+    }, [user?.enableTasks, user?.id]);
 
     const addReferences = async (files?: FileList | null) => {
         const imageFiles = Array.from(files || []).filter((file) => file.type.startsWith("image/"));
@@ -254,7 +265,67 @@ export default function ImagePage() {
         void logStore.setItem(log.id, serializeLog(log)).then(refreshLogs);
     };
 
-    const refreshLogs = async () => setLogs(await readStoredLogs());
+    const refreshLogs = async () => {
+        const storedLogs = await readStoredLogs();
+        setLogs(storedLogs);
+        return storedLogs;
+    };
+
+    const recoverServerTasks = async (storedLogs: GenerationLog[]) => {
+        try {
+            const result = await fetchUserGenerationTasks(token, { type: "image", page: 1, pageSize: 100 });
+            const knownTaskIds = new Set(storedLogs.flatMap((log) => log.serverTaskIds || []));
+            const tasks = (result.items || []).filter((task) => !task.canvasId && !task.nodeId && !knownTaskIds.has(task.id));
+            for (const task of tasks) {
+                await recoverServerTask(task);
+            }
+            if (tasks.length) await refreshLogs();
+        } catch {
+            // The task endpoint is intentionally unavailable for roles without task persistence.
+        }
+    };
+
+    const recoverServerTask = async (task: UserGenerationTask) => {
+        let state = task.status;
+        let resultImages = task.resultImages || [];
+        let error = task.errorMsg;
+        for (let attempt = 0; state === "running" && attempt < 120; attempt += 1) {
+            const polled = await pollImageGenerationTask({ ...effectiveConfig, model: task.model, imageModel: task.model, channelMode: "remote" }, task.id);
+            if (polled.status === "completed") {
+                state = "succeeded";
+                resultImages = polled.images.map((image) => image.dataUrl);
+                break;
+            }
+            if (polled.status === "failed") {
+                state = "failed";
+                error = polled.error;
+                break;
+            }
+            await new Promise((resolve) => window.setTimeout(resolve, 2000));
+        }
+        if (state === "running") return;
+        const images: GeneratedImage[] = [];
+        for (const [index, dataUrl] of resultImages.entries()) {
+            const stored = await uploadImage(dataUrl);
+            images.push({ id: `${task.id}-${index}`, dataUrl: stored.url, storageKey: stored.storageKey, durationMs: 0, width: stored.width, height: stored.height, bytes: stored.bytes, mimeType: stored.mimeType, serverTaskId: task.id });
+        }
+        const recovered = buildLog({
+            prompt: task.prompt || task.model,
+            model: task.model,
+            config: { model: task.model, imageModel: task.model, quality: effectiveConfig.quality, size: effectiveConfig.size, count: String(Math.max(images.length, 1)) },
+            references: [],
+            durationMs: Math.max(0, dayTimestamp(task.updatedAt) - dayTimestamp(task.createdAt)),
+            successCount: images.length,
+            failCount: state === "failed" ? 1 : 0,
+            status: state === "failed" ? "失败" : "成功",
+            images,
+        });
+        recovered.id = `server-${task.id}`;
+        recovered.createdAt = dayTimestamp(task.createdAt) || Date.now();
+        recovered.serverTaskIds = [task.id];
+        if (error) recovered.title = `${recovered.title}（失败）`;
+        await logStore.setItem(recovered.id, serializeLog(recovered));
+    };
 
     const previewGenerationLog = async (log: GenerationLog) => {
         setPreviewLog(log);
@@ -282,14 +353,38 @@ export default function ImagePage() {
         return { text, config: { ...effectiveConfig, model, count: "1" }, references: [...references] };
     };
 
-    const runGenerationSlot = async (index: number, snapshot: { text: string; config: AiConfig; references: ReferenceImage[] }) => {
+    const runGenerationSlot = async (index: number, snapshot: { text: string; config: AiConfig; references: ReferenceImage[] }): Promise<GeneratedImage> => {
         const itemStartedAt = performance.now();
         try {
-            const result = snapshot.references.length ? await requestEdit(snapshot.config, snapshot.text, snapshot.references) : await requestGeneration(snapshot.config, snapshot.text);
+            let result: Array<{ id: string; dataUrl: string }>;
+            let serverTaskId: string | undefined;
+            if (user?.enableTasks && snapshot.config.channelMode === "remote") {
+                const task = snapshot.references.length ? await createImageEditTask(snapshot.config, snapshot.text, snapshot.references) : await createImageGenerationTask(snapshot.config, snapshot.text);
+                serverTaskId = task.id;
+                for (;;) {
+                    const state = await pollImageGenerationTask(snapshot.config, task.id);
+                    if (state.status === "completed") {
+                        result = state.images;
+                        break;
+                    }
+                    if (state.status === "failed") throw new Error(state.error);
+                    await new Promise((resolve) => window.setTimeout(resolve, 2000));
+                }
+            } else {
+                result = snapshot.references.length ? await requestEdit(snapshot.config, snapshot.text, snapshot.references) : await requestGeneration(snapshot.config, snapshot.text);
+            }
             const image = result[0];
             if (!image) throw new Error("接口没有返回图片");
             const meta = await readImageMeta(image.dataUrl);
-            const nextImage = { id: image.id, dataUrl: image.dataUrl, durationMs: performance.now() - itemStartedAt, width: meta.width, height: meta.height, bytes: getDataUrlByteSize(image.dataUrl) };
+            const nextImage: GeneratedImage = {
+                id: image.id,
+                dataUrl: image.dataUrl,
+                durationMs: performance.now() - itemStartedAt,
+                width: meta.width,
+                height: meta.height,
+                bytes: getDataUrlByteSize(image.dataUrl),
+                ...(serverTaskId ? { serverTaskId } : {}),
+            };
             setResults((value) => updateResultAt(value, index, { status: "success", image: nextImage }));
             return nextImage;
         } catch (error) {
@@ -732,7 +827,13 @@ async function normalizeLog(log: Partial<GenerationLog>): Promise<GenerationLog>
         status: log.status || "成功",
         images,
         thumbnails: images.map((image) => image.dataUrl).filter(Boolean),
+        serverTaskIds: log.serverTaskIds || images.map((image) => image.serverTaskId).filter((id): id is string => Boolean(id)),
     };
+}
+
+function dayTimestamp(value: string) {
+    const timestamp = new Date(value).getTime();
+    return Number.isFinite(timestamp) ? timestamp : 0;
 }
 
 function serializeLog(log: GenerationLog): GenerationLog {
@@ -818,5 +919,6 @@ function buildLog({
         status,
         images,
         thumbnails: images.map((image) => image.dataUrl).filter(Boolean),
+        serverTaskIds: images.map((image) => image.serverTaskId).filter((id): id is string => Boolean(id)),
     };
 }

@@ -297,7 +297,13 @@ func CurrentAuthUser(tokenText string) (model.AuthUser, bool) {
 	if user.Status == model.UserStatusBan {
 		return model.AuthUser{}, false
 	}
-	return model.PublicUser(user), true
+	if err := ExpireUserSubscriptionIfNeeded(user.ID); err == nil {
+		_ = ResetSubscriptionCreditsIfNeeded(user.ID)
+		if refreshed, exists, refreshErr := repository.GetUserByID(user.ID); refreshErr == nil && exists {
+			user = refreshed
+		}
+	}
+	return publicUser(user), true
 }
 
 func ListUsers(q model.Query) (model.UserList, error) {
@@ -409,7 +415,7 @@ func UpdateProfile(userID string, displayName string, password string) (model.Au
 	if err != nil {
 		return model.AuthUser{}, err
 	}
-	return model.PublicUser(user), nil
+	return publicUser(user), nil
 }
 
 // BindAffCode 补填邀请码。
@@ -470,7 +476,7 @@ func BindAffCode(userID string, affCode string) (model.AuthUser, error) {
 			CreatedAt: now(),
 		})
 	}
-	return model.PublicUser(user), nil
+	return publicUser(user), nil
 }
 
 func AdjustUserCredits(id string, credits int) (model.User, error) {
@@ -727,7 +733,7 @@ func newSession(user model.User) (model.AuthSession, error) {
 	if err != nil {
 		return model.AuthSession{}, err
 	}
-	return model.AuthSession{Token: token, User: model.PublicUser(user)}, nil
+	return model.AuthSession{Token: token, User: publicUser(user)}, nil
 }
 
 func newToken(user model.User) (string, error) {
@@ -755,6 +761,17 @@ func hashPassword(password string) (string, error) {
 
 func now() string {
 	return time.Now().Format(time.RFC3339)
+}
+
+func publicUser(user model.User) model.AuthUser {
+	result := model.PublicUser(user)
+	result.EnableTasks = IsRoleTasksEnabled(string(user.Role))
+	if subscription, ok, _ := repository.GetActiveUserSubscription(user.ID); ok {
+		result.HasActiveSubscription = true
+		result.SubscriptionCredits = subscription.QuotaRemaining
+		result.SubscriptionAllowWalletFallback = subscription.AllowWalletFallback
+	}
+	return result
 }
 
 func newID(prefix string) string {

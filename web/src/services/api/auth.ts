@@ -1,8 +1,8 @@
-import { apiGet, apiPost, apiPut } from "@/services/api/request";
+import { apiGet, apiPost, apiPut, compactApiParams } from "@/services/api/request";
 
 export const AUTH_TOKEN_KEY = "infinite-canvas-auth-token-v1";
 
-export type UserRole = "guest" | "user" | "member" | "admin";
+export type UserRole = string;
 
 export type AuthUser = {
     id: string;
@@ -11,10 +11,14 @@ export type AuthUser = {
     avatarUrl: string;
     role: UserRole;
     credits: number;
+    subscriptionCredits: number;
+    hasActiveSubscription: boolean;
+    subscriptionAllowWalletFallback: boolean;
     affCode: string;
     affCount: number;
     inviterId: string;
     membershipExpiresAt: string;
+    enableTasks: boolean;
     lastLoginAt: string;
     createdAt: string;
     updatedAt: string;
@@ -74,11 +78,7 @@ export type CreditLogListResponse = {
 };
 
 export async function fetchUserCreditLogs(token: string, query: { keyword?: string; page?: number; pageSize?: number } = {}) {
-    const params = new URLSearchParams();
-    if (query.keyword) params.set("keyword", query.keyword);
-    if (query.page) params.set("page", String(query.page));
-    if (query.pageSize) params.set("pageSize", String(query.pageSize));
-    return apiGet<CreditLogListResponse>("/api/v1/credit-logs", params.toString(), token);
+    return apiGet<CreditLogListResponse>("/api/v1/credit-logs", compactApiParams(query), token);
 }
 
 export type CheckIn = {

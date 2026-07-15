@@ -3,7 +3,6 @@ package repository
 import (
 	"errors"
 	"strings"
-	"time"
 
 	"github.com/basketikun/infinite-canvas/config"
 	"github.com/basketikun/infinite-canvas/model"
@@ -22,11 +21,7 @@ func ListUsers(q model.Query) ([]model.User, int64, error) {
 		like := "%" + keyword + "%"
 		tx = tx.Where("username LIKE ? OR display_name LIKE ? OR email LIKE ? OR linux_do_id LIKE ?", like, like, like, like)
 	}
-	if q.Role == "member" {
-		tx = tx.Where("membership_expires_at != '' AND membership_expires_at > ?", time.Now().Format(time.RFC3339))
-	} else if q.Role == "user" {
-		tx = tx.Where("role = ? AND (membership_expires_at = '' OR membership_expires_at <= ?)", q.Role, time.Now().Format(time.RFC3339))
-	} else if q.Role != "" {
+	if q.Role != "" {
 		tx = tx.Where("role = ?", q.Role)
 	}
 	if q.Status != "" {
