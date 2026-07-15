@@ -25,6 +25,12 @@ docker login --username qq1371446705
 ./scripts/docker-publish.sh v0.3.1
 ```
 
+若 Buildx 只显示 `Dockerfile: RUN go build -o /server .`，使用下面的命令展开 Go 编译错误：
+
+```bash
+docker build --progress=plain --target api-build -t julong-canvas-api-debug .
+```
+
 等价的完整命令为：
 
 ```bash
@@ -136,6 +142,34 @@ docker compose start app
 备份文件只包含持久化数据，不包含 `.env`。`.env` 含管理员密码、JWT 密钥和渠道密钥，应使用服务器的秘密管理或加密备份单独保存。
 
 恢复前先停止容器，将当前 `data` 目录移走，再解压指定备份，确认目录权限后启动容器。
+
+## 首次部署并迁移本地数据
+
+需要把本地开发环境的用户、订阅、系统设置、SMTP、模型配置和素材一起迁移时，必须在本地 Go 服务停止写入后归档整个 `data` 目录。归档前执行 SQLite checkpoint 和完整性检查：
+
+```bash
+cd /Users/xujs/Downloads/xujs-infinite-canvas-main
+
+LISTENER_PID="$(lsof -tiTCP:8080 -sTCP:LISTEN)"
+PARENT_PID="$(ps -o ppid= -p "$LISTENER_PID" | tr -d ' ')"
+kill "$PARENT_PID"
+
+sqlite3 data/infinite-canvas.db 'PRAGMA wal_checkpoint(TRUNCATE); PRAGMA integrity_check;'
+tar -czf "julong-canvas-data-$(date +%Y%m%d-%H%M%S).tar.gz" data
+shasum -a 256 julong-canvas-data-*.tar.gz
+```
+
+将归档上传到服务器，在首次执行 `docker compose up` 之前恢复到仓库目录：
+
+```bash
+cd /opt/julong-canvas
+tar -xzf /root/julong-canvas-data-YYYYmmdd-HHMMSS.tar.gz
+test -s data/infinite-canvas.db
+docker compose pull
+docker compose up -d --remove-orphans
+```
+
+归档和服务器 `.env` 必须分开传输和保管。导入已有数据库后，`.env` 中的 `ADMIN_PASSWORD` 不会覆盖数据库内现有管理员密码；修改 `JWT_SECRET` 会让已有登录令牌失效，但不会删除用户数据。
 
 ## 常用运维命令
 

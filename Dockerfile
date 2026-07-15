@@ -20,7 +20,9 @@ COPY middleware ./middleware
 COPY model ./model
 COPY repository ./repository
 COPY router ./router
+COPY seedance ./seedance
 COPY service ./service
+COPY ws ./ws
 COPY main.go ./
 RUN go build -o /server .
 
