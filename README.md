@@ -45,7 +45,7 @@
 git clone git@github.com:Xujs98/xujs-infinite-canvas.git
 cd xujs-infinite-canvas
 cp .env.example .env
-# 必须修改 ADMIN_PASSWORD、JWT_SECRET，并按需填写 PUBLIC_BASE_URL
+# 必须修改 ADMIN_PASSWORD、JWT_SECRET，并按需填写 PUBLIC_BASE_URL；GIN_MODE 默认是 release
 docker compose up -d
 ```
 

@@ -37,6 +37,7 @@ COPY --from=web-build /app/web/public /app/web/public
 COPY --from=web-build /app/web/.next/standalone /app/web
 COPY --from=web-build /app/web/.next/static /app/web/.next/static
 ENV NODE_ENV=production
+ENV GIN_MODE=release
 ENV HOSTNAME=0.0.0.0
 ENV PORT=3000
 ENV PROMPT_DATA_DIR=/app/data/prompts

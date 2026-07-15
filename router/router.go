@@ -86,6 +86,13 @@ func New() *gin.Engine {
 	api.GET("/ai-text-agents", middleware.OptionalAuth, gin.WrapF(handler.AITextAgents))
 	api.GET("/assets", middleware.OptionalAuth, gin.WrapF(handler.Assets))
 	api.GET("/system-settings", gin.WrapF(handler.GetPublicSystemSettings))
+	api.GET("/app-releases/latest", gin.WrapF(handler.PublicLatestAppRelease))
+	api.GET("/app-releases/artifacts/:id/download", func(c *gin.Context) {
+		handler.DownloadAppReleaseArtifact(c.Writer, c.Request, c.Param("id"))
+	})
+	api.HEAD("/app-releases/artifacts/:id/download", func(c *gin.Context) {
+		handler.DownloadAppReleaseArtifact(c.Writer, c.Request, c.Param("id"))
+	})
 	api.GET("/available-models", gin.WrapF(handler.GetPublicAvailableModels))
 	v1.GET("/channels", gin.WrapF(handler.GetPublicChannels))
 	v1.GET("/model-classifications", gin.WrapF(handler.GetPublicModelClassifications))
@@ -176,6 +183,20 @@ func New() *gin.Engine {
 	admin.GET("/request-logs", gin.WrapF(handler.AdminRequestLogs))
 	admin.POST("/request-logs/batch-delete", gin.WrapF(handler.AdminBatchDeleteRequestLogs))
 	admin.GET("/tasks", gin.WrapF(handler.AdminGenerationTasks))
+	admin.GET("/app-releases", gin.WrapF(handler.AdminAppReleases))
+	admin.POST("/app-releases", gin.WrapF(handler.AdminCreateAppRelease))
+	admin.PUT("/app-releases/:id", func(c *gin.Context) {
+		handler.AdminUpdateAppRelease(c.Writer, c.Request, c.Param("id"))
+	})
+	admin.DELETE("/app-releases/:id", func(c *gin.Context) {
+		handler.AdminDeleteAppRelease(c.Writer, c.Request, c.Param("id"))
+	})
+	admin.POST("/app-releases/:id/artifacts", func(c *gin.Context) {
+		handler.AdminUploadAppReleaseArtifact(c.Writer, c.Request, c.Param("id"))
+	})
+	admin.DELETE("/app-release-artifacts/:id", func(c *gin.Context) {
+		handler.AdminDeleteAppReleaseArtifact(c.Writer, c.Request, c.Param("id"))
+	})
 	admin.GET("/model-classifications", gin.WrapF(handler.ListModelClassifications))
 	admin.POST("/model-classifications", gin.WrapF(handler.CreateModelClassification))
 	admin.PUT("/model-classifications/:id", func(c *gin.Context) {

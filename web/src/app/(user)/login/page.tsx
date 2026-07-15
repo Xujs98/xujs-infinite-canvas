@@ -1,6 +1,6 @@
 "use client";
 
-import { LockOutlined, MailOutlined, SafetyCertificateOutlined, UserOutlined } from "@ant-design/icons";
+import { ArrowLeftOutlined, LockOutlined, MailOutlined, SafetyCertificateOutlined, UserOutlined } from "@ant-design/icons";
 import { App, Button, Form, Input, Segmented, Space } from "antd";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
@@ -85,6 +85,18 @@ function LoginContent() {
         return () => window.clearInterval(timer);
     }, [codeCountdown]);
 
+    const openEmailCodeLogin = () => {
+        setLoginMethod("email");
+        form.setFieldsValue({ email: "", verificationCode: "" });
+        setCodeCountdown(0);
+    };
+
+    const backToPasswordLogin = () => {
+        setLoginMethod("password");
+        form.setFieldsValue({ email: "", verificationCode: "" });
+        setCodeCountdown(0);
+    };
+
     const sendEmailCode = async () => {
         try {
             const values = await form.validateFields(["email"]);
@@ -141,39 +153,29 @@ function LoginContent() {
             <section className="w-full max-w-[420px]">
                 <div className="mb-7 text-center">
                     <img src={siteLogo} alt={siteName} className="mx-auto mb-4 block size-12 object-contain" />
-                    <h1 className="text-3xl font-semibold tracking-normal text-stone-950 dark:text-stone-100">账号登录</h1>
-                    <p className="mt-3 text-base leading-7 text-stone-500 dark:text-stone-400">支持账号密码和 Linux.do 登录。</p>
+                    <h1 className="text-3xl font-semibold tracking-normal text-stone-950 dark:text-stone-100">{emailCodeLogin ? "邮箱验证码登录" : mode === "register" ? "创建账号" : "账号登录"}</h1>
+                    <p className="mt-3 text-base leading-7 text-stone-500 dark:text-stone-400">{emailCodeLogin ? "输入发送到邮箱的 6 位验证码登录账号。" : mode === "register" ? "创建账号后同步数据并使用云端功能。" : "支持账号密码和 Linux.do 登录。"}</p>
                 </div>
 
                 <Form<LoginFormValues> form={form} layout="vertical" size="large" requiredMark={false} onFinish={submit}>
-                    <Form.Item>
-                        <Segmented
-                            block
-                            value={mode}
-                            onChange={(value) => {
-                                setMode(value as "login" | "register");
-                                setCodeCountdown(0);
-                            }}
-                            options={
-                                allowRegister
-                                    ? [
-                                          { label: "登录", value: "login" },
-                                          { label: "注册", value: "register" },
-                                      ]
-                                    : [{ label: "登录", value: "login" }]
-                            }
-                        />
-                    </Form.Item>
-                    {mode === "login" && emailVerificationRequired ? (
+                    {!emailCodeLogin ? (
                         <Form.Item>
                             <Segmented
                                 block
-                                value={loginMethod}
+                                value={mode}
                                 onChange={(value) => {
-                                    setLoginMethod(value as "password" | "email");
+                                    setMode(value as "login" | "register");
+                                    setLoginMethod("password");
                                     setCodeCountdown(0);
                                 }}
-                                options={[{ label: "密码登录", value: "password" }, { label: "邮箱验证码登录", value: "email" }]}
+                                options={
+                                    allowRegister
+                                        ? [
+                                              { label: "登录", value: "login" },
+                                              { label: "注册", value: "register" },
+                                          ]
+                                        : [{ label: "登录", value: "login" }]
+                                }
                             />
                         </Form.Item>
                     ) : null}
@@ -226,14 +228,27 @@ function LoginContent() {
                     ) : null}
                     <Space orientation="vertical" size={12} style={{ width: "100%" }}>
                         <Button block type="primary" htmlType="submit" loading={isLoading}>
-                            {mode === "register" ? "注册" : "登录"}
+                            {emailCodeLogin ? "邮箱验证码登录" : mode === "register" ? "注册" : "登录"}
                         </Button>
-                        {linuxDoEnabled ? (
+                        {linuxDoEnabled && !emailCodeLogin ? (
                             <Button block href={`/api/auth/linux-do/authorize?redirect=${encodeURIComponent(redirect)}`} icon={<img src="/icons/linuxdo.svg" alt="" width={18} height={18} />}>
                                 使用 Linux.do 登录
                             </Button>
                         ) : null}
                     </Space>
+                    {emailCodeLogin ? (
+                        <button type="button" onClick={backToPasswordLogin} className="mt-4 flex min-h-10 w-full items-center justify-center gap-2 text-sm text-stone-500 transition hover:text-emerald-700 dark:text-stone-400 dark:hover:text-emerald-400">
+                            <ArrowLeftOutlined />
+                            返回账号登录
+                        </button>
+                    ) : mode === "login" ? (
+                        <div className="mt-4 flex min-h-10 items-center justify-between gap-4 text-sm">
+                            {allowRegister ? <button type="button" onClick={() => { setMode("register"); setLoginMethod("password"); setCodeCountdown(0); }} className="text-stone-500 transition hover:text-stone-950 dark:text-stone-400 dark:hover:text-stone-100">没有账号？立即注册</button> : <span />}
+                            {emailVerificationRequired ? <button type="button" onClick={openEmailCodeLogin} className="font-medium text-emerald-700 transition hover:text-emerald-800 dark:text-emerald-400 dark:hover:text-emerald-300">邮箱验证码登录</button> : null}
+                        </div>
+                    ) : (
+                        <button type="button" onClick={() => { setMode("login"); setLoginMethod("password"); setCodeCountdown(0); }} className="mt-4 min-h-10 w-full text-sm text-stone-500 transition hover:text-stone-950 dark:text-stone-400 dark:hover:text-stone-100">已有账号？返回登录</button>
+                    )}
                 </Form>
             </section>
         </main>

@@ -9,6 +9,7 @@ services:
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:?请在 .env 中设置 ADMIN_PASSWORD}
       JWT_SECRET: ${JWT_SECRET:?请在 .env 中设置 JWT_SECRET}
       DATABASE_DSN: ${DATABASE_DSN:-/app/data/infinite-canvas.db}
+      GIN_MODE: ${GIN_MODE:-release}
     volumes:
       - ./data:/app/data
     ports:

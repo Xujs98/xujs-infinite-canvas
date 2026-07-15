@@ -219,4 +219,4 @@ DATABASE_DSN=/app/data/infinite-canvas.db
 
 如果需要让火山方舟拉取本地上传的 Seedance 参考素材，还需要把 `PUBLIC_BASE_URL` 设置为公网可访问的站点地址。
 
-生产环境必须修改 `ADMIN_PASSWORD` 和 `JWT_SECRET`。`docker-compose.yml` 会在这两个变量缺失时拒绝启动，避免使用默认凭据上线。
+生产环境必须修改 `ADMIN_PASSWORD` 和 `JWT_SECRET`。`docker-compose.yml` 会在这两个变量缺失时拒绝启动，避免使用默认凭据上线；Go API 的 `GIN_MODE` 默认设置为 `release`，关闭 Gin 调试输出。

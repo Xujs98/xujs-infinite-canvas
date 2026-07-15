@@ -6,6 +6,7 @@ import {
     BarsOutlined,
     BellOutlined,
     CloudServerOutlined,
+    CloudDownloadOutlined,
     CrownOutlined,
     DashboardOutlined,
     FieldTimeOutlined,
@@ -76,6 +77,7 @@ const adminMenuGroups: Array<{ label: string; items: AdminMenuItem[] }> = [
             { key: "/admin/call-logs", icon: <FileTextOutlined />, label: "调用日志" },
             { key: "/admin/request-logs", icon: <CloudServerOutlined />, label: "请求日志" },
             { key: "/admin/tasks", icon: <FieldTimeOutlined />, label: "任务管理" },
+            { key: "/admin/app-releases", icon: <CloudDownloadOutlined />, label: "版本管理" },
             { key: "/admin/settings", icon: <SettingOutlined />, label: "模型设置" },
             { key: "/admin/system-settings", icon: <ToolOutlined />, label: "系统设置" },
         ],
@@ -101,6 +103,7 @@ const adminPageDescriptions: Record<string, string> = {
     "/admin/call-logs": "查看模型调用日志与结果",
     "/admin/request-logs": "查看服务端 API 请求记录",
     "/admin/tasks": "跟踪图片与视频生成任务",
+    "/admin/app-releases": "发布和管理桌面客户端安装包",
     "/admin/settings": "配置 AI 模型渠道和费用",
     "/admin/system-settings": "配置站点、注册与通知策略",
 };
