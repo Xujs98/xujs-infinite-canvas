@@ -6,13 +6,13 @@ import { Avatar, Button, Card, Col, DatePicker, Divider, Flex, Form, Input, Inpu
 import dayjs, { type Dayjs } from "dayjs";
 import { useEffect, useMemo, useState } from "react";
 
-import { ClickToCopyText } from "@/components/admin/click-to-copy-text";
 import type { AdminUser } from "@/services/api/admin";
 import { useQuery } from "@tanstack/react-query";
 import { useAdminUsers } from "./use-admin-users";
 import { fetchAllRoles, type AdminRole } from "@/services/api/role";
 import { useUserStore } from "@/stores/use-user-store";
 import { UserSubscriptionsModal } from "./user-subscriptions-modal";
+import { UserDetailModal } from "./user-detail-modal";
 
 type UserFormValues = Omit<Partial<AdminUser>, "membershipExpiresAt"> & { password?: string; membershipExpiresAt?: Dayjs | string };
 
@@ -66,6 +66,7 @@ export default function AdminUsersPage() {
     const [editingUser, setEditingUser] = useState<Partial<AdminUser> | null>(null);
     const [deletingUser, setDeletingUser] = useState<AdminUser | null>(null);
     const [subscriptionUser, setSubscriptionUser] = useState<AdminUser | null>(null);
+    const [detailUser, setDetailUser] = useState<AdminUser | null>(null);
     const [selectedIds, setSelectedIds] = useState<string[]>([]);
     const [batchDeleteOpen, setBatchDeleteOpen] = useState(false);
     const [batchStatusOpen, setBatchStatusOpen] = useState(false);
@@ -118,7 +119,11 @@ export default function AdminUsersPage() {
             title: "用户",
             dataIndex: "username",
             width: 140,
-            render: (_, item) => <ClickToCopyText value={item.username}>{item.username}</ClickToCopyText>,
+            render: (_, item) => (
+                <button type="button" className="cursor-pointer border-0 bg-transparent p-0 text-left font-medium text-[var(--admin-accent)] hover:underline" onClick={() => setDetailUser(item)}>
+                    {item.username}
+                </button>
+            ),
         },
         {
             title: "昵称",
@@ -179,16 +184,6 @@ export default function AdminUsersPage() {
                 const expired = dayjs(item.membershipExpiresAt).isBefore(dayjs());
                 return <Typography.Text type={expired ? "secondary" : undefined}>{dayjs(item.membershipExpiresAt).format("YYYY-MM-DD HH:mm")}</Typography.Text>;
             },
-        },
-        {
-            title: "Linux.do",
-            dataIndex: "linuxDoId",
-            width: 120,
-            render: (_, item) => (
-                <Typography.Text type="secondary" ellipsis={{ tooltip: item.linuxDoId || "-" }} style={{ maxWidth: 104 }}>
-                    {item.linuxDoId || "-"}
-                </Typography.Text>
-            ),
         },
         {
             title: "最近登录",
@@ -278,9 +273,9 @@ export default function AdminUsersPage() {
                     search={false}
                     defaultSize="middle"
                     tableLayout="fixed"
-                    scroll={{ x: 1250 }}
+                    scroll={{ x: 1130 }}
                     cardProps={{ variant: "borderless", style: { width: "100%", maxWidth: "100%", minWidth: 0, overflow: "hidden" } }}
-                    tableStyle={{ minWidth: 1250 }}
+                    tableStyle={{ minWidth: 1130 }}
                     rowSelection={{
                         selectedRowKeys: selectedIds,
                         onChange: (keys) => setSelectedIds(keys.map(String)),
@@ -317,6 +312,7 @@ export default function AdminUsersPage() {
             </Flex>
 
             <UserSubscriptionsModal user={subscriptionUser} open={Boolean(subscriptionUser)} onClose={() => setSubscriptionUser(null)} onChanged={() => void refreshUsers()} />
+            <UserDetailModal user={detailUser} open={Boolean(detailUser)} roleLabels={roleLabelMap} onClose={() => setDetailUser(null)} />
 
             <Modal title={editingUser?.id ? "编辑用户" : "新增用户"} open={Boolean(editingUser)} width="min(720px, calc(100vw - 32px))" onCancel={() => setEditingUser(null)} onOk={() => void saveUser()} okText="保存" cancelText="取消" destroyOnHidden>
                 <Form form={form} layout="vertical" requiredMark={false}>

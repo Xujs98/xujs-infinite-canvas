@@ -21,22 +21,23 @@ func AdminGetSystemSettings(w http.ResponseWriter, r *http.Request) {
 
 // PublicSystemSettings 公开的系统设置（不需要鉴权）。
 type PublicSystemSettings struct {
-	SiteName               string `json:"siteName"`
-	SiteSubtitle           string `json:"siteSubtitle"`
-	SiteLogo               string `json:"siteLogo"`
-	ServiceContact         string `json:"serviceContact"`
-	InviteRewardCredits    int    `json:"inviteRewardCredits"`
-	AllowCustomChannel     bool   `json:"allowCustomChannel"`
-	CheckInEnabled         bool   `json:"checkInEnabled"`
-	CheckInRewardMin       int    `json:"checkInRewardMin"`
-	CheckInRewardMax       int    `json:"checkInRewardMax"`
-	VideoMaxTimeoutSeconds int    `json:"videoMaxTimeoutSeconds"`
-	AgentEnabled           bool   `json:"agentEnabled"`
-	AgentVisible           bool   `json:"agentVisible"`
-	AgentAccessLevel       string `json:"agentAccessLevel"`
-	AssistantEnabled       bool   `json:"assistantEnabled"`
-	AppErrorMessagePrefix  string `json:"appErrorMessagePrefix"`
-	AppErrorShowDetails    bool   `json:"appErrorShowDetails"`
+	SiteName                  string `json:"siteName"`
+	SiteSubtitle              string `json:"siteSubtitle"`
+	SiteLogo                  string `json:"siteLogo"`
+	ServiceContact            string `json:"serviceContact"`
+	InviteRewardCredits       int    `json:"inviteRewardCredits"`
+	AllowCustomChannel        bool   `json:"allowCustomChannel"`
+	CheckInEnabled            bool   `json:"checkInEnabled"`
+	CheckInRewardMin          int    `json:"checkInRewardMin"`
+	CheckInRewardMax          int    `json:"checkInRewardMax"`
+	VideoMaxTimeoutSeconds    int    `json:"videoMaxTimeoutSeconds"`
+	AgentEnabled              bool   `json:"agentEnabled"`
+	AgentVisible              bool   `json:"agentVisible"`
+	AgentAccessLevel          string `json:"agentAccessLevel"`
+	AssistantEnabled          bool   `json:"assistantEnabled"`
+	AppErrorMessagePrefix     string `json:"appErrorMessagePrefix"`
+	AppErrorShowDetails       bool   `json:"appErrorShowDetails"`
+	EmailVerificationRequired bool   `json:"emailVerificationRequired"`
 }
 
 // GetPublicSystemSettings 获取公开的系统设置。
@@ -47,22 +48,23 @@ func GetPublicSystemSettings(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	OK(w, PublicSystemSettings{
-		SiteName:               settings.SiteName,
-		SiteSubtitle:           settings.SiteSubtitle,
-		SiteLogo:               settings.SiteLogo,
-		ServiceContact:         settings.ServiceContact,
-		InviteRewardCredits:    settings.InviteRewardCredits,
-		AllowCustomChannel:     settings.AllowCustomChannel,
-		CheckInEnabled:         settings.CheckInEnabled,
-		CheckInRewardMin:       settings.CheckInRewardMin,
-		CheckInRewardMax:       settings.CheckInRewardMax,
-		VideoMaxTimeoutSeconds: settings.VideoMaxTimeoutSeconds,
-		AgentEnabled:           settings.AgentEnabled,
-		AgentVisible:           settings.AgentVisible,
-		AgentAccessLevel:       settings.AgentAccessLevel,
-		AssistantEnabled:       settings.AssistantEnabled,
-		AppErrorMessagePrefix:  settings.AppErrorMessagePrefix,
-		AppErrorShowDetails:    settings.AppErrorShowDetails,
+		SiteName:                  settings.SiteName,
+		SiteSubtitle:              settings.SiteSubtitle,
+		SiteLogo:                  settings.SiteLogo,
+		ServiceContact:            settings.ServiceContact,
+		InviteRewardCredits:       settings.InviteRewardCredits,
+		AllowCustomChannel:        settings.AllowCustomChannel,
+		CheckInEnabled:            settings.CheckInEnabled,
+		CheckInRewardMin:          settings.CheckInRewardMin,
+		CheckInRewardMax:          settings.CheckInRewardMax,
+		VideoMaxTimeoutSeconds:    settings.VideoMaxTimeoutSeconds,
+		AgentEnabled:              settings.AgentEnabled,
+		AgentVisible:              settings.AgentVisible,
+		AgentAccessLevel:          settings.AgentAccessLevel,
+		AssistantEnabled:          settings.AssistantEnabled,
+		AppErrorMessagePrefix:     settings.AppErrorMessagePrefix,
+		AppErrorShowDetails:       settings.AppErrorShowDetails,
+		EmailVerificationRequired: settings.EmailEnabled,
 	})
 }
 
@@ -84,22 +86,23 @@ func AdminSaveSystemSettings(w http.ResponseWriter, r *http.Request) {
 		ws.DefaultHub.BroadcastJSON(map[string]any{
 			"type": "system-settings-changed",
 			"data": PublicSystemSettings{
-				SiteName:               settings.SiteName,
-				SiteSubtitle:           settings.SiteSubtitle,
-				SiteLogo:               settings.SiteLogo,
-				ServiceContact:         settings.ServiceContact,
-				InviteRewardCredits:    settings.InviteRewardCredits,
-				AllowCustomChannel:     settings.AllowCustomChannel,
-				CheckInEnabled:         settings.CheckInEnabled,
-				CheckInRewardMin:       settings.CheckInRewardMin,
-				CheckInRewardMax:       settings.CheckInRewardMax,
-				VideoMaxTimeoutSeconds: settings.VideoMaxTimeoutSeconds,
-				AgentEnabled:           settings.AgentEnabled,
-				AgentVisible:           settings.AgentVisible,
-				AgentAccessLevel:       settings.AgentAccessLevel,
-				AssistantEnabled:       settings.AssistantEnabled,
-				AppErrorMessagePrefix:  settings.AppErrorMessagePrefix,
-				AppErrorShowDetails:    settings.AppErrorShowDetails,
+				SiteName:                  settings.SiteName,
+				SiteSubtitle:              settings.SiteSubtitle,
+				SiteLogo:                  settings.SiteLogo,
+				ServiceContact:            settings.ServiceContact,
+				InviteRewardCredits:       settings.InviteRewardCredits,
+				AllowCustomChannel:        settings.AllowCustomChannel,
+				CheckInEnabled:            settings.CheckInEnabled,
+				CheckInRewardMin:          settings.CheckInRewardMin,
+				CheckInRewardMax:          settings.CheckInRewardMax,
+				VideoMaxTimeoutSeconds:    settings.VideoMaxTimeoutSeconds,
+				AgentEnabled:              settings.AgentEnabled,
+				AgentVisible:              settings.AgentVisible,
+				AgentAccessLevel:          settings.AgentAccessLevel,
+				AssistantEnabled:          settings.AssistantEnabled,
+				AppErrorMessagePrefix:     settings.AppErrorMessagePrefix,
+				AppErrorShowDetails:       settings.AppErrorShowDetails,
+				EmailVerificationRequired: settings.EmailEnabled,
 			},
 		})
 	}

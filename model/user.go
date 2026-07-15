@@ -49,10 +49,18 @@ type UserList struct {
 	Total int    `json:"total"`
 }
 
+type AdminUserDetail struct {
+	User                 User              `json:"user"`
+	SubscriptionUsed     int               `json:"subscriptionUsed"`
+	TotalConsumedCredits int               `json:"totalConsumedCredits"`
+	ActiveSubscription   *UserSubscription `json:"activeSubscription"`
+}
+
 // AuthUser 用户公开信息。
 type AuthUser struct {
 	ID                              string   `json:"id"`
 	Username                        string   `json:"username"`
+	Email                           string   `json:"email"`
 	DisplayName                     string   `json:"displayName"`
 	AvatarURL                       string   `json:"avatarUrl"`
 	Role                            UserRole `json:"role"`
@@ -80,6 +88,7 @@ func PublicUser(user User) AuthUser {
 	return AuthUser{
 		ID:                  user.ID,
 		Username:            user.Username,
+		Email:               user.Email,
 		DisplayName:         user.DisplayName,
 		AvatarURL:           user.AvatarURL,
 		Role:                user.Role,

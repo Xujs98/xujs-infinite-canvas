@@ -7,6 +7,7 @@ export type UserRole = string;
 export type AuthUser = {
     id: string;
     username: string;
+    email: string;
     displayName: string;
     avatarUrl: string;
     role: UserRole;
@@ -33,14 +34,28 @@ export type AuthPayload = {
     username: string;
     password: string;
     affCode?: string;
+    email?: string;
+    verificationCode?: string;
 };
 
 export async function login(payload: AuthPayload) {
     return apiPost<AuthSession>("/api/auth/login", payload);
 }
 
+export async function loginWithEmailCode(email: string, verificationCode: string) {
+    return apiPost<AuthSession>("/api/auth/login/email-code", { email, verificationCode });
+}
+
+export async function sendLoginEmailCode(email: string) {
+    return apiPost<boolean>("/api/auth/login/email-code/send", { email });
+}
+
 export async function register(payload: AuthPayload) {
     return apiPost<AuthSession>("/api/auth/register", payload);
+}
+
+export async function sendRegistrationEmailCode(email: string) {
+    return apiPost<boolean>("/api/auth/register/email-code", { email });
 }
 
 export async function fetchCurrentUser(token?: string) {
@@ -51,8 +66,12 @@ export async function redeemCode(token: string, code: string) {
     return apiPost<AuthUser>("/api/v1/redeem-code", { code }, token);
 }
 
-export async function updateProfile(token: string, data: { displayName?: string; password?: string }) {
+export async function updateProfile(token: string, data: { displayName?: string; password?: string; verificationCode?: string }) {
     return apiPut<AuthUser>("/api/v1/profile", data, token);
+}
+
+export async function sendPasswordChangeEmailCode(token: string) {
+    return apiPost<boolean>("/api/v1/profile/password-email-code", {}, token);
 }
 
 export async function bindAffCode(token: string, affCode: string) {

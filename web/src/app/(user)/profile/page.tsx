@@ -1,11 +1,11 @@
 "use client";
 
-import { CalendarOutlined, CheckCircleFilled, ClockCircleOutlined, CopyOutlined, CrownOutlined, GiftOutlined, ProfileOutlined, SafetyOutlined, UserOutlined, WalletOutlined } from "@ant-design/icons";
+import { CalendarOutlined, CheckCircleFilled, ClockCircleOutlined, CopyOutlined, CrownOutlined, GiftOutlined, MailOutlined, ProfileOutlined, SafetyOutlined, UserOutlined, WalletOutlined } from "@ant-design/icons";
 import { App, Button, Input, Pagination, Table, Tag, Typography } from "antd";
 import dayjs from "dayjs";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import { bindAffCode, dailyCheckIn, fetchCheckInMonth, fetchUserCreditLogs, redeemCode, updateProfile, type CheckIn, type CreditLog } from "@/services/api/auth";
+import { bindAffCode, dailyCheckIn, fetchCheckInMonth, fetchUserCreditLogs, redeemCode, sendPasswordChangeEmailCode, updateProfile, type CheckIn, type CreditLog } from "@/services/api/auth";
 import { useConfigStore } from "@/stores/use-config-store";
 import { useUserStore } from "@/stores/use-user-store";
 import SubscriptionsPage from "@/app/(user)/subscriptions/page";
@@ -520,10 +520,32 @@ function SecurityTab() {
     const user = useUserStore((state) => state.user);
     const setSession = useUserStore((state) => state.setSession);
     const [displayName, setDisplayName] = useState(user?.displayName || "");
-    const [oldPassword, setOldPassword] = useState("");
     const [newPassword, setNewPassword] = useState("");
     const [confirmPassword, setConfirmPassword] = useState("");
+    const [verificationCode, setVerificationCode] = useState("");
+    const [codeSending, setCodeSending] = useState(false);
+    const [codeCountdown, setCodeCountdown] = useState(0);
     const [loading, setLoading] = useState(false);
+    const emailVerificationRequired = useConfigStore((state) => state.publicSystemSettings?.emailVerificationRequired) === true;
+
+    useEffect(() => {
+        if (codeCountdown <= 0) return;
+        const timer = window.setInterval(() => setCodeCountdown((value) => Math.max(0, value - 1)), 1000);
+        return () => window.clearInterval(timer);
+    }, [codeCountdown]);
+
+    const handleSendPasswordCode = async () => {
+        setCodeSending(true);
+        try {
+            await sendPasswordChangeEmailCode(token);
+            setCodeCountdown(60);
+            message.success("验证码已发送到账号邮箱");
+        } catch (error) {
+            message.error(error instanceof Error ? error.message : "验证码发送失败");
+        } finally {
+            setCodeSending(false);
+        }
+    };
 
     const handleUpdateDisplayName = async () => {
         const nextDisplayName = limitDisplayName(displayName.trim());
@@ -545,10 +567,6 @@ function SecurityTab() {
     };
 
     const handleChangePassword = async () => {
-        if (!oldPassword) {
-            message.error("请输入当前密码");
-            return;
-        }
         if (!newPassword) {
             message.error("请输入新密码");
             return;
@@ -561,13 +579,17 @@ function SecurityTab() {
             message.error("两次输入的密码不一致");
             return;
         }
+        if (emailVerificationRequired && verificationCode.length !== 6) {
+            message.error("请输入 6 位邮箱验证码");
+            return;
+        }
         setLoading(true);
         try {
-            await updateProfile(token, { password: newPassword });
+            await updateProfile(token, { password: newPassword, verificationCode });
             message.success("密码修改成功");
-            setOldPassword("");
             setNewPassword("");
             setConfirmPassword("");
+            setVerificationCode("");
         } catch {
             // error handled by api layer
         } finally {
@@ -593,9 +615,27 @@ function SecurityTab() {
             <div className="rounded-lg border border-stone-200 p-4 dark:border-stone-700">
                 <div className="mb-3 text-sm font-medium text-stone-700 dark:text-stone-300">修改密码</div>
                 <div className="space-y-3">
-                    <Input.Password value={oldPassword} onChange={(e) => setOldPassword(e.target.value)} placeholder="当前密码" />
                     <Input.Password value={newPassword} onChange={(e) => setNewPassword(e.target.value)} placeholder="新密码（至少6位）" />
                     <Input.Password value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} placeholder="确认新密码" />
+                    {emailVerificationRequired ? (
+                        <>
+                            <div className="flex items-center gap-2 text-xs text-stone-500 dark:text-stone-400">
+                                <MailOutlined /> 验证码将发送到 {user?.email || "账号绑定邮箱"}
+                            </div>
+                            <Input
+                                value={verificationCode}
+                                onChange={(event) => setVerificationCode(event.target.value.replace(/\D/g, ""))}
+                                placeholder="邮箱验证码"
+                                inputMode="numeric"
+                                maxLength={6}
+                                suffix={
+                                    <Button type="link" size="small" loading={codeSending} disabled={codeCountdown > 0} onClick={() => void handleSendPasswordCode()}>
+                                        {codeCountdown > 0 ? `${codeCountdown} 秒` : "发送验证码"}
+                                    </Button>
+                                }
+                            />
+                        </>
+                    ) : null}
                     <Button type="primary" onClick={handleChangePassword} loading={loading} className="w-full sm:w-auto">
                         修改密码
                     </Button>

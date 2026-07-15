@@ -77,6 +77,25 @@ func GetUserByUsername(username string) (model.User, bool, error) {
 	return findUser(db, "username = ?", username)
 }
 
+// GetUserByLoginIdentifier 支持用户名或邮箱登录，优先匹配用户名。
+func GetUserByLoginIdentifier(identifier string) (model.User, bool, error) {
+	identifier = strings.TrimSpace(identifier)
+	user, ok, err := GetUserByUsername(identifier)
+	if err != nil || ok {
+		return user, ok, err
+	}
+	return GetUserByEmail(identifier)
+}
+
+// GetUserByEmail 根据邮箱查询用户。
+func GetUserByEmail(email string) (model.User, bool, error) {
+	db, err := DB()
+	if err != nil {
+		return model.User{}, false, err
+	}
+	return findUser(db, "LOWER(email) = ?", strings.ToLower(strings.TrimSpace(email)))
+}
+
 // SaveUser 保存用户信息。
 func SaveUser(user model.User) (model.User, error) {
 	db, err := DB()
@@ -171,6 +190,51 @@ func ListCreditLogs(q model.Query) ([]model.CreditLog, int64, error) {
 	}
 	err = tx.Order(orderExpr).Offset(q.Offset()).Limit(q.PageSize).Find(&logs).Error
 	return logs, total, err
+}
+
+func ListUserCreditLogs(userID string, q model.Query) ([]model.CreditLog, int64, error) {
+	db, err := DB()
+	if err != nil {
+		return nil, 0, err
+	}
+	q.Normalize()
+	tx := db.Model(&model.CreditLog{}).Where("user_id = ?", userID)
+	if logType := strings.TrimSpace(q.Type); logType != "" {
+		tx = tx.Where("type = ?", logType)
+	}
+	var total int64
+	if err := tx.Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+	var logs []model.CreditLog
+	orderExpr := "created_at desc"
+	if strings.EqualFold(strings.TrimSpace(config.Cfg.StorageDriver), "sqlite") || strings.TrimSpace(config.Cfg.StorageDriver) == "" {
+		orderExpr = "datetime(created_at) desc, created_at desc"
+	}
+	err = tx.Order(orderExpr).Offset(q.Offset()).Limit(q.PageSize).Find(&logs).Error
+	return logs, total, err
+}
+
+func UserCreditConsumption(userID string) (int, int, error) {
+	db, err := DB()
+	if err != nil {
+		return 0, 0, err
+	}
+	var walletConsumed int
+	if err := db.Model(&model.CreditLog{}).
+		Select("COALESCE(SUM(-amount), 0)").
+		Where("user_id = ? AND type IN ? AND amount < 0", userID, []model.CreditLogType{model.CreditLogTypeAIConsume, model.CreditLogTypeOfflineConsume}).
+		Scan(&walletConsumed).Error; err != nil {
+		return 0, 0, err
+	}
+	var subscriptionConsumed int
+	if err := db.Model(&model.SubscriptionUsageLog{}).
+		Select("COALESCE(SUM(-amount), 0)").
+		Where("user_id = ? AND type = ? AND amount < 0", userID, model.SubscriptionUsageConsume).
+		Scan(&subscriptionConsumed).Error; err != nil {
+		return 0, 0, err
+	}
+	return walletConsumed, subscriptionConsumed, nil
 }
 
 func DeleteCreditLog(id string) error {

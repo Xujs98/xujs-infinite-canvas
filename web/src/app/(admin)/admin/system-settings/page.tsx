@@ -335,7 +335,7 @@ export default function AdminSystemSettingsPage() {
                                     </div>
                                     <div>
                                         <div className="text-sm font-semibold text-gray-800">邮件功能</div>
-                                        <div className="mt-0.5 text-xs text-gray-400">开启后可发送欢迎邮件和会员到期提醒</div>
+                                        <div className="mt-0.5 text-xs text-gray-400">开启后 Web 与 App 注册必须完成邮箱验证码校验，并可发送邮件通知</div>
                                     </div>
                                 </div>
                                 <Row gutter={[24, 0]}>

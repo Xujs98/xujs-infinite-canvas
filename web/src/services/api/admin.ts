@@ -1,6 +1,7 @@
 import axios from "axios";
 import { apiDelete, apiGet, apiPost, compactApiParams } from "@/services/api/request";
 import type { Prompt, PromptListResponse } from "@/services/api/prompts";
+import type { UserSubscription } from "@/services/api/subscription";
 
 export type AdminPromptCategory = {
     category: string;
@@ -36,6 +37,13 @@ export type AdminUser = {
 export type AdminUserListResponse = {
     items: AdminUser[];
     total: number;
+};
+
+export type AdminUserDetail = {
+    user: AdminUser;
+    subscriptionUsed: number;
+    totalConsumedCredits: number;
+    activeSubscription: UserSubscription | null;
 };
 
 export type AdminDashboardStats = {
@@ -105,6 +113,14 @@ export type AdminUserQuery = {
 
 export async function fetchAdminUsers(token: string, query: AdminUserQuery = {}) {
     return apiGet<AdminUserListResponse>("/api/admin/users", compactApiParams(query), token);
+}
+
+export async function fetchAdminUserDetail(token: string, id: string) {
+    return apiGet<AdminUserDetail>(`/api/admin/users/${encodeURIComponent(id)}/detail`, undefined, token);
+}
+
+export async function fetchAdminUserCreditLogs(token: string, id: string, query: { page?: number; pageSize?: number } = {}) {
+    return apiGet<AdminCreditLogListResponse>(`/api/admin/users/${encodeURIComponent(id)}/credit-logs`, compactApiParams(query), token);
 }
 
 export async function fetchAdminDashboardStats(token: string) {

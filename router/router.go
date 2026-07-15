@@ -20,7 +20,10 @@ func New() *gin.Engine {
 		c.String(http.StatusOK, "ok")
 	})
 	api.POST("/auth/register", gin.WrapF(handler.Register))
+	api.POST("/auth/register/email-code", gin.WrapF(handler.SendRegistrationEmailCode))
 	api.POST("/auth/login", gin.WrapF(handler.Login))
+	api.POST("/auth/login/email-code/send", gin.WrapF(handler.SendLoginEmailCode))
+	api.POST("/auth/login/email-code", gin.WrapF(handler.LoginWithEmailCode))
 	api.GET("/auth/linux-do/authorize", gin.WrapF(handler.LinuxDoAuthorize))
 	api.GET("/auth/linux-do/callback", gin.WrapF(handler.LinuxDoCallback))
 	api.GET("/auth/me", middleware.OptionalAuth, gin.WrapF(handler.CurrentUser))
@@ -50,6 +53,7 @@ func New() *gin.Engine {
 	v1.POST("/media/references", gin.WrapF(handler.UploadReferenceMedia))
 	v1.POST("/redeem-code", gin.WrapF(handler.RedeemCode))
 	v1.PUT("/profile", gin.WrapF(handler.UpdateProfile))
+	v1.POST("/profile/password-email-code", gin.WrapF(handler.SendPasswordChangeEmailCode))
 	v1.POST("/bind-aff-code", gin.WrapF(handler.BindAffCode))
 	v1.GET("/credit-logs", gin.WrapF(handler.UserCreditLogs))
 	v1.POST("/credits/consume", gin.WrapF(handler.ConsumeCredits))
@@ -93,6 +97,12 @@ func New() *gin.Engine {
 	admin.GET("/server/offline", gin.WrapF(handler.AdminGetServerOffline))
 	admin.POST("/server/offline", gin.WrapF(handler.AdminSetServerOffline))
 	admin.GET("/users", gin.WrapF(handler.AdminUsers))
+	admin.GET("/users/:id/detail", func(c *gin.Context) {
+		handler.AdminUserDetail(c.Writer, c.Request, c.Param("id"))
+	})
+	admin.GET("/users/:id/credit-logs", func(c *gin.Context) {
+		handler.AdminUserCreditLogs(c.Writer, c.Request, c.Param("id"))
+	})
 	admin.POST("/users", gin.WrapF(handler.AdminSaveUser))
 	admin.POST("/users/:id/credits", func(c *gin.Context) {
 		handler.AdminAdjustUserCredits(c.Writer, c.Request, c.Param("id"))

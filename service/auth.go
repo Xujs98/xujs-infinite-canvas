@@ -62,7 +62,7 @@ func EnsureDefaultAdmin() error {
 	return err
 }
 
-func Register(username string, password string, affCode string) (model.AuthSession, error) {
+func Register(username string, password string, affCode string, email string, verificationCode string) (model.AuthSession, error) {
 	settings, err := repository.GetSettings()
 	if err != nil {
 		return model.AuthSession{}, err
@@ -84,15 +84,31 @@ func Register(username string, password string, affCode string) (model.AuthSessi
 		}
 		return model.AuthSession{}, safeMessageError{message: "用户名已存在"}
 	}
+	sysSettings, sysErr := GetSystemSettings()
+	if sysErr != nil {
+		return model.AuthSession{}, sysErr
+	}
+	email = normalizeEmail(email)
+	if sysSettings.EmailEnabled {
+		if err := validateEmailAddress(email); err != nil {
+			return model.AuthSession{}, err
+		}
+		if _, ok, err := repository.GetUserByEmail(email); err != nil || ok {
+			if err != nil {
+				return model.AuthSession{}, err
+			}
+			return model.AuthSession{}, safeMessageError{message: "该邮箱已注册"}
+		}
+	}
 	hash, err := hashPassword(password)
 	if err != nil {
 		return model.AuthSession{}, err
 	}
 	// 读取注册赠送算力点。
 	giftCredits := 0
-	sysSettings, sysErr := repository.GetSystemSettings()
-	if sysErr == nil {
-		if v, ok := sysSettings[model.SettingRegisterGiftCredits]; ok {
+	rawSystemSettings, rawSettingsErr := repository.GetSystemSettings()
+	if rawSettingsErr == nil {
+		if v, ok := rawSystemSettings[model.SettingRegisterGiftCredits]; ok {
 			fmt.Sscanf(v, "%d", &giftCredits)
 		}
 	}
@@ -104,10 +120,16 @@ func Register(username string, password string, affCode string) (model.AuthSessi
 			inviterID = inviter.ID
 		}
 	}
+	if sysSettings.EmailEnabled {
+		if err := verifyAndConsumeRegistrationEmailCode(email, verificationCode); err != nil {
+			return model.AuthSession{}, err
+		}
+	}
 	user, err := repository.SaveUser(model.User{
 		ID:        userID,
 		Username:  username,
 		Password:  hash,
+		Email:     email,
 		Role:      model.UserRoleUser,
 		Credits:   giftCredits,
 		AffCode:   newAffCode(),
@@ -134,9 +156,9 @@ func Register(username string, password string, affCode string) (model.AuthSessi
 	// 邀请人奖励算力点
 	if inviterID != "" {
 		rewardCredits := 50
-		sysSettings, sysErr := repository.GetSystemSettings()
-		if sysErr == nil {
-			if v, ok := sysSettings[model.SettingInviteRewardCredits]; ok {
+		rawSystemSettings, rawSettingsErr := repository.GetSystemSettings()
+		if rawSettingsErr == nil {
+			if v, ok := rawSystemSettings[model.SettingInviteRewardCredits]; ok {
 				fmt.Sscanf(v, "%d", &rewardCredits)
 			}
 		}
@@ -170,15 +192,40 @@ func Register(username string, password string, affCode string) (model.AuthSessi
 }
 
 func Login(username string, password string) (model.AuthSession, error) {
-	user, ok, err := repository.GetUserByUsername(strings.TrimSpace(username))
+	user, ok, err := repository.GetUserByLoginIdentifier(username)
 	if err != nil {
 		return model.AuthSession{}, err
 	}
 	if !ok || bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(password)) != nil {
-		return model.AuthSession{}, safeMessageError{message: "用户名或密码错误"}
+		return model.AuthSession{}, safeMessageError{message: "用户名、邮箱或密码错误"}
 	}
 	if user.Status == model.UserStatusBan {
 		return model.AuthSession{}, safeMessageError{message: "账号已被禁用"}
+	}
+	normalizeUserDefaults(&user)
+	user.LastLoginAt = now()
+	user.UpdatedAt = now()
+	user, err = repository.SaveUser(user)
+	if err != nil {
+		return model.AuthSession{}, err
+	}
+	return newSession(user)
+}
+
+func LoginWithEmailCode(email string, verificationCode string) (model.AuthSession, error) {
+	email = normalizeEmail(email)
+	user, ok, err := repository.GetUserByEmail(email)
+	if err != nil {
+		return model.AuthSession{}, err
+	}
+	if !ok {
+		return model.AuthSession{}, safeMessageError{message: "该邮箱未注册"}
+	}
+	if user.Status == model.UserStatusBan {
+		return model.AuthSession{}, safeMessageError{message: "账号已被禁用"}
+	}
+	if err := verifyAndConsumeLoginEmailCode(email, verificationCode); err != nil {
+		return model.AuthSession{}, err
 	}
 	normalizeUserDefaults(&user)
 	user.LastLoginAt = now()
@@ -324,6 +371,39 @@ func ListUsers(q model.Query) (model.UserList, error) {
 	return model.UserList{Items: users, Total: int(total)}, nil
 }
 
+func GetAdminUserDetail(userID string) (model.AdminUserDetail, error) {
+	if err := ExpireUserSubscriptionIfNeeded(userID); err != nil {
+		return model.AdminUserDetail{}, err
+	}
+	if err := ResetSubscriptionCreditsIfNeeded(userID); err != nil {
+		return model.AdminUserDetail{}, err
+	}
+	user, ok, err := repository.GetUserByID(userID)
+	if err != nil {
+		return model.AdminUserDetail{}, err
+	}
+	if !ok {
+		return model.AdminUserDetail{}, safeMessageError{message: "用户不存在"}
+	}
+	user.Password = ""
+	if status, exists := ws.DefaultHub.OnlineSnapshot()[user.ID]; exists {
+		user.Online = status.Online
+		user.OnlineApp = status.App
+		user.OnlineWeb = status.Web
+	}
+	subscriptionUsed := 0
+	var activeSubscription *model.UserSubscription
+	if subscription, exists, subscriptionErr := repository.GetActiveUserSubscription(userID); subscriptionErr == nil && exists {
+		subscriptionUsed = max(0, subscription.QuotaCredits-subscription.QuotaRemaining)
+		activeSubscription = &subscription
+	}
+	walletConsumed, subscriptionConsumed, err := repository.UserCreditConsumption(userID)
+	if err != nil {
+		return model.AdminUserDetail{}, err
+	}
+	return model.AdminUserDetail{User: user, SubscriptionUsed: subscriptionUsed, TotalConsumedCredits: walletConsumed + subscriptionConsumed, ActiveSubscription: activeSubscription}, nil
+}
+
 func SaveUser(user model.User, password string) (model.User, error) {
 	user.Username = strings.TrimSpace(user.Username)
 	if strings.ContainsAny(user.Username, " \t\r\n") {
@@ -388,7 +468,7 @@ func SaveUser(user model.User, password string) (model.User, error) {
 	return user, err
 }
 
-func UpdateProfile(userID string, displayName string, password string) (model.AuthUser, error) {
+func UpdateProfile(userID string, displayName string, password string, verificationCode string) (model.AuthUser, error) {
 	user, ok, err := repository.GetUserByID(userID)
 	if err != nil || !ok {
 		if err != nil {
@@ -404,6 +484,18 @@ func UpdateProfile(userID string, displayName string, password string) (model.Au
 		user.DisplayName = displayName
 	}
 	if password != "" {
+		settings, settingsErr := GetSystemSettings()
+		if settingsErr != nil {
+			return model.AuthUser{}, settingsErr
+		}
+		if settings.EmailEnabled {
+			if strings.TrimSpace(user.Email) == "" {
+				return model.AuthUser{}, safeMessageError{message: "账号未绑定邮箱，请联系管理员"}
+			}
+			if err := verifyAndConsumePasswordChangeEmailCode(user.Email, verificationCode); err != nil {
+				return model.AuthUser{}, err
+			}
+		}
 		hash, err := hashPassword(password)
 		if err != nil {
 			return model.AuthUser{}, err
@@ -617,6 +709,24 @@ func ListCreditLogs(q model.Query) (model.CreditLogList, error) {
 				}
 			}
 		}
+	}
+	return model.CreditLogList{Items: logs, Total: int(total)}, nil
+}
+
+func ListUserCreditLogs(userID string, q model.Query) (model.CreditLogList, error) {
+	if _, ok, err := repository.GetUserByID(userID); err != nil {
+		return model.CreditLogList{}, err
+	} else if !ok {
+		return model.CreditLogList{}, safeMessageError{message: "用户不存在"}
+	}
+	logs, total, err := repository.ListUserCreditLogs(userID, q)
+	if err != nil {
+		return model.CreditLogList{}, err
+	}
+	normalizeOfflineCreditLogTypes(logs)
+	fillFreeCreditLogBalances(logs)
+	for index := range logs {
+		logs[index].Username = ""
 	}
 	return model.CreditLogList{Items: logs, Total: int(total)}, nil
 }

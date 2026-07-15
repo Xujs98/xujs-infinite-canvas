@@ -105,6 +105,7 @@ export type PublicSystemSettings = {
     agentVisible: boolean;
     agentAccessLevel: string;
     assistantEnabled: boolean;
+    emailVerificationRequired: boolean;
 };
 
 type ConfigStore = {
