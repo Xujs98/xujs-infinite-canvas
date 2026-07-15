@@ -567,7 +567,7 @@ export async function batchDeleteAdminCallLogs(token: string, ids: string[]) {
 }
 
 // 请求管理日志
-export type AdminRequestLog = {
+export type AdminRequestLogSummary = {
     id: string;
     userId: string;
     username: string;
@@ -575,24 +575,29 @@ export type AdminRequestLog = {
     method: string;
     path: string;
     url: string;
-    requestHeaders: string;
-    requestBody: string;
-    requestMedia: string;
     requestBodySize: number;
-    responseBody: string;
     statusCode: number;
     success: boolean;
-    errorMsg: string;
     isPolling: boolean;
     source: string;
     createdAt: string;
 };
+export type AdminRequestLog = AdminRequestLogSummary & {
+    requestHeaders: string;
+    requestBody: string;
+    requestMedia: string;
+    responseBody: string;
+    errorMsg: string;
+};
 export type AdminRequestLogListResponse = {
-    items: AdminRequestLog[];
+    items: AdminRequestLogSummary[];
     total: number;
 };
 export async function fetchAdminRequestLogs(token: string, query: AdminUserQuery & { source?: string } = {}) {
     return apiGet<AdminRequestLogListResponse>("/api/admin/request-logs", compactApiParams(query), token);
+}
+export async function fetchAdminRequestLogDetail(token: string, id: string) {
+    return apiGet<AdminRequestLog>(`/api/admin/request-logs/${encodeURIComponent(id)}`, undefined, token);
 }
 export async function batchDeleteAdminRequestLogs(token: string, ids: string[]) {
     return apiPost<boolean>("/api/admin/request-logs/batch-delete", { ids }, token);

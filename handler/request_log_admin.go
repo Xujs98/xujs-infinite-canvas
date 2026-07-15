@@ -19,6 +19,15 @@ func AdminRequestLogs(w http.ResponseWriter, r *http.Request) {
 	OK(w, logs)
 }
 
+func AdminRequestLogDetail(w http.ResponseWriter, r *http.Request, id string) {
+	item, err := service.GetRequestLog(id)
+	if err != nil {
+		FailError(w, err)
+		return
+	}
+	OK(w, item)
+}
+
 func AdminBatchDeleteRequestLogs(w http.ResponseWriter, r *http.Request) {
 	var input struct {
 		IDs []string `json:"ids"`

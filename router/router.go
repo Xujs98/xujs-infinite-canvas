@@ -181,6 +181,9 @@ func New() *gin.Engine {
 	admin.GET("/call-logs", gin.WrapF(handler.AdminCallLogs))
 	admin.POST("/call-logs/batch-delete", gin.WrapF(handler.AdminBatchDeleteCallLogs))
 	admin.GET("/request-logs", gin.WrapF(handler.AdminRequestLogs))
+	admin.GET("/request-logs/:id", func(c *gin.Context) {
+		handler.AdminRequestLogDetail(c.Writer, c.Request, c.Param("id"))
+	})
 	admin.POST("/request-logs/batch-delete", gin.WrapF(handler.AdminBatchDeleteRequestLogs))
 	admin.GET("/tasks", gin.WrapF(handler.AdminGenerationTasks))
 	admin.GET("/app-releases", gin.WrapF(handler.AdminAppReleases))

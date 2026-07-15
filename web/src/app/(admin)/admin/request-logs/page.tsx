@@ -2,12 +2,12 @@
 
 import { DeleteOutlined, DownloadOutlined, EyeOutlined, FileImageOutlined, PlayCircleOutlined, ReloadOutlined, SoundOutlined } from "@ant-design/icons";
 import { ProTable, type ProColumns } from "@ant-design/pro-components";
-import { Button, Card, Col, Drawer, Form, Input, Modal, Row, Space, Tag, Typography } from "antd";
+import { App, Button, Card, Col, Drawer, Form, Input, Modal, Row, Space, Spin, Tag, Typography } from "antd";
 import dayjs from "dayjs";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { ClickToCopyText } from "@/components/admin/click-to-copy-text";
-import { batchDeleteAdminRequestLogs, fetchAdminRequestLogs, type AdminRequestLog } from "@/services/api/admin";
+import { batchDeleteAdminRequestLogs, fetchAdminRequestLogDetail, fetchAdminRequestLogs, type AdminRequestLog, type AdminRequestLogSummary } from "@/services/api/admin";
 import { useUserStore } from "@/stores/use-user-store";
 
 const MEDIA_FIELD_KEYS = new Set(["image", "images", "image_urls", "input_reference[]", "reference_images", "reference_videos", "reference_audios"]);
@@ -139,8 +139,9 @@ function JsonBlock({ text }: { text: string }) {
 }
 
 export default function AdminRequestLogsPage() {
+    const { message } = App.useApp();
     const token = useUserStore((s) => s.token);
-    const [logs, setLogs] = useState<AdminRequestLog[]>([]);
+    const [logs, setLogs] = useState<AdminRequestLogSummary[]>([]);
     const [total, setTotal] = useState(0);
     const [page, setPage] = useState(1);
     const [pageSize, setPageSize] = useState(20);
@@ -151,7 +152,10 @@ export default function AdminRequestLogsPage() {
     const [isLoading, setIsLoading] = useState(false);
     const [selectedIds, setSelectedIds] = useState<string[]>([]);
     const [batchDeleteOpen, setBatchDeleteOpen] = useState(false);
+    const [detailSummary, setDetailSummary] = useState<AdminRequestLogSummary | null>(null);
     const [detailLog, setDetailLog] = useState<AdminRequestLog | null>(null);
+    const [detailLoading, setDetailLoading] = useState(false);
+    const detailRequestSequence = useRef(0);
 
     const loadLogs = async () => {
         if (!token) return;
@@ -180,7 +184,30 @@ export default function AdminRequestLogsPage() {
         void loadLogs();
     };
 
-    const columns: ProColumns<AdminRequestLog>[] = [
+    const openDetail = async (item: AdminRequestLogSummary) => {
+        if (!token) return;
+        const sequence = ++detailRequestSequence.current;
+        setDetailSummary(item);
+        setDetailLog(null);
+        setDetailLoading(true);
+        try {
+            const detail = await fetchAdminRequestLogDetail(token, item.id);
+            if (detailRequestSequence.current === sequence) setDetailLog(detail);
+        } catch (error) {
+            if (detailRequestSequence.current === sequence) message.error(error instanceof Error ? error.message : "请求日志详情加载失败");
+        } finally {
+            if (detailRequestSequence.current === sequence) setDetailLoading(false);
+        }
+    };
+
+    const closeDetail = () => {
+        detailRequestSequence.current++;
+        setDetailSummary(null);
+        setDetailLog(null);
+        setDetailLoading(false);
+    };
+
+    const columns: ProColumns<AdminRequestLogSummary>[] = [
         {
             title: "请求者",
             dataIndex: "username",
@@ -246,7 +273,7 @@ export default function AdminRequestLogsPage() {
             key: "actions",
             width: 60,
             align: "center",
-            render: (_, item) => <Button type="text" size="small" icon={<EyeOutlined />} onClick={() => setDetailLog(item)} />,
+            render: (_, item) => <Button type="text" size="small" icon={<EyeOutlined />} aria-label="查看请求详情" onClick={() => void openDetail(item)} />,
         },
     ];
 
@@ -363,7 +390,7 @@ export default function AdminRequestLogsPage() {
                         </Row>
                     </Form>
                 </Card>
-                <ProTable<AdminRequestLog>
+                <ProTable<AdminRequestLogSummary>
                     rowKey="id"
                     columns={columns}
                     dataSource={logs}
@@ -401,8 +428,10 @@ export default function AdminRequestLogsPage() {
                 确定删除已选中的 {selectedIds.length} 条请求日志吗？
             </Modal>
 
-            <Drawer title="请求详情" open={Boolean(detailLog)} onClose={() => setDetailLog(null)} width={800} destroyOnHidden>
-                {detailLog && (
+            <Drawer title={detailSummary ? `请求详情 · ${detailSummary.model || detailSummary.method}` : "请求详情"} open={Boolean(detailSummary)} onClose={closeDetail} width={800} destroyOnHidden>
+                {detailLoading ? (
+                    <div className="grid min-h-72 place-items-center"><Spin tip="正在加载请求详情" /></div>
+                ) : detailLog ? (
                     <div className="space-y-4">
                         <div className="flex items-center gap-3 flex-wrap">
                             <Tag color={detailLog.method === "ERROR" ? "red" : detailLog.method === "POST" ? "blue" : "green"}>{detailLog.method}</Tag>
@@ -464,7 +493,7 @@ export default function AdminRequestLogsPage() {
                             </div>
                         )}
                     </div>
-                )}
+                ) : null}
             </Drawer>
         </div>
     );
