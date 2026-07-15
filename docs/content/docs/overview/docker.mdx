@@ -31,6 +31,15 @@ docker login --username qq1371446705
 docker build --progress=plain --target api-build -t julong-canvas-api-debug .
 ```
 
+若导出镜像时出现 `failed to fetch oauth token ... auth.docker.io/token: EOF`，表示镜像已构建但 Docker Hub 认证网络临时中断，标签可能尚未推送。重新登录后再次执行发布脚本即可；脚本默认自动重试 3 次并复用构建缓存：
+
+```bash
+docker login --username qq1371446705
+./scripts/docker-publish.sh 2f1b7f1
+```
+
+可通过 `DOCKER_PUSH_RETRIES=5` 调整重试次数。
+
 等价的完整命令为：
 
 ```bash
