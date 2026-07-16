@@ -6,3 +6,4 @@ node_modules/
 web/.next/
 web/node_modules/
 .DS_Store
+julong-canvas-data-*.tar.gz

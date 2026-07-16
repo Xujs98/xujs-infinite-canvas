@@ -58,6 +58,8 @@ docker compose -f docker-compose.local.yml up -d --build
 
 运行后默认映射宿主机 `3001` 端口，可访问 `http://localhost:3001`。
 
+生产域名固定为 `https://canvas.julongkj.top`。Compose 将 Next.js `3001` 与 Go API `8080` 仅绑定到宿主机回环地址，Nginx 配置模板位于 `deploy/nginx/canvas.julongkj.top.conf`；根路径代理到 `3001`，`/api/` 代理到 `8080` 并支持 WebSocket。使用 Certbot 启用 HTTPS 后，公网只需开放 80/443。
+
 如需要拉取提示词，可前往：`http://localhost:3001/admin/prompts`
 
 ## Docker 镜像
