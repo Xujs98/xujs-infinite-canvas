@@ -1,18 +1,26 @@
 package repository
 
-import "github.com/basketikun/infinite-canvas/model"
+import (
+	"sort"
+
+	"github.com/basketikun/infinite-canvas/model"
+)
 
 func TodayCheckIn(userID string, date string) (model.CheckIn, bool, error) {
 	db, err := DB()
 	if err != nil {
 		return model.CheckIn{}, false, err
 	}
-	var log model.CheckIn
-	tx := db.Where("user_id = ? AND created_at LIKE ?", userID, date+"%").First(&log)
-	if tx.Error != nil {
-		return model.CheckIn{}, false, tx.Error
+	var logs []model.CheckIn
+	if err := db.Where("user_id = ?", userID).Order("created_at desc").Find(&logs).Error; err != nil {
+		return model.CheckIn{}, false, err
 	}
-	return log, tx.RowsAffected > 0, nil
+	for _, log := range logs {
+		if model.CheckInDateFromTimestamp(log.CreatedAt) == date {
+			return log, true, nil
+		}
+	}
+	return model.CheckIn{}, false, nil
 }
 
 func MonthCheckIns(userID string, month string) ([]model.CheckIn, error) {
@@ -20,11 +28,20 @@ func MonthCheckIns(userID string, month string) ([]model.CheckIn, error) {
 	if err != nil {
 		return nil, err
 	}
-	var logs []model.CheckIn
-	tx := db.Where("user_id = ? AND created_at LIKE ?", userID, month+"%").Order("created_at asc").Find(&logs)
-	if tx.Error != nil {
-		return nil, tx.Error
+	var allLogs []model.CheckIn
+	if err := db.Where("user_id = ?", userID).Find(&allLogs).Error; err != nil {
+		return nil, err
 	}
+	logs := make([]model.CheckIn, 0, len(allLogs))
+	for _, log := range allLogs {
+		date := model.CheckInDateFromTimestamp(log.CreatedAt)
+		if len(month) == 7 && len(date) >= 7 && date[:7] == month {
+			logs = append(logs, log)
+		}
+	}
+	sort.Slice(logs, func(i, j int) bool {
+		return model.CheckInDateFromTimestamp(logs[i].CreatedAt) < model.CheckInDateFromTimestamp(logs[j].CreatedAt)
+	})
 	return logs, nil
 }
 

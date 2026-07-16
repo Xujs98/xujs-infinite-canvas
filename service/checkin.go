@@ -11,8 +11,8 @@ import (
 )
 
 func DailyCheckIn(userID string) (model.CheckIn, bool, error) {
-	now := time.Now()
-	date := now.Format("2006-01-02")
+	now := model.CheckInLocalTime(time.Now())
+	date := model.CheckInDate(now)
 
 	// 检查签到功能是否开启
 	sysSettings, sysErr := repository.GetSystemSettings()
@@ -93,5 +93,3 @@ func GetCheckInMonth(userID string, month string) ([]model.CheckIn, int64, int, 
 
 	return logs, totalCount, totalReward, nil
 }
-
-
