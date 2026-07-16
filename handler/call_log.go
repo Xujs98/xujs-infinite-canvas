@@ -32,3 +32,12 @@ func AdminBatchDeleteCallLogs(w http.ResponseWriter, r *http.Request) {
 	}
 	OK(w, nil)
 }
+
+func AdminClearCallLogs(w http.ResponseWriter, r *http.Request) {
+	deleted, err := service.ClearCallLogs()
+	if err != nil {
+		FailError(w, err)
+		return
+	}
+	OK(w, map[string]int64{"deleted": deleted})
+}

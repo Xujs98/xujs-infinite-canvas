@@ -7,7 +7,7 @@ import dayjs from "dayjs";
 import { useEffect, useRef, useState } from "react";
 
 import { ClickToCopyText } from "@/components/admin/click-to-copy-text";
-import { batchDeleteAdminRequestLogs, fetchAdminRequestLogDetail, fetchAdminRequestLogs, type AdminRequestLog, type AdminRequestLogSummary } from "@/services/api/admin";
+import { batchDeleteAdminRequestLogs, clearAdminRequestLogs, fetchAdminRequestLogDetail, fetchAdminRequestLogs, type AdminRequestLog, type AdminRequestLogSummary } from "@/services/api/admin";
 import { useUserStore } from "@/stores/use-user-store";
 
 const MEDIA_FIELD_KEYS = new Set(["image", "images", "image_urls", "input_reference[]", "reference_images", "reference_videos", "reference_audios"]);
@@ -152,6 +152,8 @@ export default function AdminRequestLogsPage() {
     const [isLoading, setIsLoading] = useState(false);
     const [selectedIds, setSelectedIds] = useState<string[]>([]);
     const [batchDeleteOpen, setBatchDeleteOpen] = useState(false);
+    const [clearAllOpen, setClearAllOpen] = useState(false);
+    const [isClearing, setIsClearing] = useState(false);
     const [detailSummary, setDetailSummary] = useState<AdminRequestLogSummary | null>(null);
     const [detailLog, setDetailLog] = useState<AdminRequestLog | null>(null);
     const [detailLoading, setDetailLoading] = useState(false);
@@ -182,6 +184,25 @@ export default function AdminRequestLogsPage() {
         setSelectedIds([]);
         setBatchDeleteOpen(false);
         void loadLogs();
+    };
+
+    const handleClearAll = async () => {
+        if (!token) return;
+        setIsClearing(true);
+        try {
+            const result = await clearAdminRequestLogs(token);
+            setClearAllOpen(false);
+            setSelectedIds([]);
+            setLogs([]);
+            setTotal(0);
+            setPage(1);
+            closeDetail();
+            message.success(`已清理 ${result.deleted} 条请求日志`);
+        } catch (error) {
+            message.error(error instanceof Error ? error.message : "清理失败");
+        } finally {
+            setIsClearing(false);
+        }
     };
 
     const openDetail = async (item: AdminRequestLogSummary) => {
@@ -411,6 +432,9 @@ export default function AdminRequestLogsPage() {
                         <Button key="batch-delete" danger icon={<DeleteOutlined />} disabled={!selectedIds.length} onClick={() => setBatchDeleteOpen(true)}>
                             批量删除{selectedIds.length ? ` ${selectedIds.length}` : ""}
                         </Button>,
+                        <Button key="clear-all" danger icon={<DeleteOutlined />} onClick={() => setClearAllOpen(true)}>
+                            清空全部
+                        </Button>,
                     ]}
                     pagination={{
                         current: page,
@@ -426,6 +450,10 @@ export default function AdminRequestLogsPage() {
 
             <Modal title="批量删除请求日志" open={batchDeleteOpen} onCancel={() => setBatchDeleteOpen(false)} onOk={() => void handleBatchDelete()} okText="删除" okButtonProps={{ danger: true }} cancelText="取消">
                 确定删除已选中的 {selectedIds.length} 条请求日志吗？
+            </Modal>
+
+            <Modal title="清空全部请求日志" open={clearAllOpen} onCancel={() => setClearAllOpen(false)} onOk={() => void handleClearAll()} okText="确认清空" confirmLoading={isClearing} okButtonProps={{ danger: true }} cancelText="取消">
+                此操作将永久删除数据库中的全部请求日志及其详情，不受当前筛选条件影响，删除后无法恢复。
             </Modal>
 
             <Drawer title={detailSummary ? `请求详情 · ${detailSummary.model || detailSummary.method}` : "请求详情"} open={Boolean(detailSummary)} onClose={closeDetail} width={800} destroyOnHidden>

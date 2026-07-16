@@ -1,6 +1,6 @@
 "use client";
 
-import { ControlOutlined, DeleteOutlined, GiftOutlined, GlobalOutlined, MailOutlined, SaveOutlined, ToolOutlined, UploadOutlined, UserAddOutlined } from "@ant-design/icons";
+import { ControlOutlined, DatabaseOutlined, DeleteOutlined, GiftOutlined, GlobalOutlined, MailOutlined, SaveOutlined, ToolOutlined, UploadOutlined, UserAddOutlined } from "@ant-design/icons";
 import { App, Button, Col, Form, Input, InputNumber, Row, Space, Switch, Typography } from "antd";
 import { useCallback, useEffect, useRef, useState } from "react";
 
@@ -104,6 +104,8 @@ export default function AdminSystemSettingsPage() {
 
     const emailEnabled = Form.useWatch("emailEnabled", form);
     const siteLogo = Form.useWatch("siteLogo", form);
+    const requestLogCleanupEnabled = Form.useWatch("requestLogCleanupEnabled", form);
+    const callLogCleanupEnabled = Form.useWatch("callLogCleanupEnabled", form);
 
     return (
         <div className="admin-config-page min-h-screen p-6">
@@ -244,6 +246,60 @@ export default function AdminSystemSettingsPage() {
                                         </Form.Item>
                                     </Col>
                                 </Row>
+                            </div>
+
+                            <div className="rounded-xl border border-gray-100 bg-white p-6 shadow-sm">
+                                <div className="mb-5 flex items-center gap-3">
+                                    <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-cyan-50 text-cyan-600">
+                                        <DatabaseOutlined />
+                                    </div>
+                                    <div>
+                                        <div className="text-sm font-semibold text-gray-800">日志自动清理</div>
+                                        <div className="mt-0.5 text-xs text-gray-400">按保留时间和最大条数定期清理请求日志与调用日志</div>
+                                    </div>
+                                </div>
+                                <div className="grid gap-8 lg:grid-cols-2 lg:divide-x lg:divide-gray-100">
+                                    <section className="min-w-0 lg:pr-8">
+                                        <div className="mb-4 text-sm font-medium text-gray-700">请求日志</div>
+                                        <Row gutter={[16, 0]}>
+                                            <Col span={24}>
+                                                <Form.Item name="requestLogCleanupEnabled" label="自动清理" valuePropName="checked" extra="开启后每小时检查一次，保存设置后立即执行。">
+                                                    <Switch checkedChildren="开启" unCheckedChildren="关闭" />
+                                                </Form.Item>
+                                            </Col>
+                                            <Col xs={24} sm={12}>
+                                                <Form.Item name="requestLogRetentionDays" label="保留天数" rules={[{ required: true, message: "请输入请求日志保留天数" }]}>
+                                                    <InputNumber min={1} max={3650} precision={0} disabled={!requestLogCleanupEnabled} style={{ width: "100%" }} />
+                                                </Form.Item>
+                                            </Col>
+                                            <Col xs={24} sm={12}>
+                                                <Form.Item name="requestLogMaxRows" label="最大保留条数" rules={[{ required: true, message: "请输入请求日志最大保留条数" }]}>
+                                                    <InputNumber min={100} max={1000000} precision={0} step={100} disabled={!requestLogCleanupEnabled} style={{ width: "100%" }} />
+                                                </Form.Item>
+                                            </Col>
+                                        </Row>
+                                    </section>
+                                    <section className="min-w-0 lg:pl-8">
+                                        <div className="mb-4 text-sm font-medium text-gray-700">调用日志</div>
+                                        <Row gutter={[16, 0]}>
+                                            <Col span={24}>
+                                                <Form.Item name="callLogCleanupEnabled" label="自动清理" valuePropName="checked" extra="默认关闭，开启后按相同周期检查。">
+                                                    <Switch checkedChildren="开启" unCheckedChildren="关闭" />
+                                                </Form.Item>
+                                            </Col>
+                                            <Col xs={24} sm={12}>
+                                                <Form.Item name="callLogRetentionDays" label="保留天数" rules={[{ required: true, message: "请输入调用日志保留天数" }]}>
+                                                    <InputNumber min={1} max={3650} precision={0} disabled={!callLogCleanupEnabled} style={{ width: "100%" }} />
+                                                </Form.Item>
+                                            </Col>
+                                            <Col xs={24} sm={12}>
+                                                <Form.Item name="callLogMaxRows" label="最大保留条数" rules={[{ required: true, message: "请输入调用日志最大保留条数" }]}>
+                                                    <InputNumber min={100} max={1000000} precision={0} step={100} disabled={!callLogCleanupEnabled} style={{ width: "100%" }} />
+                                                </Form.Item>
+                                            </Col>
+                                        </Row>
+                                    </section>
+                                </div>
                             </div>
                         </div>
                     )}

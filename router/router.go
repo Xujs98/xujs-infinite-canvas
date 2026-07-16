@@ -180,11 +180,13 @@ func New() *gin.Engine {
 	admin.POST("/agent/settings", gin.WrapF(handler.AdminSaveAgentSettings))
 	admin.GET("/call-logs", gin.WrapF(handler.AdminCallLogs))
 	admin.POST("/call-logs/batch-delete", gin.WrapF(handler.AdminBatchDeleteCallLogs))
+	admin.POST("/call-logs/clear", gin.WrapF(handler.AdminClearCallLogs))
 	admin.GET("/request-logs", gin.WrapF(handler.AdminRequestLogs))
 	admin.GET("/request-logs/:id", func(c *gin.Context) {
 		handler.AdminRequestLogDetail(c.Writer, c.Request, c.Param("id"))
 	})
 	admin.POST("/request-logs/batch-delete", gin.WrapF(handler.AdminBatchDeleteRequestLogs))
+	admin.POST("/request-logs/clear", gin.WrapF(handler.AdminClearRequestLogs))
 	admin.GET("/tasks", gin.WrapF(handler.AdminGenerationTasks))
 	admin.GET("/app-releases", gin.WrapF(handler.AdminAppReleases))
 	admin.POST("/app-releases", gin.WrapF(handler.AdminCreateAppRelease))

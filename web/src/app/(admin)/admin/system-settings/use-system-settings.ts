@@ -17,6 +17,12 @@ const defaultSettings: AdminSystemSettings = {
     videoMaxTimeoutSeconds: 600,
     appErrorMessagePrefix: "",
     appErrorShowDetails: true,
+    requestLogCleanupEnabled: true,
+    requestLogRetentionDays: 30,
+    requestLogMaxRows: 5000,
+    callLogCleanupEnabled: false,
+    callLogRetentionDays: 30,
+    callLogMaxRows: 5000,
     allowCustomChannel: true,
     allowRegister: true,
     assistantEnabled: true,
@@ -42,7 +48,7 @@ export function useSystemSettings() {
         setLoading(true);
         try {
             const data = await fetchAdminSystemSettings(token);
-            setSettings(data);
+            setSettings({ ...defaultSettings, ...data });
         } catch {
             // ignore
         } finally {

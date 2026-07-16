@@ -17,5 +17,6 @@ func main() {
 	}
 	service.EnsureBuiltinRoles()
 	service.StartPromptSyncScheduler()
+	service.StartLogCleanupScheduler()
 	log.Fatal(router.New().Run(":" + config.Cfg.Port))
 }

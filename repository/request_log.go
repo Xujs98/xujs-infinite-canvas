@@ -69,6 +69,15 @@ func BatchDeleteRequestLogs(ids []string) error {
 	return db.Where("id IN ?", ids).Delete(&model.RequestLog{}).Error
 }
 
+func ClearRequestLogs() (int64, error) {
+	db, err := DB()
+	if err != nil {
+		return 0, err
+	}
+	result := db.Where("1 = 1").Delete(&model.RequestLog{})
+	return result.RowsAffected, result.Error
+}
+
 // PruneRequestLogs 保留指定天数内且最新的 maxRows 条日志。
 func PruneRequestLogs(cutoff time.Time, maxRows int) (int64, error) {
 	db, err := DB()

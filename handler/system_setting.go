@@ -79,6 +79,7 @@ func AdminSaveSystemSettings(w http.ResponseWriter, r *http.Request) {
 		FailError(w, err)
 		return
 	}
+	go service.RunConfiguredLogCleanup()
 
 	// 保存后推送最新设置给所有 WebSocket 客户端
 	settings, settingsErr := service.GetSystemSettings()

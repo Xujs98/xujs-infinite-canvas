@@ -499,6 +499,12 @@ export type AdminSystemSettings = {
     videoMaxTimeoutSeconds: number;
     appErrorMessagePrefix: string;
     appErrorShowDetails: boolean;
+    requestLogCleanupEnabled: boolean;
+    requestLogRetentionDays: number;
+    requestLogMaxRows: number;
+    callLogCleanupEnabled: boolean;
+    callLogRetentionDays: number;
+    callLogMaxRows: number;
     allowCustomChannel: boolean;
     allowRegister: boolean;
     assistantEnabled: boolean;
@@ -566,6 +572,10 @@ export async function batchDeleteAdminCallLogs(token: string, ids: string[]) {
     return apiPost<boolean>("/api/admin/call-logs/batch-delete", { ids }, token);
 }
 
+export async function clearAdminCallLogs(token: string) {
+    return apiPost<{ deleted: number }>("/api/admin/call-logs/clear", {}, token);
+}
+
 // 请求管理日志
 export type AdminRequestLogSummary = {
     id: string;
@@ -601,6 +611,10 @@ export async function fetchAdminRequestLogDetail(token: string, id: string) {
 }
 export async function batchDeleteAdminRequestLogs(token: string, ids: string[]) {
     return apiPost<boolean>("/api/admin/request-logs/batch-delete", { ids }, token);
+}
+
+export async function clearAdminRequestLogs(token: string) {
+    return apiPost<{ deleted: number }>("/api/admin/request-logs/clear", {}, token);
 }
 
 // 模型分类管理

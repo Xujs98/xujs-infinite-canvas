@@ -7,7 +7,6 @@ import (
 	"regexp"
 	"strings"
 	"sync"
-	"time"
 
 	"github.com/basketikun/infinite-canvas/model"
 	"github.com/basketikun/infinite-canvas/repository"
@@ -21,8 +20,6 @@ const (
 	requestLogMediaMaxChars    = 32 * 1024
 	requestLogResponseMaxChars = 128 * 1024
 	requestLogErrorMaxChars    = 16 * 1024
-	requestLogRetentionDays    = 30
-	requestLogMaxRows          = 5000
 )
 
 // pollingTasks 跟踪轮询任务，用于去重：只记录第一次轮询和最终结果
@@ -30,8 +27,6 @@ var (
 	pollingTasksMu sync.Mutex
 	pollingTasks   = make(map[string]bool) // taskID -> true 表示已记录过首次轮询
 
-	requestLogCleanupMu   sync.Mutex
-	requestLogLastCleanup time.Time
 )
 
 // 从 URL 路径中提取任务 ID
@@ -109,8 +104,6 @@ func LogRequestWithSource(userID, username, model_, method, path, url string, re
 
 	if err := repository.CreateRequestLog(entry); err != nil {
 		log.Printf("LogRequest create failed: %v", err)
-	} else {
-		go maybePruneRequestLogs()
 	}
 	return entry.ID
 }
@@ -154,6 +147,10 @@ func BatchDeleteRequestLogs(ids []string) error {
 	return repository.BatchDeleteRequestLogs(ids)
 }
 
+func ClearRequestLogs() (int64, error) {
+	return repository.ClearRequestLogs()
+}
+
 // LogAppRequest 记录 App 端提交的请求日志
 func LogAppRequest(userID, username, model_, method, path, url string, requestHeaders string, requestBody string, responseBody string, statusCode int, success bool, errorMsg string, elapsedMs int64) string {
 	entry := &model.RequestLog{
@@ -175,8 +172,6 @@ func LogAppRequest(userID, username, model_, method, path, url string, requestHe
 	}
 	if err := repository.CreateRequestLog(entry); err != nil {
 		log.Printf("LogAppRequest create failed: %v", err)
-	} else {
-		go maybePruneRequestLogs()
 	}
 	return entry.ID
 }
@@ -191,24 +186,4 @@ func sanitizeRequestLogText(value string, maxChars int) string {
 		return value
 	}
 	return string(runes[:maxChars]) + "\n...[日志内容已截断]"
-}
-
-func maybePruneRequestLogs() {
-	nowTime := time.Now()
-	requestLogCleanupMu.Lock()
-	if !requestLogLastCleanup.IsZero() && nowTime.Sub(requestLogLastCleanup) < time.Hour {
-		requestLogCleanupMu.Unlock()
-		return
-	}
-	requestLogLastCleanup = nowTime
-	requestLogCleanupMu.Unlock()
-
-	deleted, err := repository.PruneRequestLogs(nowTime.AddDate(0, 0, -requestLogRetentionDays), requestLogMaxRows)
-	if err != nil {
-		log.Printf("request log cleanup failed: %v", err)
-		return
-	}
-	if deleted > 0 {
-		log.Printf("request log cleanup removed %d expired or excess records", deleted)
-	}
 }

@@ -2,11 +2,11 @@
 
 import { DeleteOutlined, EyeOutlined, ReloadOutlined } from "@ant-design/icons";
 import { ProTable, type ProColumns } from "@ant-design/pro-components";
-import { Button, Card, Col, Drawer, Form, Input, Modal, Row, Space, Tag, Typography } from "antd";
+import { App, Button, Card, Col, Drawer, Form, Input, Modal, Row, Space, Tag, Typography } from "antd";
 import dayjs from "dayjs";
 import { useEffect, useMemo, useState } from "react";
 
-import { batchDeleteAdminCallLogs, fetchAdminCallLogs, type AdminCallLog } from "@/services/api/admin";
+import { batchDeleteAdminCallLogs, clearAdminCallLogs, fetchAdminCallLogs, type AdminCallLog } from "@/services/api/admin";
 import { useUserStore } from "@/stores/use-user-store";
 
 function tryFormatJson(text: string): { isJson: boolean; formatted: string } {
@@ -81,6 +81,7 @@ function JsonHighlight({ text }: { text: string }) {
 }
 
 export default function AdminCallLogsPage() {
+    const { message } = App.useApp();
     const token = useUserStore((s) => s.token);
     const [logs, setLogs] = useState<AdminCallLog[]>([]);
     const [total, setTotal] = useState(0);
@@ -92,6 +93,8 @@ export default function AdminCallLogsPage() {
     const [isLoading, setIsLoading] = useState(false);
     const [selectedIds, setSelectedIds] = useState<string[]>([]);
     const [batchDeleteOpen, setBatchDeleteOpen] = useState(false);
+    const [clearAllOpen, setClearAllOpen] = useState(false);
+    const [isClearing, setIsClearing] = useState(false);
     const [detailLog, setDetailLog] = useState<AdminCallLog | null>(null);
 
     const loadLogs = async () => {
@@ -116,6 +119,24 @@ export default function AdminCallLogsPage() {
         setSelectedIds([]);
         setBatchDeleteOpen(false);
         void loadLogs();
+    };
+
+    const handleClearAll = async () => {
+        if (!token) return;
+        setIsClearing(true);
+        try {
+            const result = await clearAdminCallLogs(token);
+            setClearAllOpen(false);
+            setSelectedIds([]);
+            setLogs([]);
+            setTotal(0);
+            setPage(1);
+            message.success(`已清理 ${result.deleted} 条调用日志`);
+        } catch (error) {
+            message.error(error instanceof Error ? error.message : "清理失败");
+        } finally {
+            setIsClearing(false);
+        }
     };
 
     const pathLabel = useMemo(
@@ -295,6 +316,9 @@ export default function AdminCallLogsPage() {
                         <Button key="batch-delete" danger icon={<DeleteOutlined />} disabled={!selectedIds.length} onClick={() => setBatchDeleteOpen(true)}>
                             批量删除{selectedIds.length ? ` ${selectedIds.length}` : ""}
                         </Button>,
+                        <Button key="clear-all" danger icon={<DeleteOutlined />} onClick={() => setClearAllOpen(true)}>
+                            清空全部
+                        </Button>,
                     ]}
                     pagination={{
                         current: page,
@@ -310,6 +334,10 @@ export default function AdminCallLogsPage() {
 
             <Modal title="批量删除日志" open={batchDeleteOpen} onCancel={() => setBatchDeleteOpen(false)} onOk={() => void handleBatchDelete()} okText="删除" okButtonProps={{ danger: true }} cancelText="取消">
                 确定删除已选中的 {selectedIds.length} 条日志吗？
+            </Modal>
+
+            <Modal title="清空全部调用日志" open={clearAllOpen} onCancel={() => setClearAllOpen(false)} onOk={() => void handleClearAll()} okText="确认清空" confirmLoading={isClearing} okButtonProps={{ danger: true }} cancelText="取消">
+                此操作将永久删除数据库中的全部调用日志，不受当前筛选条件影响，删除后无法恢复。
             </Modal>
 
             <Drawer title={detailLog?.success ? "响应详情" : "错误详情"} open={Boolean(detailLog)} onClose={() => setDetailLog(null)} width={720} destroyOnHidden>

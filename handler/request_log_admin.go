@@ -42,3 +42,12 @@ func AdminBatchDeleteRequestLogs(w http.ResponseWriter, r *http.Request) {
 	}
 	OK(w, nil)
 }
+
+func AdminClearRequestLogs(w http.ResponseWriter, r *http.Request) {
+	deleted, err := service.ClearRequestLogs()
+	if err != nil {
+		FailError(w, err)
+		return
+	}
+	OK(w, map[string]int64{"deleted": deleted})
+}
