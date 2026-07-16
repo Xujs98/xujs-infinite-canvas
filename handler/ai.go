@@ -11,6 +11,7 @@ import (
 	"mime"
 	"mime/multipart"
 	"net/http"
+	"reflect"
 	"strconv"
 	"strings"
 	"time"
@@ -1064,20 +1065,20 @@ func applyRequestFields(body []byte, modelName string) []byte {
 		if !ok {
 			continue
 		}
+		mappedValue, ok := transformRequestFieldValue(val, rf)
+		if !ok {
+			continue
+		}
 		// 如果目标字段已存在且不是同一个，跳过
 		if rf.FieldName != rf.RequestKey {
 			if _, exists := bodyMap[rf.RequestKey]; !exists {
-				bodyMap[rf.RequestKey] = val
+				bodyMap[rf.RequestKey] = mappedValue
 			}
 			delete(bodyMap, rf.FieldName)
 			changed = true
-		}
-		// 类型转换
-		if rf.DataType != "" {
-			if converted, ok := convertFieldType(bodyMap[rf.RequestKey], rf.DataType); ok {
-				bodyMap[rf.RequestKey] = converted
-				changed = true
-			}
+		} else if !reflect.DeepEqual(bodyMap[rf.RequestKey], mappedValue) {
+			bodyMap[rf.RequestKey] = mappedValue
+			changed = true
 		}
 	}
 	if !changed {
@@ -1085,6 +1086,88 @@ func applyRequestFields(body []byte, modelName string) []byte {
 	}
 	out, _ := json.Marshal(bodyMap)
 	return out
+}
+
+func transformRequestFieldValue(value any, field model.RequestField) (any, bool) {
+	boundValue, ok := requestFieldValueAtPath(value, field.ValuePath)
+	if !ok {
+		return nil, false
+	}
+
+	if templateText := strings.TrimSpace(field.JSONTemplate); templateText != "" {
+		var template any
+		if err := json.Unmarshal([]byte(templateText), &template); err != nil {
+			return nil, false
+		}
+		return replaceRequestFieldTemplateData(template, boundValue), true
+	}
+
+	if field.DataType == "object" && strings.TrimSpace(field.ObjectKey) != "" {
+		return map[string]any{strings.TrimSpace(field.ObjectKey): boundValue}, true
+	}
+
+	if field.DataType != "" {
+		if converted, changed := convertFieldType(boundValue, field.DataType); changed {
+			return converted, true
+		}
+	}
+	return boundValue, true
+}
+
+func requestFieldValueAtPath(value any, path string) (any, bool) {
+	path = strings.TrimSpace(path)
+	if path == "" {
+		return value, true
+	}
+
+	current := value
+	for _, segment := range strings.Split(path, ".") {
+		segment = strings.TrimSpace(segment)
+		if segment == "" {
+			return nil, false
+		}
+		switch typed := current.(type) {
+		case map[string]any:
+			next, exists := typed[segment]
+			if !exists {
+				return nil, false
+			}
+			current = next
+		case []any:
+			index, err := strconv.Atoi(segment)
+			if err != nil || index < 0 || index >= len(typed) {
+				return nil, false
+			}
+			current = typed[index]
+		default:
+			return nil, false
+		}
+	}
+	return current, true
+}
+
+func replaceRequestFieldTemplateData(template any, boundValue any) any {
+	switch typed := template.(type) {
+	case string:
+		if typed == "@data" {
+			return boundValue
+		}
+		return typed
+	case []any:
+		result := make([]any, len(typed))
+		for index, item := range typed {
+			result[index] = replaceRequestFieldTemplateData(item, boundValue)
+		}
+		return result
+	case map[string]any:
+		result := make(map[string]any, len(typed))
+		for key, item := range typed {
+			result[key] = replaceRequestFieldTemplateData(item, boundValue)
+		}
+		return result
+	default:
+		return typed
+	}
 }
 
 func convertFieldType(val any, dataType string) (any, bool) {

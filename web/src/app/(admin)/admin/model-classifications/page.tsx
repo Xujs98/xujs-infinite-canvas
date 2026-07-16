@@ -1,6 +1,6 @@
 "use client";
 
-import { AudioOutlined, CameraOutlined, CheckCircleFilled, EditOutlined, FileTextOutlined, PlayCircleOutlined, SearchOutlined, SettingOutlined, SyncOutlined } from "@ant-design/icons";
+import { AudioOutlined, CameraOutlined, CheckCircleFilled, DeleteOutlined, EditOutlined, FileTextOutlined, PlayCircleOutlined, PlusOutlined, SearchOutlined, SettingOutlined, SyncOutlined } from "@ant-design/icons";
 import { App, Button, Card, Col, Empty, Form, Input, InputNumber, Modal, Row, Select, Spin, Switch, Tooltip, Typography } from "antd";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
@@ -176,7 +176,16 @@ export default function AdminModelClassificationsPage() {
             const classification: Partial<AdminModelClassification> = {
                 modelName: values.modelName,
                 capability,
-                requestFields: (values.requestFields || []).filter((f: any) => f?.fieldName && f?.requestKey && f?.dataType),
+                requestFields: (values.requestFields || [])
+                    .filter((f: any) => f?.fieldName && f?.requestKey && f?.dataType)
+                    .map((field: any) => ({
+                        fieldName: String(field.fieldName).trim(),
+                        requestKey: String(field.requestKey).trim(),
+                        dataType: field.dataType,
+                        ...(String(field.valuePath || "").trim() ? { valuePath: String(field.valuePath).trim() } : {}),
+                        ...(String(field.objectKey || "").trim() ? { objectKey: String(field.objectKey).trim() } : {}),
+                        ...(String(field.jsonTemplate || "").trim() ? { jsonTemplate: String(field.jsonTemplate).trim() } : {}),
+                    })),
             };
 
             if (capability === "video") {
@@ -680,44 +689,110 @@ export default function AdminModelClassificationsPage() {
                             {(fields, { add, remove }) => (
                                 <>
                                     {fields.map(({ key, name, ...restField }) => (
-                                        <Row key={key} gutter={8} align="middle" style={{ marginBottom: 8 }}>
-                                            <Col span={6}>
-                                                <Form.Item {...restField} name={[name, "fieldName"]} noStyle rules={[{ required: true, message: "字段名" }]}>
-                                                    <Input placeholder="前端字段名 (如 reference_images)" size="small" />
-                                                </Form.Item>
-                                            </Col>
-                                            <Col span={1}>
-                                                <span style={{ color: "#999", fontSize: 12 }}>→</span>
-                                            </Col>
-                                            <Col span={6}>
-                                                <Form.Item {...restField} name={[name, "requestKey"]} noStyle rules={[{ required: true, message: "映射字段" }]}>
-                                                    <Input placeholder="请求字段名 (如 images)" size="small" />
-                                                </Form.Item>
-                                            </Col>
-                                            <Col span={8}>
-                                                <Form.Item {...restField} name={[name, "dataType"]} noStyle rules={[{ required: true, message: "选择类型" }]}>
-                                                    <Select
-                                                        size="small"
-                                                        placeholder="数据类型"
-                                                        dropdownMatchSelectWidth={false}
-                                                        style={{ minWidth: 100 }}
-                                                        options={[
-                                                            { label: "string", value: "string" },
-                                                            { label: "integer", value: "integer" },
-                                                            { label: "boolean", value: "boolean" },
-                                                            { label: "number", value: "number" },
-                                                            { label: "array", value: "array" },
-                                                            { label: "object", value: "object" },
-                                                        ]}
-                                                    />
-                                                </Form.Item>
-                                            </Col>
-                                            <Col span={3}>
-                                                <Button type="link" danger size="small" icon={<span>✕</span>} onClick={() => remove(name)} />
-                                            </Col>
-                                        </Row>
+                                        <div key={key} style={{ marginBottom: 12, padding: 12, border: "1px solid #e5e7eb", borderRadius: 6, background: "#fafafa" }}>
+                                            <Row gutter={8} align="middle">
+                                                <Col span={7}>
+                                                    <Form.Item {...restField} name={[name, "fieldName"]} noStyle rules={[{ required: true, message: "字段名" }]}>
+                                                        <Input placeholder="源字段，如 images" size="small" />
+                                                    </Form.Item>
+                                                </Col>
+                                                <Col span={1} style={{ textAlign: "center" }}>
+                                                    <span style={{ color: "#999", fontSize: 12 }}>→</span>
+                                                </Col>
+                                                <Col span={7}>
+                                                    <Form.Item {...restField} name={[name, "requestKey"]} noStyle rules={[{ required: true, message: "映射字段" }]}>
+                                                        <Input placeholder="目标字段，如 image" size="small" />
+                                                    </Form.Item>
+                                                </Col>
+                                                <Col span={7}>
+                                                    <Form.Item {...restField} name={[name, "dataType"]} noStyle rules={[{ required: true, message: "选择类型" }]}>
+                                                        <Select
+                                                            size="small"
+                                                            placeholder="目标数据类型"
+                                                            options={[
+                                                                { label: "string", value: "string" },
+                                                                { label: "integer", value: "integer" },
+                                                                { label: "boolean", value: "boolean" },
+                                                                { label: "number", value: "number" },
+                                                                { label: "array", value: "array" },
+                                                                { label: "object", value: "object" },
+                                                            ]}
+                                                        />
+                                                    </Form.Item>
+                                                </Col>
+                                                <Col span={2} style={{ textAlign: "right" }}>
+                                                    <Tooltip title="删除字段映射">
+                                                        <Button type="text" danger size="small" icon={<DeleteOutlined />} onClick={() => remove(name)} aria-label="删除字段映射" />
+                                                    </Tooltip>
+                                                </Col>
+                                            </Row>
+                                            <Form.Item noStyle shouldUpdate={(previous, current) => previous.requestFields?.[name]?.dataType !== current.requestFields?.[name]?.dataType}>
+                                                {() => {
+                                                    const dataType = form.getFieldValue(["requestFields", name, "dataType"]);
+                                                    return (
+                                                        <Row gutter={12} style={{ marginTop: 12 }}>
+                                                            <Col span={dataType === "object" ? 12 : 24}>
+                                                                <Form.Item
+                                                                    {...restField}
+                                                                    name={[name, "valuePath"]}
+                                                                    label="源数据路径（可选）"
+                                                                    tooltip="点路径支持对象字段和数组下标，例如 0 或 items.0.dataUrl；留空使用完整源值"
+                                                                    style={{ marginBottom: dataType === "object" || dataType === "array" ? 10 : 0 }}
+                                                                >
+                                                                    <Input placeholder="例如 0" size="small" />
+                                                                </Form.Item>
+                                                            </Col>
+                                                            {dataType === "object" ? (
+                                                                <Col span={12}>
+                                                                    <Form.Item
+                                                                        {...restField}
+                                                                        name={[name, "objectKey"]}
+                                                                        label="对象值字段（简易模式）"
+                                                                        tooltip="把绑定数据放入这个对象字段，例如填写 url 会生成 { url: @data }"
+                                                                        style={{ marginBottom: 10 }}
+                                                                    >
+                                                                        <Input placeholder="例如 url" size="small" />
+                                                                    </Form.Item>
+                                                                </Col>
+                                                            ) : null}
+                                                            {dataType === "object" || dataType === "array" ? (
+                                                                <Col span={24}>
+                                                                    <Form.Item
+                                                                        {...restField}
+                                                                        name={[name, "jsonTemplate"]}
+                                                                        label="自定义 JSON 值模板（可选）"
+                                                                        tooltip='模板必须是合法 JSON；值为精确字符串 "@data" 时会替换为绑定数据，自定义模板优先于简易模式'
+                                                                        style={{ marginBottom: 0 }}
+                                                                        rules={[
+                                                                            {
+                                                                                validator: async (_, value) => {
+                                                                                    if (!String(value || "").trim()) return;
+                                                                                    try {
+                                                                                        const parsed = JSON.parse(value);
+                                                                                        if (dataType === "object" && (typeof parsed !== "object" || parsed === null || Array.isArray(parsed))) {
+                                                                                            throw new Error("模板根节点必须是 object");
+                                                                                        }
+                                                                                        if (dataType === "array" && !Array.isArray(parsed)) {
+                                                                                            throw new Error("模板根节点必须是 array");
+                                                                                        }
+                                                                                    } catch (error) {
+                                                                                        throw new Error(error instanceof Error ? error.message : "请输入合法 JSON");
+                                                                                    }
+                                                                                },
+                                                                            },
+                                                                        ]}
+                                                                    >
+                                                                        <Input.TextArea autoSize={{ minRows: 2, maxRows: 6 }} placeholder={'例如：{"url":"@data"}'} style={{ fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace" }} />
+                                                                    </Form.Item>
+                                                                </Col>
+                                                            ) : null}
+                                                        </Row>
+                                                    );
+                                                }}
+                                            </Form.Item>
+                                        </div>
                                     ))}
-                                    <Button type="dashed" onClick={() => add()} block size="small" icon={<span>+</span>}>
+                                    <Button type="dashed" onClick={() => add({ dataType: "string" })} block size="small" icon={<PlusOutlined />}>
                                         新增字段映射
                                     </Button>
                                 </>

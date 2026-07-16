@@ -652,6 +652,9 @@ export type RequestFieldConfig = {
     fieldName: string;
     requestKey: string;
     dataType: "string" | "integer" | "boolean" | "number" | "array" | "object";
+    valuePath?: string;
+    objectKey?: string;
+    jsonTemplate?: string;
 };
 
 export type AdminModelClassification = {

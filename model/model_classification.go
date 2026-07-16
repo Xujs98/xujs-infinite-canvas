@@ -10,9 +10,12 @@ import (
 // RequestField 定义模型级别的自定义请求字段。
 // 字段名映射到发送给 AI API 的请求体字段；留空则不映射。
 type RequestField struct {
-	FieldName  string `json:"fieldName"`  // 前端统一字段名，如 reference_images
-	RequestKey string `json:"requestKey"` // 映射到请求体的字段名，如 images
-	DataType   string `json:"dataType"`   // 数据类型: string, integer, boolean, number, array, object
+	FieldName    string `json:"fieldName"`              // 前端统一字段名，如 reference_images
+	RequestKey   string `json:"requestKey"`             // 映射到请求体的字段名，如 images
+	DataType     string `json:"dataType"`               // 数据类型: string, integer, boolean, number, array, object
+	ValuePath    string `json:"valuePath,omitempty"`    // 从源值读取的点路径，如 0、data.url
+	ObjectKey    string `json:"objectKey,omitempty"`    // object 简易模式的值字段，如 url
+	JSONTemplate string `json:"jsonTemplate,omitempty"` // 自定义 JSON 值模板，精确字符串 @data 会替换为绑定值
 }
 
 // RequestFields 是 []RequestField 的自定义类型，实现 GORM Value/Scan 以正确序列化为 JSON text。
