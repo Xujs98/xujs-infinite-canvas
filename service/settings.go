@@ -28,6 +28,56 @@ func AdminSettings() (model.Settings, error) {
 	return hidePrivateAPIKeys(normalizeSettings(settings)), err
 }
 
+func AdminChannelModelSources() ([]model.ChannelModelSource, error) {
+	settings, err := AdminSettings()
+	if err != nil {
+		return nil, err
+	}
+	return buildAdminChannelModelSources(settings.Private.Channels), nil
+}
+
+func buildAdminChannelModelSources(channels []model.ModelChannel) []model.ChannelModelSource {
+	result := make([]model.ChannelModelSource, 0)
+	modelIndexes := make(map[string]int)
+	for channelIndex, channel := range channels {
+		if !channel.Enabled {
+			continue
+		}
+		channelName := strings.TrimSpace(channel.Name)
+		if channelName == "" {
+			channelName = strings.TrimSpace(channel.Remark)
+		}
+		if channelName == "" {
+			channelName = fmt.Sprintf("渠道 %d", channelIndex+1)
+		}
+		for _, rawModelName := range channel.Models {
+			modelName := strings.TrimSpace(rawModelName)
+			if modelName == "" {
+				continue
+			}
+			index, exists := modelIndexes[modelName]
+			if !exists {
+				modelIndexes[modelName] = len(result)
+				result = append(result, model.ChannelModelSource{ModelName: modelName, Channels: []string{channelName}})
+				continue
+			}
+			if !containsString(result[index].Channels, channelName) {
+				result[index].Channels = append(result[index].Channels, channelName)
+			}
+		}
+	}
+	return result
+}
+
+func containsString(values []string, target string) bool {
+	for _, value := range values {
+		if value == target {
+			return true
+		}
+	}
+	return false
+}
+
 func SaveSettings(settings model.Settings) (model.Settings, error) {
 	saved, err := repository.GetSettings()
 	if err != nil {

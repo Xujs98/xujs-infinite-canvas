@@ -711,6 +711,15 @@ export async function fetchAllChannelModels(token: string) {
     return apiGet<string[]>("/api/admin/settings/channel-models", {}, token);
 }
 
+export type AdminChannelModelSource = {
+    modelName: string;
+    channels: string[];
+};
+
+export async function fetchChannelModelSources(token: string) {
+    return apiGet<AdminChannelModelSource[]>("/api/admin/settings/channel-model-sources", {}, token);
+}
+
 export async function fetchAllModelClassifications() {
     return apiGet<AdminModelClassification[]>("/api/model-classifications/all");
 }

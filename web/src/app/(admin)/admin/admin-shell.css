@@ -2146,6 +2146,47 @@
     margin-top: 15px;
 }
 
+.admin-model-channel-list {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    min-width: 0;
+    margin-top: 10px;
+}
+
+.admin-model-channel-label {
+    flex: 0 0 auto;
+    color: #8b95a3;
+    font-size: 10px;
+    font-weight: 600;
+}
+
+.admin-model-channel-tags {
+    display: flex;
+    min-width: 0;
+    gap: 5px;
+}
+
+.admin-model-channel-tags > span {
+    min-width: 0;
+    max-width: 112px;
+    overflow: hidden;
+    padding: 3px 6px;
+    border: 1px solid #dcebe7;
+    border-radius: 4px;
+    color: #0f766e;
+    background: #f0fdfa;
+    font-size: 10px;
+    line-height: 14px;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+}
+
+.admin-model-channel-empty {
+    color: #a1a9b3;
+    font-size: 10px;
+}
+
 .admin-model-capability,
 .admin-model-configured,
 .admin-model-pending {

@@ -128,6 +128,7 @@ func New() *gin.Engine {
 	admin.GET("/settings", gin.WrapF(handler.AdminSettings))
 	admin.POST("/settings", gin.WrapF(handler.AdminSaveSettings))
 	admin.GET("/settings/channel-models", gin.WrapF(handler.AdminAllChannelModels))
+	admin.GET("/settings/channel-model-sources", gin.WrapF(handler.AdminChannelModelSources))
 	admin.POST("/settings/channel-models", gin.WrapF(handler.AdminChannelModels))
 	admin.POST("/settings/channel-test", gin.WrapF(handler.AdminTestChannelModel))
 	admin.GET("/settings/channel-request-logs", gin.WrapF(handler.HandleGetChannelRequestLogs))

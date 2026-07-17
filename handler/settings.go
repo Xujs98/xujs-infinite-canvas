@@ -97,6 +97,15 @@ func AdminAllChannelModels(w http.ResponseWriter, r *http.Request) {
 	OK(w, unique)
 }
 
+func AdminChannelModelSources(w http.ResponseWriter, r *http.Request) {
+	sources, err := service.AdminChannelModelSources()
+	if err != nil {
+		FailError(w, err)
+		return
+	}
+	OK(w, sources)
+}
+
 func AdminTestChannelModel(w http.ResponseWriter, r *http.Request) {
 	var request adminChannelActionRequest
 	_ = json.NewDecoder(r.Body).Decode(&request)

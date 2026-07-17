@@ -44,6 +44,12 @@ type ModelChannel struct {
 	SupportsWebSearch bool `json:"supportsWebSearch,omitempty"`
 }
 
+// ChannelModelSource identifies the enabled channels that expose one model.
+type ChannelModelSource struct {
+	ModelName string   `json:"modelName"`
+	Channels  []string `json:"channels"`
+}
+
 // ChannelVideoConfig 渠道视频接口配置，用于适配不同 API 的视频生成接口。
 // 覆盖 App 端视频生成所需的全部配置。
 type ChannelVideoConfig struct {

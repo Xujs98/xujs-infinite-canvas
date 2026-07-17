@@ -5,7 +5,7 @@ import { App, Button, Card, Col, Empty, Form, Input, InputNumber, Modal, Row, Se
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { useUserStore } from "@/stores/use-user-store";
-import { type AdminModelClassification, createAdminModelClassification, fetchAdminModelClassifications, fetchAllChannelModels, updateAdminModelClassification } from "@/services/api/admin";
+import { type AdminChannelModelSource, type AdminModelClassification, createAdminModelClassification, fetchAdminModelClassifications, fetchChannelModelSources, updateAdminModelClassification } from "@/services/api/admin";
 
 const capabilityConfig = {
     text: { label: "文本", icon: <FileTextOutlined />, color: "#2563eb", tone: "blue" },
@@ -60,7 +60,7 @@ export default function AdminModelClassificationsPage() {
     const { message } = App.useApp();
     const token = useUserStore((s) => s.token);
     const [items, setItems] = useState<AdminModelClassification[]>([]);
-    const [channelModels, setChannelModels] = useState<string[]>([]);
+    const [channelModels, setChannelModels] = useState<AdminChannelModelSource[]>([]);
     const [keyword, setKeyword] = useState("");
     const [loading, setLoading] = useState(false);
     const [modalOpen, setModalOpen] = useState(false);
@@ -83,8 +83,7 @@ export default function AdminModelClassificationsPage() {
 
     const fetchChannelModels = useCallback(async () => {
         try {
-            const models = await fetchAllChannelModels(token);
-            setChannelModels(models);
+            setChannelModels(await fetchChannelModelSources(token));
         } catch {
             // ignore
         }
@@ -101,18 +100,18 @@ export default function AdminModelClassificationsPage() {
         for (const item of items) {
             configuredMap.set(item.modelName, item);
         }
-        const result: { modelName: string; configured: AdminModelClassification | null; inChannel: boolean }[] = [];
+        const result: { modelName: string; configured: AdminModelClassification | null; channels: string[] }[] = [];
         const seen = new Set<string>();
         // 先加渠道模型
-        for (const m of channelModels) {
-            seen.add(m);
-            result.push({ modelName: m, configured: configuredMap.get(m) || null, inChannel: true });
+        for (const source of channelModels) {
+            seen.add(source.modelName);
+            result.push({ modelName: source.modelName, configured: configuredMap.get(source.modelName) || null, channels: source.channels });
         }
         // 再加已配置但不在渠道中的模型
         for (const item of items) {
             if (!seen.has(item.modelName)) {
                 seen.add(item.modelName);
-                result.push({ modelName: item.modelName, configured: item, inChannel: false });
+                result.push({ modelName: item.modelName, configured: item, channels: [] });
             }
         }
         return result;
@@ -128,7 +127,7 @@ export default function AdminModelClassificationsPage() {
         }
         if (keyword) {
             const kw = keyword.toLowerCase();
-            list = list.filter((m) => m.modelName.toLowerCase().includes(kw));
+            list = list.filter((m) => m.modelName.toLowerCase().includes(kw) || m.channels.some((channel) => channel.toLowerCase().includes(kw)));
         }
         return list;
     }, [allModels, activeTab, keyword]);
@@ -483,7 +482,7 @@ export default function AdminModelClassificationsPage() {
                                             <Tooltip title={m.modelName}>
                                                 <strong>{m.modelName}</strong>
                                             </Tooltip>
-                                            <span>{m.inChannel ? "渠道模型" : "历史配置"}</span>
+                                            <span>{m.channels.length ? `${m.channels.length} 个渠道` : "历史配置"}</span>
                                         </div>
                                         <span className="admin-model-edit" aria-hidden="true">
                                             <EditOutlined />
@@ -497,6 +496,25 @@ export default function AdminModelClassificationsPage() {
                                             </span>
                                         ) : (
                                             <span className="admin-model-pending">待配置</span>
+                                        )}
+                                    </div>
+                                    <div className={`admin-model-channel-list ${m.channels.length ? "" : "is-empty"}`}>
+                                        <span className="admin-model-channel-label">渠道</span>
+                                        {m.channels.length ? (
+                                            <div className="admin-model-channel-tags">
+                                                {m.channels.slice(0, 2).map((channel) => (
+                                                    <Tooltip key={channel} title={channel}>
+                                                        <span>{channel}</span>
+                                                    </Tooltip>
+                                                ))}
+                                                {m.channels.length > 2 ? (
+                                                    <Tooltip title={m.channels.slice(2).join("、")}>
+                                                        <span>+{m.channels.length - 2}</span>
+                                                    </Tooltip>
+                                                ) : null}
+                                            </div>
+                                        ) : (
+                                            <span className="admin-model-channel-empty">未关联渠道</span>
                                         )}
                                     </div>
                                     <div className="admin-model-card-body">
