@@ -74,13 +74,23 @@ type ModelClassification struct {
 
 // VideoModelConfig 视频模型参数配置
 type VideoModelConfig struct {
-	Resolutions          []string `json:"resolutions"`
-	Ratios               []string `json:"ratios"`
-	Durations            []string `json:"durations"` // 支持 "adaptive" 和数字字符串如 "15"
-	MaxDuration          int      `json:"maxDuration"`
-	BillingMode          string   `json:"billingMode,omitempty"` // per_second | per_call
-	SupportGenerateAudio bool     `json:"supportGenerateAudio"`
-	SupportWatermark     bool     `json:"supportWatermark"`
+	Resolutions          []string              `json:"resolutions"`
+	Ratios               []string              `json:"ratios"`
+	Durations            []string              `json:"durations"` // 支持 "adaptive" 和数字字符串如 "15"
+	MaxDuration          int                   `json:"maxDuration"`
+	BillingMode          string                `json:"billingMode,omitempty"` // per_second | per_call
+	SupportGenerateAudio bool                  `json:"supportGenerateAudio"`
+	SupportWatermark     bool                  `json:"supportWatermark"`
+	ImageInput           *VideoModelInputLimit `json:"imageInput,omitempty"`
+	VideoInput           *VideoModelInputLimit `json:"videoInput,omitempty"`
+	AudioInput           *VideoModelInputLimit `json:"audioInput,omitempty"`
+}
+
+// VideoModelInputLimit overrides only material counts for one model.
+// A nil pointer inherits channel settings; Max=0 explicitly disables the input.
+type VideoModelInputLimit struct {
+	Min int `json:"min"`
+	Max int `json:"max"`
 }
 
 // UnmarshalJSON 兼容数据库中旧的数字格式 durations: [15] 和新的字符串格式 durations: ["15"]

@@ -34,12 +34,44 @@ func validateRequestFields(fields model.RequestFields) error {
 	return nil
 }
 
+func validateVideoModelInputLimit(label string, limit *model.VideoModelInputLimit, maxAllowed int) error {
+	if limit == nil {
+		return nil
+	}
+	if limit.Min < 0 || limit.Max < 0 {
+		return fmt.Errorf("%s素材数量不能小于 0", label)
+	}
+	if limit.Max > maxAllowed {
+		return fmt.Errorf("%s素材最大数量不能超过 %d", label, maxAllowed)
+	}
+	if limit.Min > limit.Max {
+		return fmt.Errorf("%s素材最小数量不能大于最大数量", label)
+	}
+	return nil
+}
+
+func validateVideoModelConfig(config *model.VideoModelConfig) error {
+	if config == nil {
+		return nil
+	}
+	if err := validateVideoModelInputLimit("图片", config.ImageInput, 20); err != nil {
+		return err
+	}
+	if err := validateVideoModelInputLimit("视频", config.VideoInput, 9); err != nil {
+		return err
+	}
+	return validateVideoModelInputLimit("音频", config.AudioInput, 9)
+}
+
 func ListModelClassifications(keyword string, page, pageSize int) (model.ModelClassificationList, error) {
 	return repository.ListModelClassifications(keyword, page, pageSize)
 }
 
 func CreateModelClassification(classification model.ModelClassification) (model.ModelClassification, error) {
 	if err := validateRequestFields(classification.RequestFields); err != nil {
+		return model.ModelClassification{}, err
+	}
+	if err := validateVideoModelConfig(classification.VideoConfig); err != nil {
 		return model.ModelClassification{}, err
 	}
 	now := time.Now().Format(time.RFC3339)
@@ -51,6 +83,9 @@ func CreateModelClassification(classification model.ModelClassification) (model.
 
 func UpdateModelClassification(id string, classification model.ModelClassification) (model.ModelClassification, error) {
 	if err := validateRequestFields(classification.RequestFields); err != nil {
+		return model.ModelClassification{}, err
+	}
+	if err := validateVideoModelConfig(classification.VideoConfig); err != nil {
 		return model.ModelClassification{}, err
 	}
 	db, dbErr := repository.DB()

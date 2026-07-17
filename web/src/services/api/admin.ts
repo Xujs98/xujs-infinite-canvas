@@ -626,6 +626,14 @@ export type VideoModelConfig = {
     billingMode?: "per_second" | "per_call";
     supportGenerateAudio: boolean;
     supportWatermark: boolean;
+    imageInput?: VideoModelInputLimit | null;
+    videoInput?: VideoModelInputLimit | null;
+    audioInput?: VideoModelInputLimit | null;
+};
+
+export type VideoModelInputLimit = {
+    min: number;
+    max: number;
 };
 
 export type ImageModelConfig = {

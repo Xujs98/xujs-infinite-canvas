@@ -20,6 +20,22 @@ const allDurationOptions = [5, 6, 8, 10, 12, 15, 20, "adaptive"];
 const allQualityOptions = ["auto", "high", "medium", "low"];
 const allAspectRatioOptions = ["1:1", "3:2", "2:3", "4:3", "3:4", "16:9", "9:16"];
 
+function buildVideoInputLimit(enabled: unknown, rawMin: unknown, rawMax: unknown, label: string, maxAllowed: number) {
+    if (enabled !== true) return null;
+    const min = Number(rawMin ?? 0);
+    const max = Number(rawMax ?? 0);
+    if (!Number.isInteger(min) || !Number.isInteger(max) || min < 0 || max < 0) {
+        throw new Error(`${label}素材数量必须是非负整数`);
+    }
+    if (max > maxAllowed) {
+        throw new Error(`${label}素材最大数量不能超过 ${maxAllowed}`);
+    }
+    if (min > max) {
+        throw new Error(`${label}素材最小数量不能大于最大数量`);
+    }
+    return { min, max };
+}
+
 function guessCapability(model: string): string {
     const v = model.toLowerCase();
     if (v.includes("seedance") || v.includes("video") || v.includes("sora") || v.includes("veo") || v.includes("kling") || v.includes("wan") || v.includes("hailuo") || v.includes("quanneng")) return "video";
@@ -130,6 +146,15 @@ export default function AdminModelClassificationsPage() {
                       videoBillingMode: item.videoConfig?.billingMode || "per_second",
                       videoSupportGenerateAudio: item.videoConfig?.supportGenerateAudio,
                       videoSupportWatermark: item.videoConfig?.supportWatermark,
+                      videoImageInputOverride: item.videoConfig?.imageInput != null,
+                      videoImageInputMin: item.videoConfig?.imageInput?.min ?? 0,
+                      videoImageInputMax: item.videoConfig?.imageInput?.max ?? 1,
+                      videoVideoInputOverride: item.videoConfig?.videoInput != null,
+                      videoVideoInputMin: item.videoConfig?.videoInput?.min ?? 0,
+                      videoVideoInputMax: item.videoConfig?.videoInput?.max ?? 0,
+                      videoAudioInputOverride: item.videoConfig?.audioInput != null,
+                      videoAudioInputMin: item.videoConfig?.audioInput?.min ?? 0,
+                      videoAudioInputMax: item.videoConfig?.audioInput?.max ?? 0,
                       imageQualities: item.imageConfig?.qualities || [],
                       imageAspectRatios: item.imageConfig?.aspectRatios || [],
                       imageMaxCount: item.imageConfig?.maxCount,
@@ -165,7 +190,27 @@ export default function AdminModelClassificationsPage() {
             const capability = form.getFieldValue("capability");
             // 只验证当前类型的字段
             const fieldsByType: Record<string, string[]> = {
-                video: ["modelName", "capability", "videoResolutions", "videoRatios", "videoDurations", "videoMaxDuration", "videoBillingMode", "requestFields"],
+                video: [
+                    "modelName",
+                    "capability",
+                    "videoResolutions",
+                    "videoRatios",
+                    "videoDurations",
+                    "videoMaxDuration",
+                    "videoBillingMode",
+                    "videoSupportGenerateAudio",
+                    "videoSupportWatermark",
+                    "videoImageInputOverride",
+                    "videoImageInputMin",
+                    "videoImageInputMax",
+                    "videoVideoInputOverride",
+                    "videoVideoInputMin",
+                    "videoVideoInputMax",
+                    "videoAudioInputOverride",
+                    "videoAudioInputMin",
+                    "videoAudioInputMax",
+                    "requestFields",
+                ],
                 image: ["modelName", "capability", "imageQualities", "imageAspectRatios", "imageMaxCount", "requestFields"],
                 audio: ["modelName", "capability", "audioVoices", "audioFormats", "requestFields"],
                 text: ["modelName", "capability", "requestFields"],
@@ -206,6 +251,9 @@ export default function AdminModelClassificationsPage() {
                     billingMode: values.videoBillingMode === "per_call" ? "per_call" : "per_second",
                     supportGenerateAudio: values.videoSupportGenerateAudio ?? true,
                     supportWatermark: values.videoSupportWatermark ?? false,
+                    imageInput: buildVideoInputLimit(values.videoImageInputOverride, values.videoImageInputMin, values.videoImageInputMax, "图片", 20),
+                    videoInput: buildVideoInputLimit(values.videoVideoInputOverride, values.videoVideoInputMin, values.videoVideoInputMax, "视频", 9),
+                    audioInput: buildVideoInputLimit(values.videoAudioInputOverride, values.videoAudioInputMin, values.videoAudioInputMax, "音频", 9),
                 };
             } else if (capability === "image") {
                 const toArr = (v: unknown): string[] =>
@@ -256,12 +304,16 @@ export default function AdminModelClassificationsPage() {
             }
             setModalOpen(false);
             fetchItems();
-        } catch {
+        } catch (error) {
+            if (error instanceof Error) message.error(error.message);
             // validation error or api error
         }
     };
 
     const capability = Form.useWatch("capability", form);
+    const videoImageInputOverride = Form.useWatch("videoImageInputOverride", form);
+    const videoVideoInputOverride = Form.useWatch("videoVideoInputOverride", form);
+    const videoAudioInputOverride = Form.useWatch("videoAudioInputOverride", form);
 
     // 切换模型类型时清空不相关的字段
     useEffect(() => {
@@ -564,6 +616,77 @@ export default function AdminModelClassificationsPage() {
                                     </Form.Item>
                                 </Col>
                             </Row>
+                            <div style={{ marginTop: 4, paddingTop: 16, borderTop: "1px solid #e5e7eb" }}>
+                                <div style={{ marginBottom: 12 }}>
+                                    <Typography.Text strong>素材输入限制</Typography.Text>
+                                    <Typography.Text type="secondary" style={{ display: "block", marginTop: 2, fontSize: 12 }}>
+                                        开启后覆盖当前模型的渠道限制；关闭时继承渠道设置。最大数量为 0 表示不支持该素材。
+                                    </Typography.Text>
+                                </div>
+
+                                <Row gutter={[12, 12]} align="middle" style={{ marginBottom: 10 }}>
+                                    <Col xs={12} sm={5}>
+                                        <Typography.Text strong>图片素材</Typography.Text>
+                                    </Col>
+                                    <Col xs={12} sm={7}>
+                                        <Form.Item name="videoImageInputOverride" valuePropName="checked" initialValue={false} style={{ marginBottom: 0 }}>
+                                            <Switch checkedChildren="覆盖" unCheckedChildren="继承" />
+                                        </Form.Item>
+                                    </Col>
+                                    <Col xs={12} sm={6}>
+                                        <Form.Item name="videoImageInputMin" label="最小数量" initialValue={0} style={{ marginBottom: 0 }}>
+                                            <InputNumber min={0} max={20} precision={0} disabled={!videoImageInputOverride} style={{ width: "100%" }} />
+                                        </Form.Item>
+                                    </Col>
+                                    <Col xs={12} sm={6}>
+                                        <Form.Item name="videoImageInputMax" label="最大数量" initialValue={1} style={{ marginBottom: 0 }}>
+                                            <InputNumber min={0} max={20} precision={0} disabled={!videoImageInputOverride} style={{ width: "100%" }} />
+                                        </Form.Item>
+                                    </Col>
+                                </Row>
+
+                                <Row gutter={[12, 12]} align="middle" style={{ marginBottom: 10 }}>
+                                    <Col xs={12} sm={5}>
+                                        <Typography.Text strong>视频素材</Typography.Text>
+                                    </Col>
+                                    <Col xs={12} sm={7}>
+                                        <Form.Item name="videoVideoInputOverride" valuePropName="checked" initialValue={false} style={{ marginBottom: 0 }}>
+                                            <Switch checkedChildren="覆盖" unCheckedChildren="继承" />
+                                        </Form.Item>
+                                    </Col>
+                                    <Col xs={12} sm={6}>
+                                        <Form.Item name="videoVideoInputMin" label="最小数量" initialValue={0} style={{ marginBottom: 0 }}>
+                                            <InputNumber min={0} max={9} precision={0} disabled={!videoVideoInputOverride} style={{ width: "100%" }} />
+                                        </Form.Item>
+                                    </Col>
+                                    <Col xs={12} sm={6}>
+                                        <Form.Item name="videoVideoInputMax" label="最大数量" initialValue={0} style={{ marginBottom: 0 }}>
+                                            <InputNumber min={0} max={9} precision={0} disabled={!videoVideoInputOverride} style={{ width: "100%" }} />
+                                        </Form.Item>
+                                    </Col>
+                                </Row>
+
+                                <Row gutter={[12, 12]} align="middle">
+                                    <Col xs={12} sm={5}>
+                                        <Typography.Text strong>音频素材</Typography.Text>
+                                    </Col>
+                                    <Col xs={12} sm={7}>
+                                        <Form.Item name="videoAudioInputOverride" valuePropName="checked" initialValue={false} style={{ marginBottom: 0 }}>
+                                            <Switch checkedChildren="覆盖" unCheckedChildren="继承" />
+                                        </Form.Item>
+                                    </Col>
+                                    <Col xs={12} sm={6}>
+                                        <Form.Item name="videoAudioInputMin" label="最小数量" initialValue={0} style={{ marginBottom: 0 }}>
+                                            <InputNumber min={0} max={9} precision={0} disabled={!videoAudioInputOverride} style={{ width: "100%" }} />
+                                        </Form.Item>
+                                    </Col>
+                                    <Col xs={12} sm={6}>
+                                        <Form.Item name="videoAudioInputMax" label="最大数量" initialValue={0} style={{ marginBottom: 0 }}>
+                                            <InputNumber min={0} max={9} precision={0} disabled={!videoAudioInputOverride} style={{ width: "100%" }} />
+                                        </Form.Item>
+                                    </Col>
+                                </Row>
+                            </div>
                         </Card>
                     )}
 
