@@ -1,5 +1,5 @@
-# 构建 Next.js 前端产物。
-FROM oven/bun:1.3.13 AS web-build
+# Next.js standalone 产物与目标 CPU 架构无关，只需在构建机架构上生成一次。
+FROM --platform=$BUILDPLATFORM oven/bun:1.3.13 AS web-build
 
 WORKDIR /app/web
 COPY web/package.json web/bun.lock ./
@@ -9,8 +9,11 @@ COPY CHANGELOG.md /app/CHANGELOG.md
 COPY web ./
 RUN bun run build
 
-# 构建 Go 后端入口。
-FROM golang:1.25-alpine AS api-build
+# 使用 Go 原生交叉编译生成目标架构后端，避免通过 QEMU 模拟 ARM 编译。
+FROM --platform=$BUILDPLATFORM golang:1.25-alpine AS api-build
+
+ARG TARGETOS
+ARG TARGETARCH
 
 WORKDIR /app
 COPY go.mod go.sum ./
@@ -24,7 +27,9 @@ COPY seedance ./seedance
 COPY service ./service
 COPY ws ./ws
 COPY main.go ./
-RUN go build -o /server .
+RUN --mount=type=cache,target=/go/pkg/mod \
+    --mount=type=cache,target=/root/.cache/go-build \
+    CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH go build -o /server .
 
 # 运行镜像：Next.js 对外监听 3000，Go 只在容器内部监听 8080。
 FROM node:22-bookworm-slim
