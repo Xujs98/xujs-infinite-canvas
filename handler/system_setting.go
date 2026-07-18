@@ -21,23 +21,24 @@ func AdminGetSystemSettings(w http.ResponseWriter, r *http.Request) {
 
 // PublicSystemSettings 公开的系统设置（不需要鉴权）。
 type PublicSystemSettings struct {
-	SiteName                  string `json:"siteName"`
-	SiteSubtitle              string `json:"siteSubtitle"`
-	SiteLogo                  string `json:"siteLogo"`
-	ServiceContact            string `json:"serviceContact"`
-	InviteRewardCredits       int    `json:"inviteRewardCredits"`
-	AllowCustomChannel        bool   `json:"allowCustomChannel"`
-	CheckInEnabled            bool   `json:"checkInEnabled"`
-	CheckInRewardMin          int    `json:"checkInRewardMin"`
-	CheckInRewardMax          int    `json:"checkInRewardMax"`
-	VideoMaxTimeoutSeconds    int    `json:"videoMaxTimeoutSeconds"`
-	AgentEnabled              bool   `json:"agentEnabled"`
-	AgentVisible              bool   `json:"agentVisible"`
-	AgentAccessLevel          string `json:"agentAccessLevel"`
-	AssistantEnabled          bool   `json:"assistantEnabled"`
-	AppErrorMessagePrefix     string `json:"appErrorMessagePrefix"`
-	AppErrorShowDetails       bool   `json:"appErrorShowDetails"`
-	EmailVerificationRequired bool   `json:"emailVerificationRequired"`
+	SiteName                  string            `json:"siteName"`
+	SiteSubtitle              string            `json:"siteSubtitle"`
+	SiteLogo                  string            `json:"siteLogo"`
+	ServiceContact            string            `json:"serviceContact"`
+	InviteRewardCredits       int               `json:"inviteRewardCredits"`
+	AllowCustomChannel        bool              `json:"allowCustomChannel"`
+	CheckInEnabled            bool              `json:"checkInEnabled"`
+	CheckInRewardMin          int               `json:"checkInRewardMin"`
+	CheckInRewardMax          int               `json:"checkInRewardMax"`
+	VideoMaxTimeoutSeconds    int               `json:"videoMaxTimeoutSeconds"`
+	AgentEnabled              bool              `json:"agentEnabled"`
+	AgentVisible              bool              `json:"agentVisible"`
+	AgentAccessLevel          string            `json:"agentAccessLevel"`
+	AssistantEnabled          bool              `json:"assistantEnabled"`
+	AppErrorMessagePrefix     string            `json:"appErrorMessagePrefix"`
+	AppErrorShowDetails       bool              `json:"appErrorShowDetails"`
+	AppErrorMessages          map[string]string `json:"appErrorMessages"`
+	EmailVerificationRequired bool              `json:"emailVerificationRequired"`
 }
 
 // GetPublicSystemSettings 获取公开的系统设置。
@@ -64,6 +65,7 @@ func GetPublicSystemSettings(w http.ResponseWriter, r *http.Request) {
 		AssistantEnabled:          settings.AssistantEnabled,
 		AppErrorMessagePrefix:     settings.AppErrorMessagePrefix,
 		AppErrorShowDetails:       settings.AppErrorShowDetails,
+		AppErrorMessages:          settings.AppErrorMessages,
 		EmailVerificationRequired: settings.EmailEnabled,
 	})
 }
@@ -103,6 +105,7 @@ func AdminSaveSystemSettings(w http.ResponseWriter, r *http.Request) {
 				AssistantEnabled:          settings.AssistantEnabled,
 				AppErrorMessagePrefix:     settings.AppErrorMessagePrefix,
 				AppErrorShowDetails:       settings.AppErrorShowDetails,
+				AppErrorMessages:          settings.AppErrorMessages,
 				EmailVerificationRequired: settings.EmailEnabled,
 			},
 		})

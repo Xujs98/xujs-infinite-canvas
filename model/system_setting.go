@@ -37,6 +37,7 @@ const (
 	SettingVideoMaxTimeoutSeconds   = "video_max_timeout_seconds"
 	SettingAppErrorMessagePrefix    = "app_error_message_prefix"
 	SettingAppErrorShowDetails      = "app_error_show_details"
+	SettingAppErrorMessages         = "app_error_messages"
 	SettingRequestLogCleanupEnabled = "request_log_cleanup_enabled"
 	SettingRequestLogRetentionDays  = "request_log_retention_days"
 	SettingRequestLogMaxRows        = "request_log_max_rows"
@@ -52,38 +53,56 @@ const (
 
 // SystemSettings 所有配置的聚合结构，方便前端一次性读取。
 type SystemSettings struct {
-	SiteName                 string `json:"siteName"`
-	SiteSubtitle             string `json:"siteSubtitle"`
-	SiteLogo                 string `json:"siteLogo"`
-	ServiceContact           string `json:"serviceContact"`
-	RegisterGiftCredits      int    `json:"registerGiftCredits"`
-	InviteRewardCredits      int    `json:"inviteRewardCredits"`
-	AllowCustomChannel       bool   `json:"allowCustomChannel"`
-	AllowRegister            bool   `json:"allowRegister"`
-	AgentEnabled             bool   `json:"agentEnabled"`
-	AgentVisible             bool   `json:"agentVisible"`
-	AgentAccessLevel         string `json:"agentAccessLevel"`
-	AssistantEnabled         bool   `json:"assistantEnabled"`
-	CheckInEnabled           bool   `json:"checkInEnabled"`
-	CheckInRewardMin         int    `json:"checkInRewardMin"`
-	CheckInRewardMax         int    `json:"checkInRewardMax"`
-	VideoMaxTimeoutSeconds   int    `json:"videoMaxTimeoutSeconds"`
-	AppErrorMessagePrefix    string `json:"appErrorMessagePrefix"`
-	AppErrorShowDetails      bool   `json:"appErrorShowDetails"`
-	RequestLogCleanupEnabled bool   `json:"requestLogCleanupEnabled"`
-	RequestLogRetentionDays  int    `json:"requestLogRetentionDays"`
-	RequestLogMaxRows        int    `json:"requestLogMaxRows"`
-	CallLogCleanupEnabled    bool   `json:"callLogCleanupEnabled"`
-	CallLogRetentionDays     int    `json:"callLogRetentionDays"`
-	CallLogMaxRows           int    `json:"callLogMaxRows"`
-	EmailEnabled             bool   `json:"emailEnabled"`
-	SMTPHost                 string `json:"smtpHost"`
-	SMTPPort                 int    `json:"smtpPort"`
-	SMTPUsername             string `json:"smtpUsername"`
-	SMTPPassword             string `json:"smtpPassword"`
-	SMTPFrom                 string `json:"smtpFrom"`
-	SMTPTLS                  bool   `json:"smtpTLS"`
-	MembershipReminder       bool   `json:"membershipReminder"`
-	EmailTemplateWelcome     string `json:"emailTemplateWelcome"`
-	EmailTemplateReminder    string `json:"emailTemplateReminder"`
+	SiteName                 string            `json:"siteName"`
+	SiteSubtitle             string            `json:"siteSubtitle"`
+	SiteLogo                 string            `json:"siteLogo"`
+	ServiceContact           string            `json:"serviceContact"`
+	RegisterGiftCredits      int               `json:"registerGiftCredits"`
+	InviteRewardCredits      int               `json:"inviteRewardCredits"`
+	AllowCustomChannel       bool              `json:"allowCustomChannel"`
+	AllowRegister            bool              `json:"allowRegister"`
+	AgentEnabled             bool              `json:"agentEnabled"`
+	AgentVisible             bool              `json:"agentVisible"`
+	AgentAccessLevel         string            `json:"agentAccessLevel"`
+	AssistantEnabled         bool              `json:"assistantEnabled"`
+	CheckInEnabled           bool              `json:"checkInEnabled"`
+	CheckInRewardMin         int               `json:"checkInRewardMin"`
+	CheckInRewardMax         int               `json:"checkInRewardMax"`
+	VideoMaxTimeoutSeconds   int               `json:"videoMaxTimeoutSeconds"`
+	AppErrorMessagePrefix    string            `json:"appErrorMessagePrefix"`
+	AppErrorShowDetails      bool              `json:"appErrorShowDetails"`
+	AppErrorMessages         map[string]string `json:"appErrorMessages"`
+	RequestLogCleanupEnabled bool              `json:"requestLogCleanupEnabled"`
+	RequestLogRetentionDays  int               `json:"requestLogRetentionDays"`
+	RequestLogMaxRows        int               `json:"requestLogMaxRows"`
+	CallLogCleanupEnabled    bool              `json:"callLogCleanupEnabled"`
+	CallLogRetentionDays     int               `json:"callLogRetentionDays"`
+	CallLogMaxRows           int               `json:"callLogMaxRows"`
+	EmailEnabled             bool              `json:"emailEnabled"`
+	SMTPHost                 string            `json:"smtpHost"`
+	SMTPPort                 int               `json:"smtpPort"`
+	SMTPUsername             string            `json:"smtpUsername"`
+	SMTPPassword             string            `json:"smtpPassword"`
+	SMTPFrom                 string            `json:"smtpFrom"`
+	SMTPTLS                  bool              `json:"smtpTLS"`
+	MembershipReminder       bool              `json:"membershipReminder"`
+	EmailTemplateWelcome     string            `json:"emailTemplateWelcome"`
+	EmailTemplateReminder    string            `json:"emailTemplateReminder"`
+}
+
+// DefaultAppErrorMessages 是 App 客户可见错误文案的服务端默认值。
+func DefaultAppErrorMessages() map[string]string {
+	return map[string]string{
+		"default":        "操作失败，请稍后重试或联系管理员",
+		"generation":     "生成失败，请联系管理员",
+		"network":        "网络连接失败，请检查网络后重试",
+		"timeout":        "请求超时，请稍后重试",
+		"authentication": "登录状态已失效，请重新登录",
+		"permission":     "当前账号没有执行此操作的权限",
+		"credits":        "算力点不足，请充值或购买订阅套餐",
+		"validation":     "提交内容不符合要求，请检查后重试",
+		"upload":         "素材上传失败，请稍后重试",
+		"download":       "结果下载失败，请稍后重试",
+		"service":        "服务暂时不可用，请稍后重试",
+	}
 }

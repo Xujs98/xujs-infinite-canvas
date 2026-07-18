@@ -1,6 +1,7 @@
 package service
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/basketikun/infinite-canvas/model"
@@ -37,5 +38,33 @@ func TestNormalizeLogCleanupSettingsSupportsLegacyPayload(t *testing.T) {
 	}
 	if input.RequestLogRetentionDays != 30 || input.RequestLogMaxRows != 5000 || input.CallLogRetentionDays != 30 || input.CallLogMaxRows != 5000 {
 		t.Fatalf("unexpected cleanup defaults: %+v", input)
+	}
+}
+
+func TestNormalizeAppErrorMessagesFillsDefaultsAndDropsUnknownKeys(t *testing.T) {
+	input := model.SystemSettings{AppErrorMessages: map[string]string{
+		"generation": "  自定义生成失败  ",
+		"unknown":    "不应保存",
+	}}
+	if err := normalizeAppErrorMessages(&input); err != nil {
+		t.Fatalf("expected error messages to normalize: %v", err)
+	}
+	if input.AppErrorMessages["generation"] != "自定义生成失败" {
+		t.Fatalf("unexpected generation message: %q", input.AppErrorMessages["generation"])
+	}
+	if input.AppErrorMessages["network"] == "" || input.AppErrorMessages["default"] == "" {
+		t.Fatal("expected missing categories to receive defaults")
+	}
+	if _, ok := input.AppErrorMessages["unknown"]; ok {
+		t.Fatal("expected unknown category to be removed")
+	}
+}
+
+func TestNormalizeAppErrorMessagesRejectsLongMessage(t *testing.T) {
+	input := model.SystemSettings{AppErrorMessages: map[string]string{
+		"default": strings.Repeat("错", 201),
+	}}
+	if err := normalizeAppErrorMessages(&input); err == nil {
+		t.Fatal("expected overlong message to be rejected")
 	}
 }

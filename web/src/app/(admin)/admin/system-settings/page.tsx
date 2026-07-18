@@ -15,6 +15,20 @@ const tabs = [
     { key: "email", label: "邮件设置", icon: <MailOutlined /> },
 ] as const;
 
+const appErrorMessageFields = [
+    { key: "default", label: "默认错误", placeholder: "无法识别具体类型时显示" },
+    { key: "generation", label: "生成失败", placeholder: "图片、视频、音频或文本生成失败" },
+    { key: "network", label: "网络错误", placeholder: "断网、连接中断、DNS 或 Socket 错误" },
+    { key: "timeout", label: "请求超时", placeholder: "提交或轮询超过等待时间" },
+    { key: "authentication", label: "登录与验证", placeholder: "登录失效、验证码或密码错误" },
+    { key: "permission", label: "权限不足", placeholder: "角色或接口权限不足" },
+    { key: "credits", label: "算力点不足", placeholder: "钱包或订阅额度不足" },
+    { key: "validation", label: "参数错误", placeholder: "必填项、格式、数量或模型参数错误" },
+    { key: "upload", label: "上传失败", placeholder: "图片、视频、音频素材上传失败" },
+    { key: "download", label: "下载失败", placeholder: "生成结果下载或本地保存失败" },
+    { key: "service", label: "服务异常", placeholder: "服务端或上游暂时不可用" },
+] as const;
+
 export default function AdminSystemSettingsPage() {
     const { settings, loading, saving, saveSettings, refresh } = useSystemSettings();
     const [form] = Form.useForm();
@@ -231,7 +245,7 @@ export default function AdminSystemSettingsPage() {
                                     </div>
                                     <div>
                                         <div className="text-sm font-semibold text-gray-800">运行与错误处理</div>
-                                        <div className="mt-0.5 text-xs text-gray-400">配置任务等待时间和 App 端统一错误提示</div>
+                                        <div className="mt-0.5 text-xs text-gray-400">配置任务等待时间和 App 客户可见错误文案</div>
                                     </div>
                                 </div>
                                 <Row gutter={[24, 0]}>
@@ -246,6 +260,29 @@ export default function AdminSystemSettingsPage() {
                                         </Form.Item>
                                     </Col>
                                 </Row>
+                                <div className="mt-2 border-t border-gray-100 pt-5">
+                                    <div className="mb-4">
+                                        <div className="text-sm font-medium text-gray-700">分类错误文案</div>
+                                        <div className="mt-1 text-xs leading-5 text-gray-400">App 自动识别错误类型并显示对应文案；原始错误只写入后台请求日志，不向客户展示。</div>
+                                    </div>
+                                    <Row gutter={[16, 0]}>
+                                        {appErrorMessageFields.map((field) => (
+                                            <Col xs={24} md={12} xl={8} key={field.key}>
+                                                <Form.Item
+                                                    name={["appErrorMessages", field.key]}
+                                                    label={field.label}
+                                                    extra={field.placeholder}
+                                                    rules={[
+                                                        { required: true, whitespace: true, message: `请输入${field.label}文案` },
+                                                        { max: 200, message: "最多 200 个字符" },
+                                                    ]}
+                                                >
+                                                    <Input maxLength={200} showCount />
+                                                </Form.Item>
+                                            </Col>
+                                        ))}
+                                    </Row>
+                                </div>
                             </div>
 
                             <div className="rounded-xl border border-gray-100 bg-white p-6 shadow-sm">
@@ -330,11 +367,6 @@ export default function AdminSystemSettingsPage() {
                                     <Col xs={24} sm={12} xl={6}>
                                         <Form.Item name="allowCustomChannel" label="自定义渠道" valuePropName="checked" extra="允许用户在前端配置自己的 API Key">
                                             <Switch checkedChildren="开启" unCheckedChildren="关闭" />
-                                        </Form.Item>
-                                    </Col>
-                                    <Col xs={24} sm={12} xl={6}>
-                                        <Form.Item name="appErrorShowDetails" label="App 显示错误详情" valuePropName="checked" extra="关闭后用户弹窗只显示简短错误，但详情仍会上报到日志。">
-                                            <Switch checkedChildren="显示" unCheckedChildren="隐藏" />
                                         </Form.Item>
                                     </Col>
                                 </Row>

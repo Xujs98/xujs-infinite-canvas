@@ -499,6 +499,19 @@ export type AdminSystemSettings = {
     videoMaxTimeoutSeconds: number;
     appErrorMessagePrefix: string;
     appErrorShowDetails: boolean;
+    appErrorMessages: {
+        default: string;
+        generation: string;
+        network: string;
+        timeout: string;
+        authentication: string;
+        permission: string;
+        credits: string;
+        validation: string;
+        upload: string;
+        download: string;
+        service: string;
+    };
     requestLogCleanupEnabled: boolean;
     requestLogRetentionDays: number;
     requestLogMaxRows: number;

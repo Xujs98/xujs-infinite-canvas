@@ -1,6 +1,8 @@
 package service
 
 import (
+	"encoding/json"
+	"fmt"
 	"strconv"
 	"strings"
 
@@ -23,6 +25,17 @@ func GetSystemSettings() (model.SystemSettings, error) {
 	requestLogMaxRows := intSetting(m, model.SettingRequestLogMaxRows, defaultRequestLogMaxRows)
 	callLogRetentionDays := intSetting(m, model.SettingCallLogRetentionDays, defaultCallLogRetentionDays)
 	callLogMaxRows := intSetting(m, model.SettingCallLogMaxRows, defaultCallLogMaxRows)
+	appErrorMessages := model.DefaultAppErrorMessages()
+	if raw := strings.TrimSpace(m[model.SettingAppErrorMessages]); raw != "" {
+		var stored map[string]string
+		if json.Unmarshal([]byte(raw), &stored) == nil {
+			for key, value := range stored {
+				if trimmed := strings.TrimSpace(value); trimmed != "" {
+					appErrorMessages[key] = trimmed
+				}
+			}
+		}
+	}
 	smtpPort, _ := strconv.Atoi(m[model.SettingSMTPPort])
 	siteName := strings.TrimSpace(m[model.SettingSiteName])
 	if siteName == "" {
@@ -59,6 +72,7 @@ func GetSystemSettings() (model.SystemSettings, error) {
 		VideoMaxTimeoutSeconds:   videoMaxTimeoutSeconds,
 		AppErrorMessagePrefix:    m[model.SettingAppErrorMessagePrefix],
 		AppErrorShowDetails:      m[model.SettingAppErrorShowDetails] == "true" || m[model.SettingAppErrorShowDetails] == "",
+		AppErrorMessages:         appErrorMessages,
 		RequestLogCleanupEnabled: m[model.SettingRequestLogCleanupEnabled] == "true" || m[model.SettingRequestLogCleanupEnabled] == "",
 		RequestLogRetentionDays:  requestLogRetentionDays,
 		RequestLogMaxRows:        requestLogMaxRows,
@@ -89,6 +103,13 @@ func SaveSystemSettings(input model.SystemSettings) error {
 	if err := normalizeLogCleanupSettings(&input); err != nil {
 		return err
 	}
+	if err := normalizeAppErrorMessages(&input); err != nil {
+		return err
+	}
+	appErrorMessagesJSON, err := json.Marshal(input.AppErrorMessages)
+	if err != nil {
+		return fmt.Errorf("序列化 App 错误文案失败: %w", err)
+	}
 	m := map[string]string{
 		model.SettingSiteName:                 input.SiteName,
 		model.SettingSiteSubtitle:             input.SiteSubtitle,
@@ -102,6 +123,7 @@ func SaveSystemSettings(input model.SystemSettings) error {
 		model.SettingVideoMaxTimeoutSeconds:   strconv.Itoa(input.VideoMaxTimeoutSeconds),
 		model.SettingAppErrorMessagePrefix:    input.AppErrorMessagePrefix,
 		model.SettingAppErrorShowDetails:      boolStr(input.AppErrorShowDetails),
+		model.SettingAppErrorMessages:         string(appErrorMessagesJSON),
 		model.SettingRequestLogCleanupEnabled: boolStr(input.RequestLogCleanupEnabled),
 		model.SettingRequestLogRetentionDays:  strconv.Itoa(input.RequestLogRetentionDays),
 		model.SettingRequestLogMaxRows:        strconv.Itoa(input.RequestLogMaxRows),
@@ -137,6 +159,30 @@ func SaveSystemSettings(input model.SystemSettings) error {
 	settings.Public.Auth.AllowRegister = &input.AllowRegister
 	_, err = repository.SaveSettings(settings, now())
 	return err
+}
+
+func normalizeAppErrorMessages(input *model.SystemSettings) error {
+	defaults := model.DefaultAppErrorMessages()
+	if input.AppErrorMessages == nil {
+		input.AppErrorMessages = defaults
+		return nil
+	}
+	for key, fallback := range defaults {
+		value := strings.TrimSpace(input.AppErrorMessages[key])
+		if value == "" {
+			value = fallback
+		}
+		if len([]rune(value)) > 200 {
+			return fmt.Errorf("App 错误文案 %s 不能超过 200 个字符", key)
+		}
+		input.AppErrorMessages[key] = value
+	}
+	for key := range input.AppErrorMessages {
+		if _, ok := defaults[key]; !ok {
+			delete(input.AppErrorMessages, key)
+		}
+	}
+	return nil
 }
 
 func normalizeLogCleanupSettings(input *model.SystemSettings) error {
