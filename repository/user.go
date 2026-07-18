@@ -3,6 +3,7 @@ package repository
 import (
 	"errors"
 	"strings"
+	"time"
 
 	"github.com/basketikun/infinite-canvas/config"
 	"github.com/basketikun/infinite-canvas/model"
@@ -193,26 +194,96 @@ func ListCreditLogs(q model.Query) ([]model.CreditLog, int64, error) {
 }
 
 func ListUserCreditLogs(userID string, q model.Query) ([]model.CreditLog, int64, error) {
+	return ListVisibleUserCreditLogs(userID, q, 0)
+}
+
+// ListVisibleUserCreditLogs 只在用户端限制最新可见条数；maxVisible=0 表示不限。
+func ListVisibleUserCreditLogs(userID string, q model.Query, maxVisible int) ([]model.CreditLog, int64, error) {
 	db, err := DB()
 	if err != nil {
 		return nil, 0, err
 	}
 	q.Normalize()
+	orderExpr := "created_at desc"
+	if strings.EqualFold(strings.TrimSpace(config.Cfg.StorageDriver), "sqlite") || strings.TrimSpace(config.Cfg.StorageDriver) == "" {
+		orderExpr = "datetime(created_at) desc, created_at desc"
+	}
 	tx := db.Model(&model.CreditLog{}).Where("user_id = ?", userID)
+	if maxVisible > 0 {
+		visibleIDs := db.Model(&model.CreditLog{}).
+			Select("id").
+			Where("user_id = ?", userID).
+			Order(orderExpr).
+			Limit(maxVisible)
+		tx = tx.Where("id IN (?)", visibleIDs)
+	}
 	if logType := strings.TrimSpace(q.Type); logType != "" {
-		tx = tx.Where("type = ?", logType)
+		tx = applyCreditLogTypeFilter(tx, logType)
 	}
 	var total int64
 	if err := tx.Count(&total).Error; err != nil {
 		return nil, 0, err
 	}
 	var logs []model.CreditLog
-	orderExpr := "created_at desc"
-	if strings.EqualFold(strings.TrimSpace(config.Cfg.StorageDriver), "sqlite") || strings.TrimSpace(config.Cfg.StorageDriver) == "" {
-		orderExpr = "datetime(created_at) desc, created_at desc"
-	}
 	err = tx.Order(orderExpr).Offset(q.Offset()).Limit(q.PageSize).Find(&logs).Error
 	return logs, total, err
+}
+
+func applyCreditLogTypeFilter(tx *gorm.DB, logType string) *gorm.DB {
+	switch logType {
+	case string(model.CreditLogTypeOfflineConsume):
+		return tx.Where("type = ? OR (type = ? AND related_id LIKE ?)", logType, model.CreditLogTypeAIConsume, "offline:%")
+	case string(model.CreditLogTypeOfflineRefund):
+		return tx.Where("type = ? OR (type = ? AND related_id LIKE ?)", logType, model.CreditLogTypeAIRefund, "offline:%")
+	case string(model.CreditLogTypeAIConsume):
+		return tx.Where("type = ? AND (related_id = '' OR related_id NOT LIKE ?)", logType, "offline:%")
+	case string(model.CreditLogTypeAIRefund):
+		return tx.Where("type = ? AND (related_id = '' OR related_id NOT LIKE ?)", logType, "offline:%")
+	default:
+		return tx.Where("type = ?", logType)
+	}
+}
+
+// PruneCreditLogs 保留指定天数内且最新的 maxRows 条算力点流水。
+func PruneCreditLogs(cutoff time.Time, maxRows int) (int64, error) {
+	db, err := DB()
+	if err != nil {
+		return 0, err
+	}
+	var deleted int64
+	err = db.Transaction(func(tx *gorm.DB) error {
+		deleteQuery := tx
+		orderExpr := "created_at DESC"
+		if strings.EqualFold(strings.TrimSpace(config.Cfg.StorageDriver), "sqlite") || strings.TrimSpace(config.Cfg.StorageDriver) == "" {
+			deleteQuery = deleteQuery.Where("datetime(created_at) < datetime(?)", cutoff.Format(time.RFC3339))
+			orderExpr = "datetime(created_at) DESC, created_at DESC"
+		} else {
+			deleteQuery = deleteQuery.Where("created_at < ?", cutoff)
+		}
+		result := deleteQuery.Delete(&model.CreditLog{})
+		if result.Error != nil {
+			return result.Error
+		}
+		deleted += result.RowsAffected
+		if maxRows <= 0 {
+			return nil
+		}
+		for {
+			var ids []string
+			if err := tx.Model(&model.CreditLog{}).Select("id").Order(orderExpr).Offset(maxRows).Limit(500).Pluck("id", &ids).Error; err != nil {
+				return err
+			}
+			if len(ids) == 0 {
+				return nil
+			}
+			result = tx.Where("id IN ?", ids).Delete(&model.CreditLog{})
+			if result.Error != nil {
+				return result.Error
+			}
+			deleted += result.RowsAffected
+		}
+	})
+	return deleted, err
 }
 
 func UserCreditConsumption(userID string) (int, int, error) {

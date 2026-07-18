@@ -518,6 +518,10 @@ export type AdminSystemSettings = {
     callLogCleanupEnabled: boolean;
     callLogRetentionDays: number;
     callLogMaxRows: number;
+    creditLogCleanupEnabled: boolean;
+    creditLogRetentionDays: number;
+    creditLogMaxRows: number;
+    userCreditLogVisibleRows: number;
     allowCustomChannel: boolean;
     allowRegister: boolean;
     assistantEnabled: boolean;

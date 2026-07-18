@@ -36,8 +36,22 @@ func TestNormalizeLogCleanupSettingsSupportsLegacyPayload(t *testing.T) {
 	if err := normalizeLogCleanupSettings(&input); err != nil {
 		t.Fatalf("expected legacy payload defaults to be accepted: %v", err)
 	}
-	if input.RequestLogRetentionDays != 30 || input.RequestLogMaxRows != 5000 || input.CallLogRetentionDays != 30 || input.CallLogMaxRows != 5000 {
+	if input.RequestLogRetentionDays != 30 || input.RequestLogMaxRows != 5000 || input.CallLogRetentionDays != 30 || input.CallLogMaxRows != 5000 || input.CreditLogRetentionDays != 365 || input.CreditLogMaxRows != 100000 {
 		t.Fatalf("unexpected cleanup defaults: %+v", input)
+	}
+}
+
+func TestNormalizeLogCleanupSettingsAcceptsUnlimitedUserCreditLogVisibility(t *testing.T) {
+	input := model.SystemSettings{UserCreditLogVisibleRows: 0}
+	if err := normalizeLogCleanupSettings(&input); err != nil {
+		t.Fatalf("expected zero visible rows to mean unlimited: %v", err)
+	}
+}
+
+func TestNormalizeLogCleanupSettingsRejectsNegativeUserCreditLogVisibility(t *testing.T) {
+	input := model.SystemSettings{UserCreditLogVisibleRows: -1}
+	if err := normalizeLogCleanupSettings(&input); err == nil {
+		t.Fatal("expected negative visible rows to be rejected")
 	}
 }
 

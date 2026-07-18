@@ -120,6 +120,7 @@ export default function AdminSystemSettingsPage() {
     const siteLogo = Form.useWatch("siteLogo", form);
     const requestLogCleanupEnabled = Form.useWatch("requestLogCleanupEnabled", form);
     const callLogCleanupEnabled = Form.useWatch("callLogCleanupEnabled", form);
+    const creditLogCleanupEnabled = Form.useWatch("creditLogCleanupEnabled", form);
 
     return (
         <div className="admin-config-page min-h-screen p-6">
@@ -292,11 +293,11 @@ export default function AdminSystemSettingsPage() {
                                     </div>
                                     <div>
                                         <div className="text-sm font-semibold text-gray-800">日志自动清理</div>
-                                        <div className="mt-0.5 text-xs text-gray-400">按保留时间和最大条数定期清理请求日志与调用日志</div>
+                                        <div className="mt-0.5 text-xs text-gray-400">统一管理请求日志、调用日志和算力点明细的保留策略</div>
                                     </div>
                                 </div>
-                                <div className="grid gap-8 lg:grid-cols-2 lg:divide-x lg:divide-gray-100">
-                                    <section className="min-w-0 lg:pr-8">
+                                <div className="grid gap-8 xl:grid-cols-3 xl:divide-x xl:divide-gray-100">
+                                    <section className="min-w-0 xl:pr-8">
                                         <div className="mb-4 text-sm font-medium text-gray-700">请求日志</div>
                                         <Row gutter={[16, 0]}>
                                             <Col span={24}>
@@ -316,7 +317,7 @@ export default function AdminSystemSettingsPage() {
                                             </Col>
                                         </Row>
                                     </section>
-                                    <section className="min-w-0 lg:pl-8">
+                                    <section className="min-w-0 xl:px-8">
                                         <div className="mb-4 text-sm font-medium text-gray-700">调用日志</div>
                                         <Row gutter={[16, 0]}>
                                             <Col span={24}>
@@ -332,6 +333,31 @@ export default function AdminSystemSettingsPage() {
                                             <Col xs={24} sm={12}>
                                                 <Form.Item name="callLogMaxRows" label="最大保留条数" rules={[{ required: true, message: "请输入调用日志最大保留条数" }]}>
                                                     <InputNumber min={100} max={1000000} precision={0} step={100} disabled={!callLogCleanupEnabled} style={{ width: "100%" }} />
+                                                </Form.Item>
+                                            </Col>
+                                        </Row>
+                                    </section>
+                                    <section className="min-w-0 xl:pl-8">
+                                        <div className="mb-4 text-sm font-medium text-gray-700">算力点明细</div>
+                                        <Row gutter={[16, 0]}>
+                                            <Col span={24}>
+                                                <Form.Item name="creditLogCleanupEnabled" label="自动清理" valuePropName="checked" extra="默认关闭；开启后每小时按时间和总条数清理。">
+                                                    <Switch checkedChildren="开启" unCheckedChildren="关闭" />
+                                                </Form.Item>
+                                            </Col>
+                                            <Col xs={24} sm={12} xl={24} xxl={12}>
+                                                <Form.Item name="creditLogRetentionDays" label="保留天数" rules={[{ required: true, message: "请输入算力点明细保留天数" }]}>
+                                                    <InputNumber min={1} max={3650} precision={0} disabled={!creditLogCleanupEnabled} style={{ width: "100%" }} />
+                                                </Form.Item>
+                                            </Col>
+                                            <Col xs={24} sm={12} xl={24} xxl={12}>
+                                                <Form.Item name="creditLogMaxRows" label="数据库最大条数" rules={[{ required: true, message: "请输入算力点明细最大保留条数" }]}>
+                                                    <InputNumber min={100} max={1000000} precision={0} step={1000} disabled={!creditLogCleanupEnabled} style={{ width: "100%" }} />
+                                                </Form.Item>
+                                            </Col>
+                                            <Col span={24}>
+                                                <Form.Item name="userCreditLogVisibleRows" label="用户最多可查看" extra="只限制 Web/App 个人中心；0 表示不限，管理员仍可查看全部保留记录。" rules={[{ required: true, message: "请输入用户最多可查看条数" }]}>
+                                                    <InputNumber min={0} max={1000000} precision={0} step={10} style={{ width: "100%" }} addonAfter="条" />
                                                 </Form.Item>
                                             </Col>
                                         </Row>

@@ -15,6 +15,8 @@ const (
 	defaultRequestLogMaxRows       = 5000
 	defaultCallLogRetentionDays    = 30
 	defaultCallLogMaxRows          = 5000
+	defaultCreditLogRetentionDays  = 365
+	defaultCreditLogMaxRows        = 100000
 )
 
 func RunConfiguredLogCleanup() {
@@ -41,6 +43,14 @@ func RunConfiguredLogCleanup() {
 			log.Printf("call log cleanup failed: %v", cleanupErr)
 		} else if deleted > 0 {
 			log.Printf("call log cleanup removed %d expired or excess records", deleted)
+		}
+	}
+	if settings.CreditLogCleanupEnabled {
+		deleted, cleanupErr := repository.PruneCreditLogs(nowTime.AddDate(0, 0, -settings.CreditLogRetentionDays), settings.CreditLogMaxRows)
+		if cleanupErr != nil {
+			log.Printf("credit log cleanup failed: %v", cleanupErr)
+		} else if deleted > 0 {
+			log.Printf("credit log cleanup removed %d expired or excess records", deleted)
 		}
 	}
 }

@@ -219,7 +219,7 @@ function CreditLogsTab() {
     const fetchLogs = useCallback(async () => {
         setLoading(true);
         try {
-            const res = await fetchUserCreditLogs(token, { page, pageSize, keyword: typeFilter });
+            const res = await fetchUserCreditLogs(token, { page, pageSize, type: typeFilter || undefined });
             setLogs(res.items || []);
             setTotal(res.total || 0);
         } catch {

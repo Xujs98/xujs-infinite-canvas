@@ -714,12 +714,24 @@ func ListCreditLogs(q model.Query) (model.CreditLogList, error) {
 }
 
 func ListUserCreditLogs(userID string, q model.Query) (model.CreditLogList, error) {
+	return listUserCreditLogs(userID, q, 0)
+}
+
+func ListVisibleUserCreditLogs(userID string, q model.Query) (model.CreditLogList, error) {
+	settings, err := GetSystemSettings()
+	if err != nil {
+		return model.CreditLogList{}, err
+	}
+	return listUserCreditLogs(userID, q, settings.UserCreditLogVisibleRows)
+}
+
+func listUserCreditLogs(userID string, q model.Query, maxVisible int) (model.CreditLogList, error) {
 	if _, ok, err := repository.GetUserByID(userID); err != nil {
 		return model.CreditLogList{}, err
 	} else if !ok {
 		return model.CreditLogList{}, safeMessageError{message: "用户不存在"}
 	}
-	logs, total, err := repository.ListUserCreditLogs(userID, q)
+	logs, total, err := repository.ListVisibleUserCreditLogs(userID, q, maxVisible)
 	if err != nil {
 		return model.CreditLogList{}, err
 	}

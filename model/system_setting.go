@@ -44,6 +44,10 @@ const (
 	SettingCallLogCleanupEnabled    = "call_log_cleanup_enabled"
 	SettingCallLogRetentionDays     = "call_log_retention_days"
 	SettingCallLogMaxRows           = "call_log_max_rows"
+	SettingCreditLogCleanupEnabled  = "credit_log_cleanup_enabled"
+	SettingCreditLogRetentionDays   = "credit_log_retention_days"
+	SettingCreditLogMaxRows         = "credit_log_max_rows"
+	SettingUserCreditLogVisibleRows = "user_credit_log_visible_rows"
 )
 
 const (
@@ -78,6 +82,10 @@ type SystemSettings struct {
 	CallLogCleanupEnabled    bool              `json:"callLogCleanupEnabled"`
 	CallLogRetentionDays     int               `json:"callLogRetentionDays"`
 	CallLogMaxRows           int               `json:"callLogMaxRows"`
+	CreditLogCleanupEnabled  bool              `json:"creditLogCleanupEnabled"`
+	CreditLogRetentionDays   int               `json:"creditLogRetentionDays"`
+	CreditLogMaxRows         int               `json:"creditLogMaxRows"`
+	UserCreditLogVisibleRows int               `json:"userCreditLogVisibleRows"`
 	EmailEnabled             bool              `json:"emailEnabled"`
 	SMTPHost                 string            `json:"smtpHost"`
 	SMTPPort                 int               `json:"smtpPort"`

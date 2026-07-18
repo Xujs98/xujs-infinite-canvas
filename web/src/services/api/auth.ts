@@ -96,7 +96,7 @@ export type CreditLogListResponse = {
     total: number;
 };
 
-export async function fetchUserCreditLogs(token: string, query: { keyword?: string; page?: number; pageSize?: number } = {}) {
+export async function fetchUserCreditLogs(token: string, query: { type?: string; page?: number; pageSize?: number } = {}) {
     return apiGet<CreditLogListResponse>("/api/v1/credit-logs", compactApiParams(query), token);
 }
 

@@ -297,8 +297,7 @@ func UserCreditLogs(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	q := parseQuery(r)
-	q.Keyword = user.ID + " " + q.Keyword
-	logs, err := service.ListCreditLogs(q)
+	logs, err := service.ListVisibleUserCreditLogs(user.ID, q)
 	if err != nil {
 		FailError(w, err)
 		return

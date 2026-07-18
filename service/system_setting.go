@@ -25,6 +25,9 @@ func GetSystemSettings() (model.SystemSettings, error) {
 	requestLogMaxRows := intSetting(m, model.SettingRequestLogMaxRows, defaultRequestLogMaxRows)
 	callLogRetentionDays := intSetting(m, model.SettingCallLogRetentionDays, defaultCallLogRetentionDays)
 	callLogMaxRows := intSetting(m, model.SettingCallLogMaxRows, defaultCallLogMaxRows)
+	creditLogRetentionDays := intSetting(m, model.SettingCreditLogRetentionDays, defaultCreditLogRetentionDays)
+	creditLogMaxRows := intSetting(m, model.SettingCreditLogMaxRows, defaultCreditLogMaxRows)
+	userCreditLogVisibleRows, _ := strconv.Atoi(m[model.SettingUserCreditLogVisibleRows])
 	appErrorMessages := model.DefaultAppErrorMessages()
 	if raw := strings.TrimSpace(m[model.SettingAppErrorMessages]); raw != "" {
 		var stored map[string]string
@@ -79,6 +82,10 @@ func GetSystemSettings() (model.SystemSettings, error) {
 		CallLogCleanupEnabled:    m[model.SettingCallLogCleanupEnabled] == "true",
 		CallLogRetentionDays:     callLogRetentionDays,
 		CallLogMaxRows:           callLogMaxRows,
+		CreditLogCleanupEnabled:  m[model.SettingCreditLogCleanupEnabled] == "true",
+		CreditLogRetentionDays:   creditLogRetentionDays,
+		CreditLogMaxRows:         creditLogMaxRows,
+		UserCreditLogVisibleRows: userCreditLogVisibleRows,
 		AllowCustomChannel:       allowCustomChannel,
 		AllowRegister:            allowRegister,
 		AgentEnabled:             m[model.SettingAgentEnabled] == "true",
@@ -130,6 +137,10 @@ func SaveSystemSettings(input model.SystemSettings) error {
 		model.SettingCallLogCleanupEnabled:    boolStr(input.CallLogCleanupEnabled),
 		model.SettingCallLogRetentionDays:     strconv.Itoa(input.CallLogRetentionDays),
 		model.SettingCallLogMaxRows:           strconv.Itoa(input.CallLogMaxRows),
+		model.SettingCreditLogCleanupEnabled:  boolStr(input.CreditLogCleanupEnabled),
+		model.SettingCreditLogRetentionDays:   strconv.Itoa(input.CreditLogRetentionDays),
+		model.SettingCreditLogMaxRows:         strconv.Itoa(input.CreditLogMaxRows),
+		model.SettingUserCreditLogVisibleRows: strconv.Itoa(input.UserCreditLogVisibleRows),
 		model.SettingAllowCustomChannel:       boolStr(input.AllowCustomChannel),
 		model.SettingAllowRegister:            boolStr(input.AllowRegister),
 		model.SettingAgentEnabled:             boolStr(input.AgentEnabled),
@@ -198,11 +209,20 @@ func normalizeLogCleanupSettings(input *model.SystemSettings) error {
 	if input.CallLogMaxRows == 0 {
 		input.CallLogMaxRows = defaultCallLogMaxRows
 	}
-	if input.RequestLogRetentionDays < 1 || input.RequestLogRetentionDays > 3650 || input.CallLogRetentionDays < 1 || input.CallLogRetentionDays > 3650 {
+	if input.CreditLogRetentionDays == 0 {
+		input.CreditLogRetentionDays = defaultCreditLogRetentionDays
+	}
+	if input.CreditLogMaxRows == 0 {
+		input.CreditLogMaxRows = defaultCreditLogMaxRows
+	}
+	if input.RequestLogRetentionDays < 1 || input.RequestLogRetentionDays > 3650 || input.CallLogRetentionDays < 1 || input.CallLogRetentionDays > 3650 || input.CreditLogRetentionDays < 1 || input.CreditLogRetentionDays > 3650 {
 		return safeMessageError{message: "日志保留天数必须在 1 到 3650 天之间"}
 	}
-	if input.RequestLogMaxRows < 100 || input.RequestLogMaxRows > 1000000 || input.CallLogMaxRows < 100 || input.CallLogMaxRows > 1000000 {
+	if input.RequestLogMaxRows < 100 || input.RequestLogMaxRows > 1000000 || input.CallLogMaxRows < 100 || input.CallLogMaxRows > 1000000 || input.CreditLogMaxRows < 100 || input.CreditLogMaxRows > 1000000 {
 		return safeMessageError{message: "日志最大保留条数必须在 100 到 1000000 条之间"}
+	}
+	if input.UserCreditLogVisibleRows < 0 || input.UserCreditLogVisibleRows > 1000000 {
+		return safeMessageError{message: "用户可查看算力点明细条数必须在 0 到 1000000 之间"}
 	}
 	return nil
 }
