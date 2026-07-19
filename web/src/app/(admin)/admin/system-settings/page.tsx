@@ -471,6 +471,16 @@ export default function AdminSystemSettingsPage() {
                                             <InputNumber min={60} max={86400} precision={0} className="w-full" addonAfter="秒" />
                                         </Form.Item>
                                     </Col>
+                                    <Col xs={24} md={12}>
+                                        <Form.Item
+                                            name={["minioStorage", "canvasImageUploadMaxMB"]}
+                                            label="本地图片恢复上传限制"
+                                            extra="MinIO 原图被清理后，App 上传本地副本时允许的单张图片大小；允许 1-200MB。"
+                                            rules={[{ required: true, message: "请输入本地图片恢复上传限制" }]}
+                                        >
+                                            <InputNumber min={1} max={200} precision={0} className="w-full" addonAfter="MB" />
+                                        </Form.Item>
+                                    </Col>
                                 </Row>
                             </div>
                         </div>

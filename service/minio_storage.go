@@ -2,15 +2,29 @@ package service
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
+	"io"
 	"net/url"
+	"path"
 	"strings"
+	"time"
 
 	"github.com/basketikun/infinite-canvas/model"
 	"github.com/basketikun/infinite-canvas/repository"
 	"github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
 )
+
+type CanvasImageUploadResult struct {
+	URL       string    `json:"url"`
+	ObjectKey string    `json:"objectKey"`
+	MimeType  string    `json:"mimeType"`
+	Bytes     int64     `json:"bytes"`
+	ExpiresIn int       `json:"expiresIn"`
+	ExpiresAt time.Time `json:"expiresAt"`
+}
 
 func GetMinIOStorageConfig() (model.MinIOStorageConfig, error) {
 	settings, err := repository.GetSystemSettings()
@@ -44,6 +58,115 @@ func TestMinIOStorage(ctx context.Context, candidate model.MinIOStorageConfig) e
 		return safeMessageError{message: fmt.Sprintf("存储桶 %q 不存在，请先在 MinIO 中创建", candidate.Bucket)}
 	}
 	return nil
+}
+
+func UploadCanvasImageToMinIO(
+	ctx context.Context,
+	source io.ReadSeeker,
+	mimeType string,
+	extension string,
+) (CanvasImageUploadResult, error) {
+	config, err := GetMinIOStorageConfig()
+	if err != nil {
+		return CanvasImageUploadResult{}, err
+	}
+	if !config.Enabled {
+		return CanvasImageUploadResult{}, safeMessageError{message: "媒体资产存储未启用，请管理员先完成 MinIO 配置"}
+	}
+	if err := validateMinIOStorageConfig(config, true); err != nil {
+		return CanvasImageUploadResult{}, safeMessageError{message: err.Error()}
+	}
+	maxBytes := int64(config.CanvasImageUploadMaxMB) << 20
+	extension, err = normalizeCanvasImageExtension(extension)
+	if err != nil {
+		return CanvasImageUploadResult{}, safeMessageError{message: err.Error()}
+	}
+
+	hasher := sha256.New()
+	bytesWritten, err := io.Copy(hasher, io.LimitReader(source, maxBytes+1))
+	if err != nil {
+		return CanvasImageUploadResult{}, safeMessageError{message: "读取本地恢复图片失败"}
+	}
+	if bytesWritten <= 0 {
+		return CanvasImageUploadResult{}, safeMessageError{message: "本地恢复图片为空"}
+	}
+	if bytesWritten > maxBytes {
+		return CanvasImageUploadResult{}, safeMessageError{message: fmt.Sprintf("本地恢复图片超过 %dMB 限制", config.CanvasImageUploadMaxMB)}
+	}
+	if _, err := source.Seek(0, io.SeekStart); err != nil {
+		return CanvasImageUploadResult{}, safeMessageError{message: "无法重新读取本地恢复图片"}
+	}
+
+	client, err := newMinIOClient(config)
+	if err != nil {
+		return CanvasImageUploadResult{}, safeMessageError{message: "媒体资产存储配置无效"}
+	}
+	digest := hex.EncodeToString(hasher.Sum(nil))
+	objectKey := canvasImageObjectKey(config.CanvasPrefix, digest, extension, time.Now().UTC())
+	if _, err := client.PutObject(ctx, config.Bucket, objectKey, source, bytesWritten, minio.PutObjectOptions{
+		ContentType: strings.TrimSpace(mimeType),
+	}); err != nil {
+		return CanvasImageUploadResult{}, minIOOperationSafeError(err, "上传")
+	}
+
+	expiresIn := config.PresignedURLExpirySeconds
+	expiresAt := time.Now().Add(time.Duration(expiresIn) * time.Second)
+	signedURL, err := client.PresignedGetObject(
+		ctx,
+		config.Bucket,
+		objectKey,
+		time.Duration(expiresIn)*time.Second,
+		nil,
+	)
+	if err != nil {
+		return CanvasImageUploadResult{}, minIOOperationSafeError(err, "签发")
+	}
+	return CanvasImageUploadResult{
+		URL:       signedURL.String(),
+		ObjectKey: objectKey,
+		MimeType:  strings.TrimSpace(mimeType),
+		Bytes:     bytesWritten,
+		ExpiresIn: expiresIn,
+		ExpiresAt: expiresAt,
+	}, nil
+}
+
+func canvasImageObjectKey(prefix, digest, extension string, now time.Time) string {
+	return path.Join(
+		strings.Trim(strings.TrimSpace(prefix), "/"),
+		"images",
+		now.UTC().Format("2006/01/02"),
+		digest+extension,
+	)
+}
+
+func normalizeCanvasImageExtension(extension string) (string, error) {
+	value := strings.ToLower(strings.TrimSpace(extension))
+	if value != "" && !strings.HasPrefix(value, ".") {
+		value = "." + value
+	}
+	switch value {
+	case ".jpg", ".jpeg":
+		return ".jpg", nil
+	case ".png", ".webp", ".gif", ".bmp", ".heic", ".heif":
+		return value, nil
+	default:
+		return "", fmt.Errorf("本地恢复图片格式不支持")
+	}
+}
+
+func minIOOperationSafeError(err error, action string) error {
+	response := minio.ToErrorResponse(err)
+	switch response.Code {
+	case "InvalidAccessKeyId", "SignatureDoesNotMatch", "AccessDenied", "Unauthorized":
+		return safeMessageError{message: "媒体资产存储鉴权失败，请管理员检查 MinIO 密钥与权限"}
+	case "NoSuchBucket":
+		return safeMessageError{message: "媒体资产存储桶不存在，请管理员检查 MinIO 配置"}
+	case "RequestTimeTooSkewed":
+		return safeMessageError{message: "媒体资产存储时间不同步，请管理员检查服务器时间"}
+	default:
+		return safeMessageError{message: fmt.Sprintf("媒体资产存储%s失败，请稍后重试", action)}
+	}
 }
 
 func minIOTestSafeError(err error) error {
@@ -89,6 +212,7 @@ func minIOStorageConfigFromMap(settings map[string]string) model.MinIOStorageCon
 		GeneratedPrefix:           settings[model.SettingMinIOGeneratedPrefix],
 		CanvasPrefix:              settings[model.SettingMinIOCanvasPrefix],
 		PresignedURLExpirySeconds: intSetting(settings, model.SettingMinIOPresignedURLExpiry, 3600),
+		CanvasImageUploadMaxMB:    intSetting(settings, model.SettingMinIOCanvasUploadMaxMB, 30),
 	}
 	applyMinIOStorageDefaults(&config)
 	config.SecretConfigured = strings.TrimSpace(config.SecretKey) != ""
@@ -118,6 +242,9 @@ func applyMinIOStorageDefaults(config *model.MinIOStorageConfig) {
 	if config.PresignedURLExpirySeconds == 0 {
 		config.PresignedURLExpirySeconds = 3600
 	}
+	if config.CanvasImageUploadMaxMB == 0 {
+		config.CanvasImageUploadMaxMB = 30
+	}
 }
 
 func validateMinIOStorageConfig(config model.MinIOStorageConfig, required bool) error {
@@ -135,6 +262,9 @@ func validateMinIOStorageConfig(config model.MinIOStorageConfig, required bool) 
 	}
 	if config.PresignedURLExpirySeconds < 60 || config.PresignedURLExpirySeconds > 86400 {
 		return fmt.Errorf("临时图片地址有效期必须在 60 秒到 86400 秒之间")
+	}
+	if config.CanvasImageUploadMaxMB < 1 || config.CanvasImageUploadMaxMB > 200 {
+		return fmt.Errorf("本地图片恢复上传限制必须在 1MB 到 200MB 之间")
 	}
 	_, _, err := normalizeMinIOEndpoint(config.Endpoint, config.UseSSL)
 	return err

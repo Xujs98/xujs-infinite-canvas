@@ -66,6 +66,7 @@ const defaultSettings: AdminSystemSettings = {
         generatedPrefix: "generated/images",
         canvasPrefix: "canvas/uploads",
         presignedURLExpirySeconds: 3600,
+        canvasImageUploadMaxMB: 30,
     },
 };
 

@@ -52,6 +52,7 @@ func New() *gin.Engine {
 	v1.POST("/videos", gin.WrapF(handler.AIVideos))
 	v1.POST("/media/references", gin.WrapF(handler.UploadReferenceMedia))
 	v1.POST("/media/generated-image-url", gin.WrapF(handler.GeneratedImageTemporaryURL))
+	v1.POST("/media/generated-image-upload", gin.WrapF(handler.UploadGeneratedImageFallback))
 	v1.POST("/redeem-code", gin.WrapF(handler.RedeemCode))
 	v1.PUT("/profile", gin.WrapF(handler.UpdateProfile))
 	v1.POST("/profile/password-email-code", gin.WrapF(handler.SendPasswordChangeEmailCode))

@@ -548,6 +548,7 @@ export type AdminSystemSettings = {
         generatedPrefix: string;
         canvasPrefix: string;
         presignedURLExpirySeconds: number;
+        canvasImageUploadMaxMB: number;
     };
 };
 

@@ -59,6 +59,7 @@ const (
 	SettingMinIOGeneratedPrefix     = "minio_generated_prefix"
 	SettingMinIOCanvasPrefix        = "minio_canvas_prefix"
 	SettingMinIOPresignedURLExpiry  = "minio_presigned_url_expiry_seconds"
+	SettingMinIOCanvasUploadMaxMB   = "minio_canvas_image_upload_max_mb"
 )
 
 const (
@@ -124,6 +125,7 @@ type MinIOStorageConfig struct {
 	GeneratedPrefix           string `json:"generatedPrefix"`
 	CanvasPrefix              string `json:"canvasPrefix"`
 	PresignedURLExpirySeconds int    `json:"presignedURLExpirySeconds"`
+	CanvasImageUploadMaxMB    int    `json:"canvasImageUploadMaxMB"`
 }
 
 // DefaultAppErrorMessages 是 App 客户可见错误文案的服务端默认值。

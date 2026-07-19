@@ -184,6 +184,7 @@ func SaveSystemSettings(input model.SystemSettings) error {
 		model.SettingMinIOGeneratedPrefix:     minioConfig.GeneratedPrefix,
 		model.SettingMinIOCanvasPrefix:        minioConfig.CanvasPrefix,
 		model.SettingMinIOPresignedURLExpiry:  strconv.Itoa(minioConfig.PresignedURLExpirySeconds),
+		model.SettingMinIOCanvasUploadMaxMB:   strconv.Itoa(minioConfig.CanvasImageUploadMaxMB),
 	}
 	if err := repository.SaveSystemSettings(m); err != nil {
 		return err

@@ -4,6 +4,7 @@ import (
 	"errors"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/basketikun/infinite-canvas/model"
 	"github.com/minio/minio-go/v7"
@@ -40,6 +41,33 @@ func TestMinIOTestSafeError(t *testing.T) {
 	}
 }
 
+func TestCanvasImageObjectKey(t *testing.T) {
+	when := time.Date(2026, time.July, 19, 20, 30, 0, 0, time.FixedZone("CST", 8*60*60))
+	key := canvasImageObjectKey("/canvas/uploads/", "abcdef", ".png", when)
+	if key != "canvas/uploads/images/2026/07/19/abcdef.png" {
+		t.Fatalf("canvasImageObjectKey() = %q", key)
+	}
+}
+
+func TestNormalizeCanvasImageExtension(t *testing.T) {
+	tests := map[string]string{
+		"jpeg":  ".jpg",
+		".JPG":  ".jpg",
+		".png":  ".png",
+		"webp":  ".webp",
+		".heic": ".heic",
+	}
+	for input, expected := range tests {
+		actual, err := normalizeCanvasImageExtension(input)
+		if err != nil || actual != expected {
+			t.Fatalf("normalizeCanvasImageExtension(%q) = %q, %v; want %q", input, actual, err, expected)
+		}
+	}
+	if _, err := normalizeCanvasImageExtension(".svg"); err == nil {
+		t.Fatal("expected SVG to be rejected")
+	}
+}
+
 func TestMinIOTestSafeErrorDoesNotExposeUnknownError(t *testing.T) {
 	const secret = "do-not-leak-this-secret"
 	err := minIOTestSafeError(errors.New("unexpected upstream failure: " + secret))
@@ -55,6 +83,9 @@ func TestMinIOPresignedURLExpiryDefaultsAndValidation(t *testing.T) {
 	if config.PresignedURLExpirySeconds != 3600 {
 		t.Fatalf("default expiry = %d, want 3600", config.PresignedURLExpirySeconds)
 	}
+	if config.CanvasImageUploadMaxMB != 30 {
+		t.Fatalf("default canvas upload limit = %d, want 30", config.CanvasImageUploadMaxMB)
+	}
 	config.Endpoint = "https://media.example.com"
 	config.PresignedURLExpirySeconds = 59
 	if err := validateMinIOStorageConfig(config, false); err == nil {
@@ -63,5 +94,14 @@ func TestMinIOPresignedURLExpiryDefaultsAndValidation(t *testing.T) {
 	config.PresignedURLExpirySeconds = 86401
 	if err := validateMinIOStorageConfig(config, false); err == nil {
 		t.Fatal("expected expiry above 24 hours to be rejected")
+	}
+	config.PresignedURLExpirySeconds = 3600
+	config.CanvasImageUploadMaxMB = 0
+	if err := validateMinIOStorageConfig(config, false); err == nil {
+		t.Fatal("expected zero canvas upload limit to be rejected")
+	}
+	config.CanvasImageUploadMaxMB = 201
+	if err := validateMinIOStorageConfig(config, false); err == nil {
+		t.Fatal("expected canvas upload limit above 200MB to be rejected")
 	}
 }
