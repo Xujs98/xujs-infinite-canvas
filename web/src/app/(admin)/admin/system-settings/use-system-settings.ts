@@ -53,6 +53,20 @@ const defaultSettings: AdminSystemSettings = {
     membershipReminder: false,
     emailTemplateWelcome: "",
     emailTemplateReminder: "",
+    minioStorage: {
+        enabled: false,
+        endpoint: "",
+        bucket: "julong-media",
+        region: "us-east-1",
+        accessKey: "",
+        secretKey: "",
+        secretConfigured: false,
+        useSSL: true,
+        usePathStyle: true,
+        generatedPrefix: "generated/images",
+        canvasPrefix: "canvas/uploads",
+        presignedURLExpirySeconds: 3600,
+    },
 };
 
 export function useSystemSettings() {
@@ -81,7 +95,14 @@ export function useSystemSettings() {
         setSaving(true);
         try {
             await saveAdminSystemSettings(token, values);
-            setSettings(values);
+            setSettings({
+                ...values,
+                minioStorage: {
+                    ...values.minioStorage,
+                    secretKey: "",
+                    secretConfigured: values.minioStorage.secretConfigured || Boolean(values.minioStorage.secretKey),
+                },
+            });
         } finally {
             setSaving(false);
         }

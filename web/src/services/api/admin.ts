@@ -535,6 +535,20 @@ export type AdminSystemSettings = {
     membershipReminder: boolean;
     emailTemplateWelcome: string;
     emailTemplateReminder: string;
+    minioStorage: {
+        enabled: boolean;
+        endpoint: string;
+        bucket: string;
+        region: string;
+        accessKey: string;
+        secretKey: string;
+        secretConfigured: boolean;
+        useSSL: boolean;
+        usePathStyle: boolean;
+        generatedPrefix: string;
+        canvasPrefix: string;
+        presignedURLExpirySeconds: number;
+    };
 };
 
 export async function fetchAdminSystemSettings(token: string) {
@@ -543,6 +557,10 @@ export async function fetchAdminSystemSettings(token: string) {
 
 export async function saveAdminSystemSettings(token: string, settings: AdminSystemSettings) {
     return apiPost<boolean>("/api/admin/system-settings", settings, token);
+}
+
+export async function testAdminMinIOStorage(token: string, config: AdminSystemSettings["minioStorage"]) {
+    return apiPost<boolean>("/api/admin/system-settings/minio/test", config, token);
 }
 
 export async function uploadAdminLogo(token: string, file: File) {
@@ -658,6 +676,22 @@ export type ImageModelConfig = {
     aspectRatios: string[];
     maxCount: number;
     supportCustomSize: boolean;
+    asyncTask?: ImageAsyncTaskConfig | null;
+};
+
+export type ImageAsyncTaskConfig = {
+    enabled: boolean;
+    taskIdField: string;
+    statusEndpointPath: string;
+    contentEndpointPath?: string;
+    statusMethod: "GET" | "POST";
+    statusField: string;
+    imageUrlPath: string;
+    pendingValues: string[];
+    successValues: string[];
+    failedValues: string[];
+    pollIntervalMs: number;
+    pollTimeoutMs: number;
 };
 
 export type AudioModelConfig = {

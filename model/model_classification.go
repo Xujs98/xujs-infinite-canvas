@@ -153,12 +153,29 @@ func (c *VideoModelConfig) Scan(src interface{}) error {
 	}
 }
 
+// ImageAsyncTaskConfig 图片模型异步任务配置。
+type ImageAsyncTaskConfig struct {
+	Enabled             bool     `json:"enabled"`
+	TaskIDField         string   `json:"taskIdField,omitempty"`
+	StatusEndpointPath  string   `json:"statusEndpointPath,omitempty"`
+	ContentEndpointPath string   `json:"contentEndpointPath,omitempty"`
+	StatusMethod        string   `json:"statusMethod,omitempty"`
+	StatusField         string   `json:"statusField,omitempty"`
+	ImageURLPath        string   `json:"imageUrlPath,omitempty"`
+	PendingValues       []string `json:"pendingValues,omitempty"`
+	SuccessValues       []string `json:"successValues,omitempty"`
+	FailedValues        []string `json:"failedValues,omitempty"`
+	PollIntervalMs      int      `json:"pollIntervalMs,omitempty"`
+	PollTimeoutMs       int      `json:"pollTimeoutMs,omitempty"`
+}
+
 // ImageModelConfig 图片模型参数配置
 type ImageModelConfig struct {
-	Qualities         []string `json:"qualities"`
-	AspectRatios      []string `json:"aspectRatios"`
-	MaxCount          int      `json:"maxCount"`
-	SupportCustomSize bool     `json:"supportCustomSize"`
+	Qualities         []string              `json:"qualities"`
+	AspectRatios      []string              `json:"aspectRatios"`
+	MaxCount          int                   `json:"maxCount"`
+	SupportCustomSize bool                  `json:"supportCustomSize"`
+	AsyncTask         *ImageAsyncTaskConfig `json:"asyncTask,omitempty"`
 }
 
 func (c ImageModelConfig) Value() (driver.Value, error) {

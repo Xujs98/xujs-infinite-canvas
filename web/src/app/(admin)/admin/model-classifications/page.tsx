@@ -20,6 +20,15 @@ const allDurationOptions = [5, 6, 8, 10, 12, 15, 20, "adaptive"];
 const allQualityOptions = ["auto", "high", "medium", "low"];
 const allAspectRatioOptions = ["1:1", "3:2", "2:3", "4:3", "3:4", "16:9", "9:16"];
 
+function formatMilliseconds(value: unknown): string {
+    const milliseconds = Number(value);
+    if (!Number.isFinite(milliseconds) || milliseconds <= 0) return "";
+    if (milliseconds % 3_600_000 === 0) return `${milliseconds / 3_600_000} 小时`;
+    if (milliseconds % 60_000 === 0) return `${milliseconds / 60_000} 分钟`;
+    if (milliseconds % 1000 === 0) return `${milliseconds / 1000} 秒`;
+    return `${milliseconds} 毫秒`;
+}
+
 function buildVideoInputLimit(enabled: unknown, rawMin: unknown, rawMax: unknown, label: string, maxAllowed: number) {
     if (enabled !== true) return null;
     const min = Number(rawMin ?? 0);
@@ -158,6 +167,18 @@ export default function AdminModelClassificationsPage() {
                       imageAspectRatios: item.imageConfig?.aspectRatios || [],
                       imageMaxCount: item.imageConfig?.maxCount,
                       imageSupportCustomSize: item.imageConfig?.supportCustomSize,
+                      imageAsyncTaskEnabled: item.imageConfig?.asyncTask?.enabled ?? false,
+                      imageAsyncTaskIdField: item.imageConfig?.asyncTask?.taskIdField ?? "task_id",
+                      imageAsyncStatusEndpointPath: item.imageConfig?.asyncTask?.statusEndpointPath ?? "/v1/images/generations/{taskId}",
+                      imageAsyncContentEndpointPath: item.imageConfig?.asyncTask?.contentEndpointPath ?? "",
+                      imageAsyncStatusMethod: item.imageConfig?.asyncTask?.statusMethod ?? "GET",
+                      imageAsyncStatusField: item.imageConfig?.asyncTask?.statusField ?? "status",
+                      imageAsyncImageUrlPath: item.imageConfig?.asyncTask?.imageUrlPath ?? "data.0.url",
+                      imageAsyncPendingValues: item.imageConfig?.asyncTask?.pendingValues ?? ["pending", "processing"],
+                      imageAsyncSuccessValues: item.imageConfig?.asyncTask?.successValues ?? ["success"],
+                      imageAsyncFailedValues: item.imageConfig?.asyncTask?.failedValues ?? ["failed"],
+                      imageAsyncPollIntervalMs: item.imageConfig?.asyncTask?.pollIntervalMs ?? 15000,
+                      imageAsyncPollTimeoutMs: item.imageConfig?.asyncTask?.pollTimeoutMs ?? 900000,
                       audioVoices: item.audioConfig?.voices || [],
                       audioFormats: item.audioConfig?.formats || [],
                       audioSpeedMin: item.audioConfig?.speedRange?.min,
@@ -210,7 +231,26 @@ export default function AdminModelClassificationsPage() {
                     "videoAudioInputMax",
                     "requestFields",
                 ],
-                image: ["modelName", "capability", "imageQualities", "imageAspectRatios", "imageMaxCount", "requestFields"],
+                image: [
+                    "modelName",
+                    "capability",
+                    "imageQualities",
+                    "imageAspectRatios",
+                    "imageMaxCount",
+                    "imageAsyncTaskEnabled",
+                    "imageAsyncTaskIdField",
+                    "imageAsyncStatusEndpointPath",
+                    "imageAsyncContentEndpointPath",
+                    "imageAsyncStatusMethod",
+                    "imageAsyncStatusField",
+                    "imageAsyncImageUrlPath",
+                    "imageAsyncPendingValues",
+                    "imageAsyncSuccessValues",
+                    "imageAsyncFailedValues",
+                    "imageAsyncPollIntervalMs",
+                    "imageAsyncPollTimeoutMs",
+                    "requestFields",
+                ],
                 audio: ["modelName", "capability", "audioVoices", "audioFormats", "requestFields"],
                 text: ["modelName", "capability", "requestFields"],
             };
@@ -269,6 +309,22 @@ export default function AdminModelClassificationsPage() {
                     aspectRatios: toArr(values.imageAspectRatios).length ? toArr(values.imageAspectRatios) : ["1:1"],
                     maxCount: values.imageMaxCount || 1,
                     supportCustomSize: values.imageSupportCustomSize ?? true,
+                    asyncTask: values.imageAsyncTaskEnabled
+                        ? {
+                              enabled: true,
+                              taskIdField: String(values.imageAsyncTaskIdField || "").trim(),
+                              statusEndpointPath: String(values.imageAsyncStatusEndpointPath || "").trim(),
+                              contentEndpointPath: String(values.imageAsyncContentEndpointPath || "").trim(),
+                              statusMethod: values.imageAsyncStatusMethod === "POST" ? "POST" : "GET",
+                              statusField: String(values.imageAsyncStatusField || "").trim(),
+                              imageUrlPath: String(values.imageAsyncImageUrlPath || "").trim(),
+                              pendingValues: toArr(values.imageAsyncPendingValues),
+                              successValues: toArr(values.imageAsyncSuccessValues),
+                              failedValues: toArr(values.imageAsyncFailedValues),
+                              pollIntervalMs: Number(values.imageAsyncPollIntervalMs),
+                              pollTimeoutMs: Number(values.imageAsyncPollTimeoutMs),
+                          }
+                        : null,
                 };
             } else if (capability === "audio") {
                 const toArr = (v: unknown): string[] =>
@@ -313,6 +369,9 @@ export default function AdminModelClassificationsPage() {
     const videoImageInputOverride = Form.useWatch("videoImageInputOverride", form);
     const videoVideoInputOverride = Form.useWatch("videoVideoInputOverride", form);
     const videoAudioInputOverride = Form.useWatch("videoAudioInputOverride", form);
+    const imageAsyncTaskEnabled = Form.useWatch("imageAsyncTaskEnabled", form);
+    const imageAsyncPollIntervalMs = Form.useWatch("imageAsyncPollIntervalMs", form);
+    const imageAsyncPollTimeoutMs = Form.useWatch("imageAsyncPollTimeoutMs", form);
 
     // 切换模型类型时清空不相关的字段
     useEffect(() => {
@@ -737,6 +796,83 @@ export default function AdminModelClassificationsPage() {
                                     </Form.Item>
                                 </Col>
                             </Row>
+                            <div className="rounded-md border border-green-100 bg-white p-4">
+                                <Row gutter={[12, 12]} align="middle">
+                                    <Col flex="auto">
+                                        <Typography.Text strong>异步任务轮询</Typography.Text>
+                                        <Typography.Paragraph type="secondary" style={{ margin: "4px 0 0" }}>
+                                            开启后提交请求会自动加入 async: true，并按任务状态获取图片结果。
+                                        </Typography.Paragraph>
+                                    </Col>
+                                    <Col>
+                                        <Form.Item name="imageAsyncTaskEnabled" valuePropName="checked" initialValue={false} style={{ marginBottom: 0 }}>
+                                            <Switch />
+                                        </Form.Item>
+                                    </Col>
+                                </Row>
+
+                                {imageAsyncTaskEnabled && (
+                                    <div className="mt-4 border-t border-green-100 pt-4">
+                                        <Row gutter={[12, 0]}>
+                                            <Col xs={24} sm={12}>
+                                                <Form.Item name="imageAsyncTaskIdField" label="任务 ID 字段" initialValue="task_id" rules={[{ required: true, message: "请输入任务 ID 字段" }]}>
+                                                    <Input placeholder="task_id" />
+                                                </Form.Item>
+                                            </Col>
+                                            <Col xs={24} sm={12}>
+                                                <Form.Item name="imageAsyncStatusMethod" label="状态查询方法" initialValue="GET" rules={[{ required: true }]}>
+                                                    <Select options={[{ value: "GET", label: "GET" }, { value: "POST", label: "POST" }]} />
+                                                </Form.Item>
+                                            </Col>
+                                            <Col xs={24}>
+                                                <Form.Item name="imageAsyncStatusEndpointPath" label="状态轮询端点" initialValue="/v1/images/generations/{taskId}" rules={[{ required: true, message: "请输入状态轮询端点" }]} help="使用 {taskId} 作为任务 ID 占位符">
+                                                    <Input placeholder="/v1/images/generations/{taskId}" />
+                                                </Form.Item>
+                                            </Col>
+                                            <Col xs={24}>
+                                                <Form.Item name="imageAsyncContentEndpointPath" label="内容端点（可选）" help="成功响应没有图片 URL 时，再从该端点读取结果">
+                                                    <Input placeholder="/v1/images/generations/{taskId}/content" />
+                                                </Form.Item>
+                                            </Col>
+                                            <Col xs={24} sm={12}>
+                                                <Form.Item name="imageAsyncStatusField" label="状态字段路径" initialValue="status" rules={[{ required: true, message: "请输入状态字段路径" }]}>
+                                                    <Input placeholder="status" />
+                                                </Form.Item>
+                                            </Col>
+                                            <Col xs={24} sm={12}>
+                                                <Form.Item name="imageAsyncImageUrlPath" label="图片 URL 路径" initialValue="data.0.url" rules={[{ required: true, message: "请输入图片 URL 路径" }]}>
+                                                    <Input placeholder="data.0.url" />
+                                                </Form.Item>
+                                            </Col>
+                                            <Col xs={24}>
+                                                <Form.Item name="imageAsyncPendingValues" label="等待中状态值" initialValue={["pending", "processing"]} rules={[{ required: true, message: "至少填写一个等待中状态" }]}>
+                                                    <Select mode="tags" tokenSeparators={[","]} placeholder="pending, processing" />
+                                                </Form.Item>
+                                            </Col>
+                                            <Col xs={24} sm={12}>
+                                                <Form.Item name="imageAsyncSuccessValues" label="成功状态值" initialValue={["success"]} rules={[{ required: true, message: "至少填写一个成功状态" }]}>
+                                                    <Select mode="tags" tokenSeparators={[","]} placeholder="success" />
+                                                </Form.Item>
+                                            </Col>
+                                            <Col xs={24} sm={12}>
+                                                <Form.Item name="imageAsyncFailedValues" label="失败状态值" initialValue={["failed"]} rules={[{ required: true, message: "至少填写一个失败状态" }]}>
+                                                    <Select mode="tags" tokenSeparators={[","]} placeholder="failed" />
+                                                </Form.Item>
+                                            </Col>
+                                            <Col xs={24} sm={12}>
+                                                <Form.Item name="imageAsyncPollIntervalMs" label="轮询间隔 (ms)" initialValue={15000} rules={[{ required: true, message: "请输入轮询间隔" }]} help={formatMilliseconds(imageAsyncPollIntervalMs) ? `${imageAsyncPollIntervalMs} ms = ${formatMilliseconds(imageAsyncPollIntervalMs)}` : undefined}>
+                                                    <InputNumber min={500} precision={0} step={500} style={{ width: "100%" }} />
+                                                </Form.Item>
+                                            </Col>
+                                            <Col xs={24} sm={12}>
+                                                <Form.Item name="imageAsyncPollTimeoutMs" label="轮询超时 (ms)" initialValue={900000} rules={[{ required: true, message: "请输入轮询超时" }]} help={formatMilliseconds(imageAsyncPollTimeoutMs) ? `${imageAsyncPollTimeoutMs} ms = ${formatMilliseconds(imageAsyncPollTimeoutMs)}` : undefined}>
+                                                    <InputNumber min={500} precision={0} step={1000} style={{ width: "100%" }} />
+                                                </Form.Item>
+                                            </Col>
+                                        </Row>
+                                    </div>
+                                )}
+                            </div>
                         </Card>
                     )}
 

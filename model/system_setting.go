@@ -48,6 +48,17 @@ const (
 	SettingCreditLogRetentionDays   = "credit_log_retention_days"
 	SettingCreditLogMaxRows         = "credit_log_max_rows"
 	SettingUserCreditLogVisibleRows = "user_credit_log_visible_rows"
+	SettingMinIOEnabled             = "minio_enabled"
+	SettingMinIOEndpoint            = "minio_endpoint"
+	SettingMinIOBucket              = "minio_bucket"
+	SettingMinIORegion              = "minio_region"
+	SettingMinIOAccessKey           = "minio_access_key"
+	SettingMinIOSecretKey           = "minio_secret_key"
+	SettingMinIOUseSSL              = "minio_use_ssl"
+	SettingMinIOUsePathStyle        = "minio_use_path_style"
+	SettingMinIOGeneratedPrefix     = "minio_generated_prefix"
+	SettingMinIOCanvasPrefix        = "minio_canvas_prefix"
+	SettingMinIOPresignedURLExpiry  = "minio_presigned_url_expiry_seconds"
 )
 
 const (
@@ -57,45 +68,62 @@ const (
 
 // SystemSettings 所有配置的聚合结构，方便前端一次性读取。
 type SystemSettings struct {
-	SiteName                 string            `json:"siteName"`
-	SiteSubtitle             string            `json:"siteSubtitle"`
-	SiteLogo                 string            `json:"siteLogo"`
-	ServiceContact           string            `json:"serviceContact"`
-	RegisterGiftCredits      int               `json:"registerGiftCredits"`
-	InviteRewardCredits      int               `json:"inviteRewardCredits"`
-	AllowCustomChannel       bool              `json:"allowCustomChannel"`
-	AllowRegister            bool              `json:"allowRegister"`
-	AgentEnabled             bool              `json:"agentEnabled"`
-	AgentVisible             bool              `json:"agentVisible"`
-	AgentAccessLevel         string            `json:"agentAccessLevel"`
-	AssistantEnabled         bool              `json:"assistantEnabled"`
-	CheckInEnabled           bool              `json:"checkInEnabled"`
-	CheckInRewardMin         int               `json:"checkInRewardMin"`
-	CheckInRewardMax         int               `json:"checkInRewardMax"`
-	VideoMaxTimeoutSeconds   int               `json:"videoMaxTimeoutSeconds"`
-	AppErrorMessagePrefix    string            `json:"appErrorMessagePrefix"`
-	AppErrorShowDetails      bool              `json:"appErrorShowDetails"`
-	AppErrorMessages         map[string]string `json:"appErrorMessages"`
-	RequestLogCleanupEnabled bool              `json:"requestLogCleanupEnabled"`
-	RequestLogRetentionDays  int               `json:"requestLogRetentionDays"`
-	RequestLogMaxRows        int               `json:"requestLogMaxRows"`
-	CallLogCleanupEnabled    bool              `json:"callLogCleanupEnabled"`
-	CallLogRetentionDays     int               `json:"callLogRetentionDays"`
-	CallLogMaxRows           int               `json:"callLogMaxRows"`
-	CreditLogCleanupEnabled  bool              `json:"creditLogCleanupEnabled"`
-	CreditLogRetentionDays   int               `json:"creditLogRetentionDays"`
-	CreditLogMaxRows         int               `json:"creditLogMaxRows"`
-	UserCreditLogVisibleRows int               `json:"userCreditLogVisibleRows"`
-	EmailEnabled             bool              `json:"emailEnabled"`
-	SMTPHost                 string            `json:"smtpHost"`
-	SMTPPort                 int               `json:"smtpPort"`
-	SMTPUsername             string            `json:"smtpUsername"`
-	SMTPPassword             string            `json:"smtpPassword"`
-	SMTPFrom                 string            `json:"smtpFrom"`
-	SMTPTLS                  bool              `json:"smtpTLS"`
-	MembershipReminder       bool              `json:"membershipReminder"`
-	EmailTemplateWelcome     string            `json:"emailTemplateWelcome"`
-	EmailTemplateReminder    string            `json:"emailTemplateReminder"`
+	SiteName                 string             `json:"siteName"`
+	SiteSubtitle             string             `json:"siteSubtitle"`
+	SiteLogo                 string             `json:"siteLogo"`
+	ServiceContact           string             `json:"serviceContact"`
+	RegisterGiftCredits      int                `json:"registerGiftCredits"`
+	InviteRewardCredits      int                `json:"inviteRewardCredits"`
+	AllowCustomChannel       bool               `json:"allowCustomChannel"`
+	AllowRegister            bool               `json:"allowRegister"`
+	AgentEnabled             bool               `json:"agentEnabled"`
+	AgentVisible             bool               `json:"agentVisible"`
+	AgentAccessLevel         string             `json:"agentAccessLevel"`
+	AssistantEnabled         bool               `json:"assistantEnabled"`
+	CheckInEnabled           bool               `json:"checkInEnabled"`
+	CheckInRewardMin         int                `json:"checkInRewardMin"`
+	CheckInRewardMax         int                `json:"checkInRewardMax"`
+	VideoMaxTimeoutSeconds   int                `json:"videoMaxTimeoutSeconds"`
+	AppErrorMessagePrefix    string             `json:"appErrorMessagePrefix"`
+	AppErrorShowDetails      bool               `json:"appErrorShowDetails"`
+	AppErrorMessages         map[string]string  `json:"appErrorMessages"`
+	RequestLogCleanupEnabled bool               `json:"requestLogCleanupEnabled"`
+	RequestLogRetentionDays  int                `json:"requestLogRetentionDays"`
+	RequestLogMaxRows        int                `json:"requestLogMaxRows"`
+	CallLogCleanupEnabled    bool               `json:"callLogCleanupEnabled"`
+	CallLogRetentionDays     int                `json:"callLogRetentionDays"`
+	CallLogMaxRows           int                `json:"callLogMaxRows"`
+	CreditLogCleanupEnabled  bool               `json:"creditLogCleanupEnabled"`
+	CreditLogRetentionDays   int                `json:"creditLogRetentionDays"`
+	CreditLogMaxRows         int                `json:"creditLogMaxRows"`
+	UserCreditLogVisibleRows int                `json:"userCreditLogVisibleRows"`
+	EmailEnabled             bool               `json:"emailEnabled"`
+	SMTPHost                 string             `json:"smtpHost"`
+	SMTPPort                 int                `json:"smtpPort"`
+	SMTPUsername             string             `json:"smtpUsername"`
+	SMTPPassword             string             `json:"smtpPassword"`
+	SMTPFrom                 string             `json:"smtpFrom"`
+	SMTPTLS                  bool               `json:"smtpTLS"`
+	MembershipReminder       bool               `json:"membershipReminder"`
+	EmailTemplateWelcome     string             `json:"emailTemplateWelcome"`
+	EmailTemplateReminder    string             `json:"emailTemplateReminder"`
+	MinIOStorage             MinIOStorageConfig `json:"minioStorage"`
+}
+
+// MinIOStorageConfig 是画布服务端连接共享媒体桶的配置。
+type MinIOStorageConfig struct {
+	Enabled                   bool   `json:"enabled"`
+	Endpoint                  string `json:"endpoint"`
+	Bucket                    string `json:"bucket"`
+	Region                    string `json:"region"`
+	AccessKey                 string `json:"accessKey"`
+	SecretKey                 string `json:"secretKey,omitempty"`
+	SecretConfigured          bool   `json:"secretConfigured"`
+	UseSSL                    bool   `json:"useSSL"`
+	UsePathStyle              bool   `json:"usePathStyle"`
+	GeneratedPrefix           string `json:"generatedPrefix"`
+	CanvasPrefix              string `json:"canvasPrefix"`
+	PresignedURLExpirySeconds int    `json:"presignedURLExpirySeconds"`
 }
 
 // DefaultAppErrorMessages 是 App 客户可见错误文案的服务端默认值。

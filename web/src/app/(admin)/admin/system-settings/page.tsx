@@ -5,7 +5,7 @@ import { App, Button, Col, Form, Input, InputNumber, Row, Space, Switch, Typogra
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { DEFAULT_SITE_NAME } from "@/constant/brand";
-import { removeAdminLogo, uploadAdminLogo } from "@/services/api/admin";
+import { removeAdminLogo, testAdminMinIOStorage, uploadAdminLogo } from "@/services/api/admin";
 import { useUserStore } from "@/stores/use-user-store";
 import { useSystemSettings } from "./use-system-settings";
 
@@ -13,6 +13,7 @@ const tabs = [
     { key: "general", label: "通用设置", icon: <ToolOutlined /> },
     { key: "registration", label: "注册与积分", icon: <UserAddOutlined /> },
     { key: "email", label: "邮件设置", icon: <MailOutlined /> },
+    { key: "mediaStorage", label: "媒体资产与存储", icon: <DatabaseOutlined /> },
 ] as const;
 
 const appErrorMessageFields = [
@@ -35,6 +36,7 @@ export default function AdminSystemSettingsPage() {
     const token = useUserStore((state) => state.token);
     const { message } = App.useApp();
     const [logoUploading, setLogoUploading] = useState(false);
+    const [minioTesting, setMinioTesting] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
     const [activeTab, setActiveTab] = useState<string>("general");
     const tabRefs = useRef<Map<string, HTMLButtonElement>>(new Map());
@@ -116,11 +118,26 @@ export default function AdminSystemSettingsPage() {
         }
     };
 
+    const handleMinIOTest = async () => {
+        setMinioTesting(true);
+        try {
+            const config = form.getFieldValue("minioStorage");
+            await testAdminMinIOStorage(token, config);
+            message.success("MinIO 连接成功");
+        } catch (error) {
+            message.error(error instanceof Error ? error.message : "MinIO 连接失败");
+        } finally {
+            setMinioTesting(false);
+        }
+    };
+
     const emailEnabled = Form.useWatch("emailEnabled", form);
     const siteLogo = Form.useWatch("siteLogo", form);
     const requestLogCleanupEnabled = Form.useWatch("requestLogCleanupEnabled", form);
     const callLogCleanupEnabled = Form.useWatch("callLogCleanupEnabled", form);
     const creditLogCleanupEnabled = Form.useWatch("creditLogCleanupEnabled", form);
+    const minioEnabled = Form.useWatch(["minioStorage", "enabled"], form);
+    const presignedURLExpirySeconds = Form.useWatch(["minioStorage", "presignedURLExpirySeconds"], form);
 
     return (
         <div className="admin-config-page min-h-screen p-6">
@@ -367,6 +384,98 @@ export default function AdminSystemSettingsPage() {
                         </div>
                     )}
 
+                    {activeTab === "mediaStorage" && (
+                        <div className="space-y-5">
+                            <div className="rounded-xl border border-gray-100 bg-white p-6 shadow-sm">
+                                <div className="mb-5 flex flex-wrap items-start justify-between gap-4">
+                                    <div className="flex items-center gap-3">
+                                        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-violet-50 text-violet-600">
+                                            <DatabaseOutlined />
+                                        </div>
+                                        <div>
+                                            <div className="text-sm font-semibold text-gray-800">媒体资产与存储</div>
+                                            <div className="mt-0.5 text-xs text-gray-400">连接与聚合平台共用的私有 MinIO 存储桶，避免重复保存生成文件</div>
+                                        </div>
+                                    </div>
+                                    <Button loading={minioTesting} onClick={() => void handleMinIOTest()}>
+                                        测试连接
+                                    </Button>
+                                </div>
+                                <Row gutter={[20, 0]}>
+                                    <Col xs={24} md={8}>
+                                        <Form.Item name={["minioStorage", "enabled"]} label="启用媒体资产存储" valuePropName="checked" extra="启用前请先测试连接。">
+                                            <Switch checkedChildren="开启" unCheckedChildren="关闭" />
+                                        </Form.Item>
+                                    </Col>
+                                    <Col xs={24} md={8}>
+                                        <Form.Item name={["minioStorage", "useSSL"]} label="使用 HTTPS" valuePropName="checked">
+                                            <Switch checkedChildren="开启" unCheckedChildren="关闭" />
+                                        </Form.Item>
+                                    </Col>
+                                    <Col xs={24} md={8}>
+                                        <Form.Item name={["minioStorage", "usePathStyle"]} label="使用路径式访问" valuePropName="checked" extra="兼容 MinIO 的 S3 路径访问方式。">
+                                            <Switch checkedChildren="开启" unCheckedChildren="关闭" />
+                                        </Form.Item>
+                                    </Col>
+                                    <Col span={24}>
+                                        <Form.Item name={["minioStorage", "endpoint"]} label="服务地址" rules={minioEnabled ? [{ required: true, message: "请输入 MinIO 服务地址" }] : undefined}>
+                                            <Input placeholder="https://media.julongkj.top" />
+                                        </Form.Item>
+                                    </Col>
+                                    <Col xs={24} md={12}>
+                                        <Form.Item name={["minioStorage", "bucket"]} label="存储桶" rules={minioEnabled ? [{ required: true, message: "请输入存储桶名称" }] : undefined}>
+                                            <Input placeholder="julong-media" />
+                                        </Form.Item>
+                                    </Col>
+                                    <Col xs={24} md={12}>
+                                        <Form.Item name={["minioStorage", "region"]} label="区域">
+                                            <Input placeholder="us-east-1" />
+                                        </Form.Item>
+                                    </Col>
+                                    <Col xs={24} md={12}>
+                                        <Form.Item name={["minioStorage", "accessKey"]} label="访问密钥" rules={minioEnabled ? [{ required: true, message: "请输入访问密钥" }] : undefined}>
+                                            <Input autoComplete="off" />
+                                        </Form.Item>
+                                    </Col>
+                                    <Col xs={24} md={12}>
+                                        <Form.Item shouldUpdate noStyle>
+                                            {({ getFieldValue }) => (
+                                                <Form.Item
+                                                    name={["minioStorage", "secretKey"]}
+                                                    label="私密密钥"
+                                                    rules={minioEnabled && !getFieldValue(["minioStorage", "secretConfigured"]) ? [{ required: true, message: "请输入私密密钥" }] : undefined}
+                                                    extra={getFieldValue(["minioStorage", "secretConfigured"]) ? "已配置；留空保存表示继续使用原密钥。" : undefined}
+                                                >
+                                                    <Input.Password autoComplete="new-password" />
+                                                </Form.Item>
+                                            )}
+                                        </Form.Item>
+                                    </Col>
+                                    <Col xs={24} md={12}>
+                                        <Form.Item name={["minioStorage", "generatedPrefix"]} label="聚合平台生成目录" extra="双方约定读取 generated/images/YYYY/MM/DD/{sha256}.{ext}">
+                                            <Input placeholder="generated/images" />
+                                        </Form.Item>
+                                    </Col>
+                                    <Col xs={24} md={12}>
+                                        <Form.Item name={["minioStorage", "canvasPrefix"]} label="画布上传目录" extra="画布主动上传的素材保存在该目录下。">
+                                            <Input placeholder="canvas/uploads" />
+                                        </Form.Item>
+                                    </Col>
+                                    <Col xs={24} md={12}>
+                                        <Form.Item
+                                            name={["minioStorage", "presignedURLExpirySeconds"]}
+                                            label="临时图片地址有效期"
+                                            extra={`视频提交时按需生成，当前约 ${formatExpiryDuration(presignedURLExpirySeconds)}；允许 60 秒到 24 小时。`}
+                                            rules={[{ required: true, message: "请输入临时图片地址有效期" }]}
+                                        >
+                                            <InputNumber min={60} max={86400} precision={0} className="w-full" addonAfter="秒" />
+                                        </Form.Item>
+                                    </Col>
+                                </Row>
+                            </div>
+                        </div>
+                    )}
+
                     {activeTab === "registration" && (
                         <div className="space-y-5">
                             <div className="rounded-xl border border-gray-100 bg-white p-6 shadow-sm">
@@ -545,4 +654,12 @@ export default function AdminSystemSettingsPage() {
             </div>
         </div>
     );
+}
+
+function formatExpiryDuration(raw: unknown): string {
+    const seconds = Number(raw);
+    if (!Number.isFinite(seconds) || seconds <= 0) return "1 小时";
+    if (seconds % 3600 === 0) return `${seconds / 3600} 小时`;
+    if (seconds % 60 === 0) return `${seconds / 60} 分钟`;
+    return `${Math.round(seconds)} 秒`;
 }

@@ -503,3 +503,27 @@ docker builder prune
 ```
 
 不要执行会批量删除镜像、卷或数据的高风险清理命令。
+对，服务器正常更新本质上就是三步。刚才给的是包含停机备份、校验和回滚的完整生产流程，所以命令较多。
+如果数据已经有备份，并且新镜像已经推送到 Docker Hub，服务器直接执行：
+cd /opt/julong-canvas
+
+git pull --ff-only origin main
+docker compose pull
+docker compose up -d
+然后简单确认：
+docker compose ps
+curl https://canvas.julongkj.top/api/health
+但在执行前，本地必须先构建并推送镜像：
+cd /Users/xujs/Agent.localized/xujs-infinite-canvas-main
+
+./scripts/docker-publish.sh 877004b
+如果服务器 .env 使用固定标签，还要修改一次：
+sed -i 's/^IMAGE_TAG=.*/IMAGE_TAG=877004b/' .env
+然后才是：
+docker compose pull
+docker compose up -d
+所以最简服务器流程确实是：
+git pull
+docker compose pull
+docker compose up -d
+其中正确命令是 docker compose up -d，不是 docker -d。备份、日志和健康检查只是降低部署失败风险，并非每次强制执行。

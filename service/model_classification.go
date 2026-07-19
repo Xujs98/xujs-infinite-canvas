@@ -63,6 +63,41 @@ func validateVideoModelConfig(config *model.VideoModelConfig) error {
 	return validateVideoModelInputLimit("音频", config.AudioInput, 9)
 }
 
+func validateImageModelConfig(config *model.ImageModelConfig) error {
+	if config == nil || config.AsyncTask == nil || !config.AsyncTask.Enabled {
+		return nil
+	}
+	task := config.AsyncTask
+	required := []struct {
+		label string
+		value string
+	}{
+		{"任务 ID 字段", task.TaskIDField},
+		{"状态轮询端点", task.StatusEndpointPath},
+		{"状态字段路径", task.StatusField},
+		{"图片 URL 路径", task.ImageURLPath},
+	}
+	for _, field := range required {
+		if strings.TrimSpace(field.value) == "" {
+			return fmt.Errorf("开启图片异步任务后，%s不能为空", field.label)
+		}
+	}
+	method := strings.ToUpper(strings.TrimSpace(task.StatusMethod))
+	if method != "GET" && method != "POST" {
+		return fmt.Errorf("状态查询方法只能是 GET 或 POST")
+	}
+	if len(task.PendingValues) == 0 || len(task.SuccessValues) == 0 || len(task.FailedValues) == 0 {
+		return fmt.Errorf("等待中、成功和失败状态值均不能为空")
+	}
+	if task.PollIntervalMs < 500 {
+		return fmt.Errorf("轮询间隔不能小于 500 ms")
+	}
+	if task.PollTimeoutMs < task.PollIntervalMs {
+		return fmt.Errorf("轮询超时不能小于轮询间隔")
+	}
+	return nil
+}
+
 func ListModelClassifications(keyword string, page, pageSize int) (model.ModelClassificationList, error) {
 	return repository.ListModelClassifications(keyword, page, pageSize)
 }
@@ -72,6 +107,9 @@ func CreateModelClassification(classification model.ModelClassification) (model.
 		return model.ModelClassification{}, err
 	}
 	if err := validateVideoModelConfig(classification.VideoConfig); err != nil {
+		return model.ModelClassification{}, err
+	}
+	if err := validateImageModelConfig(classification.ImageConfig); err != nil {
 		return model.ModelClassification{}, err
 	}
 	now := time.Now().Format(time.RFC3339)
@@ -86,6 +124,9 @@ func UpdateModelClassification(id string, classification model.ModelClassificati
 		return model.ModelClassification{}, err
 	}
 	if err := validateVideoModelConfig(classification.VideoConfig); err != nil {
+		return model.ModelClassification{}, err
+	}
+	if err := validateImageModelConfig(classification.ImageConfig); err != nil {
 		return model.ModelClassification{}, err
 	}
 	db, dbErr := repository.DB()

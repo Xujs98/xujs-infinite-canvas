@@ -62,6 +62,9 @@ func GetSystemSettings() (model.SystemSettings, error) {
 			}
 		}
 	}
+	minioConfig := minIOStorageConfigFromMap(m)
+	minioConfig.SecretConfigured = strings.TrimSpace(minioConfig.SecretKey) != ""
+	minioConfig.SecretKey = ""
 	return model.SystemSettings{
 		SiteName:                 siteName,
 		SiteSubtitle:             m[model.SettingSiteSubtitle],
@@ -102,11 +105,24 @@ func GetSystemSettings() (model.SystemSettings, error) {
 		MembershipReminder:       m[model.SettingMembershipReminder] == "true",
 		EmailTemplateWelcome:     m[model.SettingEmailTemplateWelcome],
 		EmailTemplateReminder:    m[model.SettingEmailTemplateReminder],
+		MinIOStorage:             minioConfig,
 	}, nil
 }
 
 // SaveSystemSettings 保存系统配置。
 func SaveSystemSettings(input model.SystemSettings) error {
+	existingSettings, err := repository.GetSystemSettings()
+	if err != nil {
+		return err
+	}
+	minioConfig := input.MinIOStorage
+	if strings.TrimSpace(minioConfig.SecretKey) == "" {
+		minioConfig.SecretKey = existingSettings[model.SettingMinIOSecretKey]
+	}
+	applyMinIOStorageDefaults(&minioConfig)
+	if err := validateMinIOStorageConfig(minioConfig, minioConfig.Enabled); err != nil {
+		return err
+	}
 	if err := normalizeLogCleanupSettings(&input); err != nil {
 		return err
 	}
@@ -157,6 +173,17 @@ func SaveSystemSettings(input model.SystemSettings) error {
 		model.SettingMembershipReminder:       boolStr(input.MembershipReminder),
 		model.SettingEmailTemplateWelcome:     input.EmailTemplateWelcome,
 		model.SettingEmailTemplateReminder:    input.EmailTemplateReminder,
+		model.SettingMinIOEnabled:             boolStr(minioConfig.Enabled),
+		model.SettingMinIOEndpoint:            minioConfig.Endpoint,
+		model.SettingMinIOBucket:              minioConfig.Bucket,
+		model.SettingMinIORegion:              minioConfig.Region,
+		model.SettingMinIOAccessKey:           minioConfig.AccessKey,
+		model.SettingMinIOSecretKey:           minioConfig.SecretKey,
+		model.SettingMinIOUseSSL:              boolStr(minioConfig.UseSSL),
+		model.SettingMinIOUsePathStyle:        boolStr(minioConfig.UsePathStyle),
+		model.SettingMinIOGeneratedPrefix:     minioConfig.GeneratedPrefix,
+		model.SettingMinIOCanvasPrefix:        minioConfig.CanvasPrefix,
+		model.SettingMinIOPresignedURLExpiry:  strconv.Itoa(minioConfig.PresignedURLExpirySeconds),
 	}
 	if err := repository.SaveSystemSettings(m); err != nil {
 		return err

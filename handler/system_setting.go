@@ -136,3 +136,17 @@ func AdminSaveSystemSettings(w http.ResponseWriter, r *http.Request) {
 
 	OK(w, true)
 }
+
+// AdminTestMinIOStorage 使用未保存的表单配置测试共享媒体桶连接。
+func AdminTestMinIOStorage(w http.ResponseWriter, r *http.Request) {
+	var request model.MinIOStorageConfig
+	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
+		Fail(w, "参数错误")
+		return
+	}
+	if err := service.TestMinIOStorage(r.Context(), request); err != nil {
+		FailError(w, err)
+		return
+	}
+	OK(w, true)
+}
