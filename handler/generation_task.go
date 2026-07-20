@@ -164,6 +164,9 @@ func prepareAIRequestBody(body []byte, contentType string, modelName string, cha
 			}
 		}
 	}
+	if finalContentType == "application/json" {
+		finalBody = normalizeStandardAIRequestTypes(finalBody)
+	}
 	return finalBody, finalContentType
 }
 

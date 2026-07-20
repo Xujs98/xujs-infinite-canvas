@@ -15,6 +15,7 @@ export const NODE_DEFAULT_SIZE = {
     [CanvasNodeType.Video]: { width: 420, height: 236, title: "Video" },
     [CanvasNodeType.Audio]: { width: 340, height: 120, title: "Audio" },
     [CanvasNodeType.Script]: { width: 420, height: 520, title: "视频脚本创作" },
+    [CanvasNodeType.Pdf]: { width: 280, height: 360, title: "PDF 文档" },
 } satisfies Record<CanvasNodeType, { width: number; height: number; title: string }>;
 
 export const NODE_SPECS = {
@@ -41,6 +42,10 @@ export const NODE_SPECS = {
     [CanvasNodeType.Script]: {
         ...NODE_DEFAULT_SIZE[CanvasNodeType.Script],
         metadata: { content: "", status: "idle", scriptMessages: [] },
+    },
+    [CanvasNodeType.Pdf]: {
+        ...NODE_DEFAULT_SIZE[CanvasNodeType.Pdf],
+        metadata: { content: "", status: "success", mimeType: "application/pdf", pdfPageCount: 0 },
     },
 } satisfies Record<CanvasNodeType, CanvasNodeSpec>;
 

@@ -16,6 +16,7 @@ export enum CanvasNodeType {
     Video = "video",
     Audio = "audio",
     Script = "script",
+    Pdf = "pdf",
 }
 
 export type CanvasNodeStatus = "idle" | "success" | "loading" | "error";
@@ -63,6 +64,10 @@ export type CanvasNodeMetadata = {
     generationTaskProvider?: "openai" | "seedance";
     generationTaskModel?: string;
     generationTaskCanvasId?: string;
+    pdfPageCount?: number;
+    pdfPreviewDataUrl?: string;
+    pdfPreviewWidth?: number;
+    pdfPreviewHeight?: number;
 };
 
 export type CanvasNodeData = {

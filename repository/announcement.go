@@ -59,7 +59,7 @@ func DeleteAnnouncement(id string) error {
 	return db.Delete(&model.Announcement{}, "id = ?", id).Error
 }
 
-func GetActiveAnnouncements(target string) ([]model.Announcement, error) {
+func GetActiveAnnouncements(platform string, subscribed bool) ([]model.Announcement, error) {
 	db, err := DB()
 	if err != nil {
 		return nil, err
@@ -68,11 +68,19 @@ func GetActiveAnnouncements(target string) ([]model.Announcement, error) {
 	tx := db.Model(&model.Announcement{}).Where("status = ?", model.AnnouncementStatusActive)
 	tx = tx.Where("(start_time IS NULL OR start_time <= ?)", now)
 	tx = tx.Where("(end_time IS NULL OR end_time >= ?)", now)
-	if target == "member" {
-		tx = tx.Where("target IN ('all', 'member')")
+	targets := []string{string(model.AnnouncementTargetAll)}
+	if platform == string(model.AnnouncementTargetApp) {
+		targets = append(targets, string(model.AnnouncementTargetApp))
 	} else {
-		tx = tx.Where("target = 'all'")
+		targets = append(targets, string(model.AnnouncementTargetWeb))
 	}
+	if subscribed {
+		targets = append(targets,
+			string(model.AnnouncementTargetSubscription),
+			string(model.AnnouncementTargetMember),
+		)
+	}
+	tx = tx.Where("target IN ?", targets)
 	var items []model.Announcement
 	err = tx.Order("pinned desc, created_at desc").Find(&items).Error
 	return items, err

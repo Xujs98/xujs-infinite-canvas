@@ -3,6 +3,8 @@ package handler
 import (
 	"encoding/json"
 	"net/http"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/basketikun/infinite-canvas/model"
@@ -111,11 +113,16 @@ func AdminBatchUpdateAnnouncementPinned(w http.ResponseWriter, r *http.Request) 
 }
 
 func PublicAnnouncements(w http.ResponseWriter, r *http.Request) {
-	target := r.URL.Query().Get("target")
-	if target == "" {
-		target = "all"
+	platform := strings.ToLower(strings.TrimSpace(r.URL.Query().Get("platform")))
+	if platform != string(model.AnnouncementTargetApp) {
+		platform = string(model.AnnouncementTargetWeb)
 	}
-	items, err := service.GetActiveAnnouncements(target)
+	subscribed, _ := strconv.ParseBool(r.URL.Query().Get("subscriber"))
+	// Keep older clients that used target=member working.
+	if strings.EqualFold(r.URL.Query().Get("target"), string(model.AnnouncementTargetMember)) {
+		subscribed = true
+	}
+	items, err := service.GetActiveAnnouncements(platform, subscribed)
 	if err != nil {
 		FailError(w, err)
 		return

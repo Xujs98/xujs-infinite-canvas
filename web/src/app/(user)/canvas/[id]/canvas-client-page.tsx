@@ -12,7 +12,7 @@ import { createVideoGenerationTask, pollVideoGenerationTask, storeGeneratedVideo
 import { DOCS_URL } from "@/constant/env";
 import { defaultConfig, type AiConfig, useConfigStore, useEffectiveConfig } from "@/stores/use-config-store";
 import { resolveImageUrl, uploadImage, type UploadedImage } from "@/services/image-storage";
-import { resolveMediaUrl, uploadMediaFile, type UploadedFile } from "@/services/file-storage";
+import { cleanupUnusedMedia, deleteStoredMedia, getStoredMediaBytes, resolveMediaUrl, uploadMediaFile, type UploadedFile } from "@/services/file-storage";
 import { nanoid } from "nanoid";
 import { getDataUrlByteSize, readImageMeta } from "@/lib/image-utils";
 import { type CanvasBackgroundMode, type CanvasTheme } from "@/lib/canvas-theme";
@@ -39,6 +39,8 @@ import { CanvasNodeSplitDialog, type CanvasImageSplitParams } from "../component
 import { CanvasNodeUpscaleDialog, type CanvasImageUpscaleParams } from "../components/canvas-node-upscale-dialog";
 import { buildNodeChatMessages, buildNodeGenerationContext, buildNodeGenerationInputs, hydrateNodeGenerationContext, type NodeGenerationInput } from "../components/canvas-node-generation";
 import { CanvasNodeHoverToolbar, CanvasNodeInfoModal } from "../components/canvas-node-hover-toolbar";
+import { CanvasPdfPreviewDialog } from "../components/canvas-pdf-preview-dialog";
+import { CanvasPdfToolsDialog, type PdfImageOutput } from "../components/canvas-pdf-tools-dialog";
 import { InfiniteCanvas } from "../components/infinite-canvas";
 import { Minimap } from "../components/canvas-mini-map";
 import { CanvasNode } from "../components/canvas-node";
@@ -53,6 +55,7 @@ import { CanvasTimelineEditor, createDefaultTimeline, type TimelineData } from "
 import { useCanvasStore } from "../stores/use-canvas-store";
 import { applyCanvasAgentOps, type CanvasAgentOp, type CanvasAgentSnapshot } from "../utils/canvas-agent-ops";
 import { buildCanvasResourceReferences, buildNodeMentionReferences } from "../utils/canvas-resource-references";
+import { blobToDataUrl, inspectPdf } from "../utils/pdf-processing";
 import {
     CanvasNodeType,
     type CanvasAssistantImage,
@@ -329,6 +332,8 @@ function InfiniteCanvasPage() {
     const [editingNodeId, setEditingNodeId] = useState<string | null>(null);
     const [editRequestNonce, setEditRequestNonce] = useState(0);
     const [infoNodeId, setInfoNodeId] = useState<string | null>(null);
+    const [pdfToolsNodeId, setPdfToolsNodeId] = useState<string | null>(null);
+    const [pdfPreviewNodeId, setPdfPreviewNodeId] = useState<string | null>(null);
     const [cropNodeId, setCropNodeId] = useState<string | null>(null);
     const [maskEditNodeId, setMaskEditNodeId] = useState<string | null>(null);
     const [splitNodeId, setSplitNodeId] = useState<string | null>(null);
@@ -366,6 +371,8 @@ function InfiniteCanvasPage() {
     const connectionTargetNodeIdRef = useRef(connectionTargetNodeId);
     const selectionBoxRef = useRef(selectionBox);
     const pendingConnectionCreateRef = useRef(pendingConnectionCreate);
+    const pdfImportInFlightRef = useRef(0);
+    const pdfCleanupInFlightRef = useRef(false);
 
     const createHistoryEntry = useCallback(
         (): CanvasHistoryEntry => ({
@@ -385,6 +392,35 @@ function InfiniteCanvasPage() {
         },
         [cleanupAssetImages],
     );
+
+    useEffect(() => {
+        if (!hydrated) return;
+
+        const cleanupOrphanedPdfFiles = async () => {
+            if (pdfImportInFlightRef.current > 0 || pdfCleanupInFlightRef.current) return;
+            pdfCleanupInFlightRef.current = true;
+            try {
+                await cleanupUnusedMedia(
+                    {
+                        projects: useCanvasStore.getState().projects,
+                        nodes: nodesRef.current,
+                        history: historyRef.current,
+                        lastHistory: lastHistoryRef.current,
+                    },
+                    { keyPrefixes: ["pdf:"] },
+                );
+            } finally {
+                pdfCleanupInFlightRef.current = false;
+            }
+        };
+
+        const initialTimer = window.setTimeout(() => void cleanupOrphanedPdfFiles(), 30_000);
+        const interval = window.setInterval(() => void cleanupOrphanedPdfFiles(), 10 * 60_000);
+        return () => {
+            window.clearTimeout(initialTimer);
+            window.clearInterval(interval);
+        };
+    }, [hydrated]);
 
     useEffect(() => {
         if (!hydrated) return;
@@ -666,6 +702,8 @@ function InfiniteCanvasPage() {
     const nodeById = useMemo(() => new Map(nodes.map((node) => [node.id, node])), [nodes]);
     const toolbarNode = toolbarNodeId ? nodeById.get(toolbarNodeId) || null : null;
     const infoNode = infoNodeId ? nodeById.get(infoNodeId) || null : null;
+    const pdfToolsNode = pdfToolsNodeId ? nodeById.get(pdfToolsNodeId) || null : null;
+    const pdfPreviewNode = pdfPreviewNodeId ? nodeById.get(pdfPreviewNodeId) || null : null;
     const cropNode = cropNodeId ? nodeById.get(cropNodeId) || null : null;
     const maskEditNode = maskEditNodeId ? nodeById.get(maskEditNodeId) || null : null;
     const splitNode = splitNodeId ? nodeById.get(splitNodeId) || null : null;
@@ -1402,6 +1440,84 @@ function InfiniteCanvasPage() {
         setSelectedConnectionId(null);
     }, []);
 
+    const createPdfFileNode = useCallback(async (file: File, position: Position) => {
+        if (file.size > MAX_WEB_PDF_FILE_BYTES) {
+            throw new Error(`单个 PDF 不能超过 ${formatStorageLimit(MAX_WEB_PDF_FILE_BYTES)}`);
+        }
+
+        pdfImportInFlightRef.current += 1;
+        let stored: UploadedFile | null = null;
+        try {
+            const storedBytes = await getStoredMediaBytes({ keyPrefixes: ["pdf:"] });
+            if (storedBytes + file.size > MAX_WEB_PDF_STORAGE_BYTES) {
+                throw new Error(`浏览器中的 PDF 总占用不能超过 ${formatStorageLimit(MAX_WEB_PDF_STORAGE_BYTES)}，请先删除不再使用的 PDF 节点或画布`);
+            }
+
+            stored = await uploadMediaFile(file, "pdf");
+            const inspection = await inspectPdf(stored.url);
+            const previewDataUrl = await blobToDataUrl(inspection.preview.blob);
+            const spec = NODE_DEFAULT_SIZE[CanvasNodeType.Pdf];
+            const id = `pdf-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+            setNodes((prev) => [
+                ...prev,
+                {
+                    id,
+                    type: CanvasNodeType.Pdf,
+                    title: file.name,
+                    position: { x: position.x - spec.width / 2, y: position.y - spec.height / 2 },
+                    width: spec.width,
+                    height: spec.height,
+                    metadata: {
+                        content: stored?.url || "",
+                        storageKey: stored?.storageKey,
+                        mimeType: "application/pdf",
+                        bytes: file.size,
+                        status: NODE_STATUS_SUCCESS,
+                        pdfPageCount: inspection.pageCount,
+                        pdfPreviewDataUrl: previewDataUrl,
+                        pdfPreviewWidth: inspection.preview.width,
+                        pdfPreviewHeight: inspection.preview.height,
+                    },
+                },
+            ]);
+            setSelectedNodeIds(new Set([id]));
+            setSelectedConnectionId(null);
+        } catch (error) {
+            if (stored) await deleteStoredMedia([stored.storageKey]);
+            throw error;
+        } finally {
+            pdfImportInFlightRef.current -= 1;
+        }
+    }, []);
+
+    const createPdfImageNodes = useCallback(async (sourceNode: CanvasNodeData, images: PdfImageOutput[]) => {
+        const created: CanvasNodeData[] = [];
+        const columns = images.length === 1 ? 1 : Math.min(3, images.length);
+        for (let index = 0; index < images.length; index += 1) {
+            const output = images[index];
+            const uploaded = await uploadImage(output.blob);
+            const nodeSize = fitNodeSize(uploaded.width, uploaded.height);
+            const column = index % columns;
+            const row = Math.floor(index / columns);
+            created.push({
+                id: `image-${Date.now()}-${index}-${Math.random().toString(36).slice(2, 7)}`,
+                type: CanvasNodeType.Image,
+                title: output.fileName,
+                position: {
+                    x: sourceNode.position.x + sourceNode.width + 72 + column * 380,
+                    y: sourceNode.position.y + row * 300,
+                },
+                width: nodeSize.width,
+                height: nodeSize.height,
+                metadata: imageMetadata(uploaded),
+            });
+        }
+        if (!created.length) return;
+        setNodes((prev) => [...prev, ...created]);
+        setSelectedNodeIds(new Set(created.map((item) => item.id)));
+        setSelectedConnectionId(null);
+    }, []);
+
     const createTextNodeFromClipboard = useCallback(
         (text: string) => {
             const trimmed = text.trim();
@@ -1903,7 +2019,21 @@ function InfiniteCanvasPage() {
         async (event: ReactChangeEvent<HTMLInputElement>) => {
             const file = event.target.files?.[0];
             const target = uploadTargetRef.current;
-            if (!file || (!file.type.startsWith("image/") && !file.type.startsWith("video/") && !isAudioFile(file))) return;
+            if (!file || (!file.type.startsWith("image/") && !file.type.startsWith("video/") && !isAudioFile(file) && !isPdfFile(file))) return;
+
+            if (isPdfFile(file)) {
+                const position = target?.position || screenToCanvas((containerRef.current?.getBoundingClientRect().left || 0) + size.width / 2, (containerRef.current?.getBoundingClientRect().top || 0) + size.height / 2);
+                try {
+                    await createPdfFileNode(file, position);
+                    message.success("PDF 已添加到画布");
+                } catch (error) {
+                    message.error(error instanceof Error ? error.message : "PDF 导入失败");
+                } finally {
+                    uploadTargetRef.current = null;
+                    event.target.value = "";
+                }
+                return;
+            }
 
             if (target?.nodeId) {
                 if (isAudioFile(file)) {
@@ -1971,19 +2101,25 @@ function InfiniteCanvasPage() {
             uploadTargetRef.current = null;
             event.target.value = "";
         },
-        [createAudioFileNode, createImageFileNode, createVideoFileNode, screenToCanvas, size.height, size.width],
+        [createAudioFileNode, createImageFileNode, createPdfFileNode, createVideoFileNode, message, screenToCanvas, size.height, size.width],
     );
 
     const handleDrop = useCallback(
         (event: ReactDragEvent<HTMLDivElement>) => {
             event.preventDefault();
-            const file = Array.from(event.dataTransfer.files).find((item) => item.type.startsWith("image/") || item.type.startsWith("video/") || isAudioFile(item));
+            const file = Array.from(event.dataTransfer.files).find((item) => item.type.startsWith("image/") || item.type.startsWith("video/") || isAudioFile(item) || isPdfFile(item));
             if (!file) return;
 
             const pos = screenToCanvas(event.clientX, event.clientY);
+            if (isPdfFile(file)) {
+                void createPdfFileNode(file, pos)
+                    .then(() => message.success("PDF 已添加到画布"))
+                    .catch((error) => message.error(error instanceof Error ? error.message : "PDF 导入失败"));
+                return;
+            }
             void (isAudioFile(file) ? createAudioFileNode(file, pos) : file.type.startsWith("video/") ? createVideoFileNode(file, pos) : createImageFileNode(file, pos));
         },
-        [createAudioFileNode, createImageFileNode, createVideoFileNode, screenToCanvas],
+        [createAudioFileNode, createImageFileNode, createPdfFileNode, createVideoFileNode, message, screenToCanvas],
     );
 
     const pasteAssistantImage = useCallback(
@@ -3201,6 +3337,8 @@ function InfiniteCanvasPage() {
                     onToggleFreeResize={(node) => toggleNodeFreeResize(node.id)}
                     onDelete={(node) => deleteNodes(new Set([node.id]))}
                     onJimeng={(node) => setJimengNodeId(node.id)}
+                    onPdfPreview={(node) => setPdfPreviewNodeId(node.id)}
+                    onPdfTools={(node) => setPdfToolsNodeId(node.id)}
                 />
 
                 <CanvasToolbar
@@ -3262,9 +3400,13 @@ function InfiniteCanvasPage() {
                     />
                 ) : null}
 
-                <input ref={imageInputRef} type="file" accept="image/*,video/*,audio/mpeg,audio/wav,audio/x-wav,.mp3,.wav" className="hidden" onChange={handleImageInputChange} />
+                <input ref={imageInputRef} type="file" accept="image/*,video/*,application/pdf,.pdf,audio/mpeg,audio/wav,audio/x-wav,.mp3,.wav" className="hidden" onChange={handleImageInputChange} />
 
                 <CanvasNodeInfoModal node={infoNode} open={Boolean(infoNode)} onClose={() => setInfoNodeId(null)} />
+
+                <CanvasPdfToolsDialog node={pdfToolsNode} open={Boolean(pdfToolsNode)} onClose={() => setPdfToolsNodeId(null)} onCreateImageNodes={createPdfImageNodes} />
+
+                <CanvasPdfPreviewDialog node={pdfPreviewNode} open={Boolean(pdfPreviewNode)} onClose={() => setPdfPreviewNodeId(null)} />
 
                 {cropNode?.metadata?.content ? <CanvasNodeCropDialog dataUrl={cropNode.metadata.content} open={Boolean(cropNode)} onClose={() => setCropNodeId(null)} onConfirm={(crop) => void cropImageNode(cropNode!, crop)} /> : null}
 
@@ -3688,7 +3830,7 @@ async function hydrateCanvasImages(nodes: CanvasNodeData[]) {
     return Promise.all(
         nodes.map(async (node) => {
             const content = node.metadata?.content;
-            if ((node.type === CanvasNodeType.Video || node.type === CanvasNodeType.Audio) && node.metadata?.storageKey) return { ...node, metadata: { ...node.metadata, content: await resolveMediaUrl(node.metadata.storageKey, content) } };
+            if ((node.type === CanvasNodeType.Video || node.type === CanvasNodeType.Audio || node.type === CanvasNodeType.Pdf) && node.metadata?.storageKey) return { ...node, metadata: { ...node.metadata, content: await resolveMediaUrl(node.metadata.storageKey, content) } };
             if (node.type !== CanvasNodeType.Image || !content) return node;
             if (node.metadata?.storageKey) return { ...node, metadata: { ...node.metadata, content: await resolveImageUrl(node.metadata.storageKey, content) } };
             if (!content.startsWith("data:image/")) return node;
@@ -3843,6 +3985,17 @@ function sourceNodeReferenceImages(node: CanvasNodeData | null) {
 
 function isAudioFile(file: File) {
     return file.type.startsWith("audio/") || /\.(mp3|wav)$/i.test(file.name);
+}
+
+function isPdfFile(file: File) {
+    return file.type === "application/pdf" || /\.pdf$/i.test(file.name);
+}
+
+const MAX_WEB_PDF_FILE_BYTES = 100 * 1024 * 1024;
+const MAX_WEB_PDF_STORAGE_BYTES = 500 * 1024 * 1024;
+
+function formatStorageLimit(bytes: number) {
+    return `${Math.round(bytes / 1024 / 1024)} MB`;
 }
 
 function isHiddenBatchChild(node: CanvasNodeData, nodes: CanvasNodeData[], collapsingBatchIds?: Set<string>) {

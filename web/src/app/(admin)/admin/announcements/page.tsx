@@ -30,8 +30,11 @@ const notifyTypeLabels: Record<string, string> = {
 };
 
 const targetLabels: Record<string, string> = {
-    all: "所有用户",
-    member: "会员",
+    all: "全部",
+    web: "Web 端",
+    app: "App 端",
+    subscription: "订阅用户",
+    member: "订阅用户",
 };
 
 export default function AdminAnnouncementsPage() {
@@ -319,8 +322,10 @@ export default function AdminAnnouncementsPage() {
                             <Form.Item name="target" label="展示条件">
                                 <Select
                                     options={[
-                                        { label: "所有用户", value: "all" },
-                                        { label: "会员", value: "member" },
+                                        { label: "全部", value: "all" },
+                                        { label: "Web 端", value: "web" },
+                                        { label: "App 端", value: "app" },
+                                        { label: "订阅用户", value: "subscription" },
                                     ]}
                                 />
                             </Form.Item>

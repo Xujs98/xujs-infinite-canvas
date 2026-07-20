@@ -6,7 +6,7 @@ export interface AdminAnnouncement {
   content: string;
   status: "draft" | "active" | "archived";
   notifyType: "silent" | "popup";
-  target: "all" | "member";
+  target: "all" | "web" | "app" | "subscription" | "member";
   pinned: boolean;
   startTime?: string;
   endTime?: string;

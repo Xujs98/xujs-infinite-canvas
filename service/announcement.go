@@ -40,8 +40,8 @@ func DeleteAnnouncement(id string) error {
 	return repository.DeleteAnnouncement(id)
 }
 
-func GetActiveAnnouncements(target string) ([]model.Announcement, error) {
-	return repository.GetActiveAnnouncements(target)
+func GetActiveAnnouncements(platform string, subscribed bool) ([]model.Announcement, error) {
+	return repository.GetActiveAnnouncements(platform, subscribed)
 }
 
 func BatchDeleteAnnouncements(ids []string) error {

@@ -53,6 +53,10 @@ func AIVideoContent(w http.ResponseWriter, r *http.Request, id string) {
 
 const canvasProviderHeader = "X-Canvas-Provider-ID"
 
+// multipartJSONFieldTypesField carries type information that FormData cannot
+// represent. It is consumed by the proxy and never forwarded upstream.
+const multipartJSONFieldTypesField = "__julong_json_field_types"
+
 func selectAIModelChannel(r *http.Request, modelName string) (model.ModelChannel, error) {
 	providerID := strings.TrimSpace(r.Header.Get(canvasProviderHeader))
 	channel, err := service.SelectModelChannelByProviderID(modelName, providerID)
@@ -351,6 +355,9 @@ func proxyAIRequest(w http.ResponseWriter, r *http.Request, path string) {
 				finalBody = merged
 			}
 		}
+	}
+	if contentType == "application/json" {
+		finalBody = normalizeStandardAIRequestTypes(finalBody)
 	}
 
 	// 渠道配置了 OpenAI 兼容视频请求格式时，转换 Ark 请求体
@@ -1552,6 +1559,12 @@ func multipartToJSON(body []byte, contentType string, fieldMapping *model.Channe
 	mr := multipart.NewReader(bytes.NewReader(body), boundary)
 	result := make(map[string]any)
 	files := make(map[string][]FileData)
+	fieldTypes := map[string]string{
+		// OpenAI-compatible image APIs define n as an integer. Keeping this
+		// default also fixes requests from clients released before type hints.
+		"n":     "integer",
+		"async": "boolean",
+	}
 
 	for {
 		part, err := mr.NextPart()
@@ -1575,9 +1588,32 @@ func multipartToJSON(body []byte, contentType string, fieldMapping *model.Channe
 			})
 			continue
 		}
-		// 普通字段：保持原始字符串类型（API 可能期望 string 而非 number）
 		val := string(partBody)
+		if name == multipartJSONFieldTypesField {
+			var hintedTypes map[string]string
+			if err := json.Unmarshal(partBody, &hintedTypes); err != nil {
+				return nil, fmt.Errorf("invalid multipart JSON field types: %w", err)
+			}
+			for fieldName, fieldType := range hintedTypes {
+				fieldTypes[fieldName] = fieldType
+			}
+			continue
+		}
+		// FormData text fields remain strings unless the client explicitly
+		// supplies a JSON type hint (or the field has a standard type above).
 		result[name] = val
+	}
+
+	for name, dataType := range fieldTypes {
+		value, exists := result[name]
+		if !exists {
+			continue
+		}
+		converted, err := convertMultipartJSONField(value, dataType)
+		if err != nil {
+			return nil, fmt.Errorf("invalid multipart field %q as %s: %w", name, dataType, err)
+		}
+		result[name] = converted
 	}
 
 	// 处理文件字段：转为 base64 data URL
@@ -1650,6 +1686,87 @@ func multipartToJSON(body []byte, contentType string, fieldMapping *model.Channe
 	}
 
 	return json.Marshal(result)
+}
+
+func convertMultipartJSONField(value any, dataType string) (any, error) {
+	text, ok := value.(string)
+	if !ok {
+		return value, nil
+	}
+	switch strings.ToLower(strings.TrimSpace(dataType)) {
+	case "", "string":
+		return text, nil
+	case "integer":
+		parsed, err := strconv.ParseInt(strings.TrimSpace(text), 10, 64)
+		return parsed, err
+	case "number":
+		parsed, err := strconv.ParseFloat(strings.TrimSpace(text), 64)
+		return parsed, err
+	case "boolean":
+		switch strings.ToLower(strings.TrimSpace(text)) {
+		case "true", "1":
+			return true, nil
+		case "false", "0":
+			return false, nil
+		default:
+			return nil, fmt.Errorf("expected true, false, 1, or 0")
+		}
+	case "array":
+		var parsed []any
+		if err := json.Unmarshal([]byte(text), &parsed); err != nil {
+			return nil, err
+		}
+		return parsed, nil
+	case "object":
+		var parsed map[string]any
+		if err := json.Unmarshal([]byte(text), &parsed); err != nil {
+			return nil, err
+		}
+		return parsed, nil
+	case "json":
+		var parsed any
+		if err := json.Unmarshal([]byte(text), &parsed); err != nil {
+			return nil, err
+		}
+		return parsed, nil
+	default:
+		return nil, fmt.Errorf("unsupported JSON field type %q", dataType)
+	}
+}
+
+// normalizeStandardAIRequestTypes repairs scalar types that can be lost when
+// a client serializes a typed JSON request through multipart/form-data or a
+// persisted string-based configuration. Invalid values are left unchanged so
+// the upstream can return its own validation error.
+func normalizeStandardAIRequestTypes(body []byte) []byte {
+	var result map[string]any
+	if err := json.Unmarshal(body, &result); err != nil {
+		return body
+	}
+	changed := false
+	for name, dataType := range map[string]string{
+		"n":     "integer",
+		"async": "boolean",
+	} {
+		value, exists := result[name]
+		if !exists {
+			continue
+		}
+		converted, err := convertMultipartJSONField(value, dataType)
+		if err != nil || reflect.DeepEqual(converted, value) {
+			continue
+		}
+		result[name] = converted
+		changed = true
+	}
+	if !changed {
+		return body
+	}
+	converted, err := json.Marshal(result)
+	if err != nil {
+		return body
+	}
+	return converted
 }
 
 type FileData struct {

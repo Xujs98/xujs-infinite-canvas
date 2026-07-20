@@ -20,7 +20,12 @@ const (
 type AnnouncementTarget string
 
 const (
-	AnnouncementTargetAll    AnnouncementTarget = "all"
+	AnnouncementTargetAll          AnnouncementTarget = "all"
+	AnnouncementTargetWeb          AnnouncementTarget = "web"
+	AnnouncementTargetApp          AnnouncementTarget = "app"
+	AnnouncementTargetSubscription AnnouncementTarget = "subscription"
+	// AnnouncementTargetMember is retained for announcements created before
+	// the audience label was renamed to subscription users.
 	AnnouncementTargetMember AnnouncementTarget = "member"
 )
 

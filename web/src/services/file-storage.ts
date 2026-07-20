@@ -4,6 +4,7 @@ import localforage from "localforage";
 import { nanoid } from "nanoid";
 
 export type UploadedFile = { url: string; storageKey: string; bytes: number; mimeType: string; width?: number; height?: number; durationMs?: number };
+export type MediaCleanupOptions = { keyPrefixes?: string[] };
 
 const store = localforage.createInstance({ name: "infinite-canvas", storeName: "media_files" });
 const objectUrls = new Map<string, string>();
@@ -35,6 +36,8 @@ export async function getMediaBlob(storageKey: string) {
 
 export async function setMediaBlob(storageKey: string, blob: Blob) {
     await store.setItem(storageKey, blob);
+    const previousUrl = objectUrls.get(storageKey);
+    if (previousUrl) URL.revokeObjectURL(previousUrl);
     const url = URL.createObjectURL(blob);
     objectUrls.set(storageKey, url);
     return url;
@@ -51,13 +54,26 @@ export async function deleteStoredMedia(keys: Iterable<string>) {
     );
 }
 
-export async function cleanupUnusedMedia(usedData: unknown) {
+export async function cleanupUnusedMedia(usedData: unknown, options: MediaCleanupOptions = {}) {
     const usedKeys = collectMediaStorageKeys(usedData);
+    const prefixes = options.keyPrefixes?.filter(Boolean) || [];
     const unused: string[] = [];
     await store.iterate((_value, key) => {
+        if (prefixes.length && !prefixes.some((prefix) => key.startsWith(prefix))) return;
         if (!usedKeys.has(key)) unused.push(key);
     });
-    await Promise.all(unused.map((key) => store.removeItem(key)));
+    await deleteStoredMedia(unused);
+    return unused.length;
+}
+
+export async function getStoredMediaBytes(options: MediaCleanupOptions = {}) {
+    const prefixes = options.keyPrefixes?.filter(Boolean) || [];
+    let bytes = 0;
+    await store.iterate((value, key) => {
+        if (prefixes.length && !prefixes.some((prefix) => key.startsWith(prefix))) return;
+        if (value instanceof Blob) bytes += value.size;
+    });
+    return bytes;
 }
 
 export function collectMediaStorageKeys(value: unknown, keys = new Set<string>()) {

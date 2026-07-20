@@ -79,6 +79,11 @@ const IMAGE_MAX_PIXELS = 8294400;
 const IMAGE_MAX_EDGE = 3840;
 const IMAGE_MAX_RATIO = 3;
 const IMAGE_OUTPUT_FORMAT = "png";
+const MULTIPART_JSON_FIELD_TYPES_FIELD = "__julong_json_field_types";
+
+function setMultipartJSONFieldTypes(formData: FormData, fieldTypes: Record<string, "integer" | "number" | "boolean" | "array" | "object" | "json">) {
+    formData.set(MULTIPART_JSON_FIELD_TYPES_FIELD, JSON.stringify(fieldTypes));
+}
 
 function normalizeQuality(quality: string) {
     const value = quality.trim().toLowerCase();
@@ -301,6 +306,7 @@ export async function requestEdit(config: AiConfig, prompt: string, references: 
     formData.set("model", config.model);
     formData.set("prompt", withSystemPrompt(config, requestPrompt));
     formData.set("n", String(n));
+    setMultipartJSONFieldTypes(formData, { n: "integer" });
     formData.set("response_format", "b64_json");
     formData.set("output_format", IMAGE_OUTPUT_FORMAT);
     if (quality) {
@@ -335,6 +341,7 @@ export async function createImageEditTask(config: AiConfig, prompt: string, refe
     formData.set("model", config.model);
     formData.set("prompt", withSystemPrompt(config, requestPrompt));
     formData.set("n", String(n));
+    setMultipartJSONFieldTypes(formData, { n: "integer" });
     formData.set("response_format", "b64_json");
     formData.set("output_format", IMAGE_OUTPUT_FORMAT);
     if (quality) formData.set("quality", quality);

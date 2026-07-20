@@ -2,7 +2,7 @@
 
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
-import { ChevronRight, Image as ImageIcon, Music2, RefreshCw, Star, Video } from "lucide-react";
+import { ChevronRight, FileText, Image as ImageIcon, Music2, RefreshCw, Star, Video } from "lucide-react";
 
 import { useCanvasTheme } from "@/hooks/use-canvas-theme";
 import { formatBytes } from "@/lib/image-utils";
@@ -358,6 +358,7 @@ const nodeContentRenderers = {
     [CanvasNodeType.Video]: VideoNodeContent,
     [CanvasNodeType.Audio]: AudioNodeContent,
     [CanvasNodeType.Script]: ScriptNodeContent,
+    [CanvasNodeType.Pdf]: PdfNodeContent,
 } satisfies Record<CanvasNodeType, (props: NodeContentRendererProps) => ReactNode>;
 
 function LoadingContent({ theme, node }: Pick<NodeContentRendererProps, "theme"> & { node?: CanvasNodeData }) {
@@ -546,6 +547,30 @@ function AudioNodeContent({ node, theme }: NodeContentRendererProps) {
                 <span className="truncate">{node.title || "音频"}</span>
             </div>
             <audio src={node.metadata.content} controls className="w-full" data-canvas-no-zoom />
+        </div>
+    );
+}
+
+function PdfNodeContent({ node, theme }: NodeContentRendererProps) {
+    const pageCount = node.metadata?.pdfPageCount || 0;
+    const preview = node.metadata?.pdfPreviewDataUrl;
+    return (
+        <div className="flex h-full w-full flex-col overflow-hidden rounded-[18px]" style={{ background: theme.node.fill, color: theme.node.text }}>
+            <div className="relative min-h-0 flex-1 overflow-hidden bg-white">
+                {preview ? (
+                    <img src={preview} alt={`${node.title} 首页预览`} draggable={false} className="pointer-events-none h-full w-full select-none object-contain" />
+                ) : (
+                    <div className="flex h-full flex-col items-center justify-center gap-3" style={{ color: theme.node.placeholder }}>
+                        <FileText className="size-12 text-red-500 opacity-75" />
+                        <span className="text-xs">PDF 预览不可用</span>
+                    </div>
+                )}
+                <span className="absolute right-2 top-2 rounded-md bg-red-500 px-2 py-1 text-[10px] font-semibold text-white shadow-sm">PDF</span>
+            </div>
+            <div className="flex h-10 shrink-0 items-center justify-between border-t px-3 text-[11px]" style={{ borderColor: theme.node.stroke, color: theme.node.muted }}>
+                <span className="min-w-0 truncate pr-3">{node.title}</span>
+                <span className="shrink-0">{pageCount} 页</span>
+            </div>
         </div>
     );
 }

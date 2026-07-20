@@ -15,5 +15,9 @@ export interface Announcement {
 }
 
 export async function fetchAnnouncements(target: string = "all") {
-  return apiGet<Announcement[]>("/api/announcements", { target });
+  return apiGet<Announcement[]>("/api/announcements", {
+    target,
+    platform: "web",
+    subscriber: target === "member" ? "true" : "false",
+  });
 }
