@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/url"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -287,6 +288,50 @@ func SelectModelChannel(modelName string) (model.ModelChannel, error) {
 		}
 	}
 	return channels[0], nil
+}
+
+// SelectModelChannelByProviderID resolves the opaque srv-N identifier exposed
+// to the App. Empty provider IDs keep the weighted routing used by legacy
+// clients; an explicit ID must match that exact enabled channel and model.
+func SelectModelChannelByProviderID(modelName, providerID string) (model.ModelChannel, error) {
+	providerID = strings.TrimSpace(providerID)
+	if providerID == "" {
+		return SelectModelChannel(modelName)
+	}
+	if !strings.HasPrefix(providerID, "srv-") {
+		return model.ModelChannel{}, errors.New("服务端渠道标识无效")
+	}
+	settings, err := repository.GetSettings()
+	if err != nil {
+		return model.ModelChannel{}, err
+	}
+	return selectModelChannelByProviderID(normalizePrivateSetting(settings.Private).Channels, modelName, providerID)
+}
+
+func selectModelChannelByProviderID(channels []model.ModelChannel, modelName, providerID string) (model.ModelChannel, error) {
+	index, err := strconv.Atoi(strings.TrimPrefix(providerID, "srv-"))
+	if err != nil || index < 0 {
+		return model.ModelChannel{}, errors.New("服务端渠道标识无效")
+	}
+	enabled := make([]model.ModelChannel, 0, len(channels))
+	for _, channel := range channels {
+		if channel.Enabled {
+			enabled = append(enabled, channel)
+		}
+	}
+	if index >= len(enabled) {
+		return model.ModelChannel{}, errors.New("服务端渠道不存在")
+	}
+	channel := enabled[index]
+	if strings.TrimSpace(channel.BaseURL) == "" || strings.TrimSpace(channel.APIKey) == "" {
+		return model.ModelChannel{}, errors.New("服务端渠道不可用")
+	}
+	for _, item := range channel.Models {
+		if strings.TrimSpace(item) == strings.TrimSpace(modelName) {
+			return channel, nil
+		}
+	}
+	return model.ModelChannel{}, errors.New("模型不属于指定的服务端渠道")
 }
 
 func BuildModelChannelURL(channel model.ModelChannel, path string) string {

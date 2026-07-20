@@ -198,9 +198,14 @@ func RefundCreditCharge(userID, chargeID, modelName, path string) error {
 				return err
 			}
 		}
-		return tx.Model(&model.CreditCharge{}).Where("id = ? AND status = ?", charge.ID, model.CreditChargePending).Updates(map[string]any{
+		if err := tx.Model(&model.CreditCharge{}).Where("id = ? AND status = ?", charge.ID, model.CreditChargePending).Updates(map[string]any{
 			"status":      model.CreditChargeRefunded,
 			"refunded_at": nowText,
+		}).Error; err != nil {
+			return err
+		}
+		return tx.Model(&model.RequestLog{}).Where("credit_charge_id = ?", charge.ID).Updates(map[string]any{
+			"charge_status": string(model.CreditChargeRefunded),
 		}).Error
 	})
 }

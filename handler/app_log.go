@@ -43,6 +43,7 @@ func SubmitAppRequestLog(w http.ResponseWriter, r *http.Request) {
 		input.StatusCode, input.Success, input.ErrorMsg,
 		input.ElapsedMs,
 	)
+	service.UpdateRequestLogClient(logID, service.ClientMetadataFromRequest(r))
 
 	OK(w, map[string]string{"id": logID})
 }

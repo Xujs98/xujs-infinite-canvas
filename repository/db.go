@@ -86,6 +86,9 @@ func DB() (*gorm.DB, error) {
 			&model.GenerationTask{},
 			&model.AppRelease{},
 			&model.AppReleaseArtifact{},
+			&model.ClientAccessRecord{},
+			&model.AccessBan{},
+			&model.RiskEvent{},
 		)
 		if dbErr != nil {
 			return

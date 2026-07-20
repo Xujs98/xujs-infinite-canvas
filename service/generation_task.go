@@ -107,6 +107,7 @@ func UpdateGenerationTask(id string, update GenerationTaskUpdate) (model.Generat
 	if task.Persistent {
 		_ = repository.SaveGenerationTask(task)
 	}
+	CompleteRequestLogsForTask(task)
 	return task, true
 }
 

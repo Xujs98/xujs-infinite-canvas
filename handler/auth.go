@@ -53,23 +53,32 @@ type adjustUserCreditsRequest struct {
 }
 
 func Register(w http.ResponseWriter, r *http.Request) {
+	if rejectBlockedClient(w, r) {
+		return
+	}
 	var request registerRequest
 	_ = json.NewDecoder(r.Body).Decode(&request)
 	session, err := service.Register(request.Username, request.Password, request.AffCode, request.Email, request.VerificationCode)
 	if err != nil {
+		service.RecordRequestRisk(r, model.AuthUser{}, "registration_rejected", model.RiskLevelMedium, "auth", "注册请求未通过校验", nil)
 		FailError(w, err)
 		return
 	}
+	recordAuthenticatedClient(session.User.ID, r)
 	OK(w, session)
 }
 
 func SendRegistrationEmailCode(w http.ResponseWriter, r *http.Request) {
+	if rejectBlockedClient(w, r) {
+		return
+	}
 	var request registrationEmailCodeRequest
 	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
 		Fail(w, "参数错误")
 		return
 	}
 	if err := service.SendRegistrationEmailCode(request.Email, r.RemoteAddr); err != nil {
+		service.RecordRequestRisk(r, model.AuthUser{}, "verification_code_request_rejected", model.RiskLevelMedium, "auth", "注册验证码发送请求被拒绝", map[string]any{"flow": "registration"})
 		FailError(w, err)
 		return
 	}
@@ -77,12 +86,16 @@ func SendRegistrationEmailCode(w http.ResponseWriter, r *http.Request) {
 }
 
 func SendLoginEmailCode(w http.ResponseWriter, r *http.Request) {
+	if rejectBlockedClient(w, r) {
+		return
+	}
 	var request registrationEmailCodeRequest
 	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
 		Fail(w, "参数错误")
 		return
 	}
 	if err := service.SendLoginEmailCode(request.Email, r.RemoteAddr); err != nil {
+		service.RecordRequestRisk(r, model.AuthUser{}, "verification_code_request_rejected", model.RiskLevelMedium, "auth", "登录验证码发送请求被拒绝", map[string]any{"flow": "login"})
 		FailError(w, err)
 		return
 	}
@@ -90,6 +103,9 @@ func SendLoginEmailCode(w http.ResponseWriter, r *http.Request) {
 }
 
 func LoginWithEmailCode(w http.ResponseWriter, r *http.Request) {
+	if rejectBlockedClient(w, r) {
+		return
+	}
 	var request emailCodeLoginRequest
 	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
 		Fail(w, "参数错误")
@@ -97,9 +113,11 @@ func LoginWithEmailCode(w http.ResponseWriter, r *http.Request) {
 	}
 	session, err := service.LoginWithEmailCode(request.Email, request.VerificationCode)
 	if err != nil {
+		service.RecordRequestRisk(r, model.AuthUser{}, "verification_code_rejected", model.RiskLevelHigh, "auth", "邮箱验证码登录失败", map[string]any{"flow": "login"})
 		FailError(w, err)
 		return
 	}
+	recordAuthenticatedClient(session.User.ID, r)
 	OK(w, session)
 }
 
@@ -120,13 +138,18 @@ func BindAffCode(w http.ResponseWriter, r *http.Request) {
 }
 
 func Login(w http.ResponseWriter, r *http.Request) {
+	if rejectBlockedClient(w, r) {
+		return
+	}
 	var request loginRequest
 	_ = json.NewDecoder(r.Body).Decode(&request)
 	session, err := service.Login(request.Username, request.Password)
 	if err != nil {
+		service.RecordRequestRisk(r, model.AuthUser{}, "login_failed", model.RiskLevelMedium, "auth", "账号密码登录失败", nil)
 		FailError(w, err)
 		return
 	}
+	recordAuthenticatedClient(session.User.ID, r)
 	OK(w, session)
 }
 
@@ -142,6 +165,7 @@ func LinuxDoAuthorize(w http.ResponseWriter, r *http.Request) {
 func LinuxDoCallback(w http.ResponseWriter, r *http.Request) {
 	session, redirect, err := service.LoginWithLinuxDo(r, r.URL.Query().Get("code"), r.URL.Query().Get("state"))
 	if err != nil {
+		service.RecordRequestRisk(r, model.AuthUser{}, "linux_do_login_failed", model.RiskLevelMedium, "auth", "Linux.do 登录回调失败", nil)
 		http.Redirect(w, r, loginRedirect(r, redirect, "", err.Error()), http.StatusFound)
 		return
 	}
@@ -153,10 +177,12 @@ func AdminLogin(w http.ResponseWriter, r *http.Request) {
 	_ = json.NewDecoder(r.Body).Decode(&request)
 	session, err := service.Login(request.Username, request.Password)
 	if err != nil {
+		service.RecordRequestRisk(r, model.AuthUser{}, "admin_login_failed", model.RiskLevelHigh, "auth", "后台管理员登录失败", nil)
 		FailError(w, err)
 		return
 	}
 	if session.User.Role != model.UserRoleAdmin {
+		service.RecordRequestRisk(r, session.User, "admin_login_failed", model.RiskLevelHigh, "auth", "非管理员账号尝试登录后台", nil)
 		Fail(w, "需要管理员权限")
 		return
 	}
@@ -165,6 +191,7 @@ func AdminLogin(w http.ResponseWriter, r *http.Request) {
 
 func CurrentUser(w http.ResponseWriter, r *http.Request) {
 	if user, ok := service.UserFromContext(r.Context()); ok {
+		recordAuthenticatedClient(user.ID, r)
 		OK(w, user)
 		return
 	}
@@ -271,6 +298,9 @@ func UpdateProfile(w http.ResponseWriter, r *http.Request) {
 	_ = json.NewDecoder(r.Body).Decode(&request)
 	updated, err := service.UpdateProfile(user.ID, request.DisplayName, request.Password, request.VerificationCode)
 	if err != nil {
+		if strings.TrimSpace(request.Password) != "" {
+			service.RecordRequestRisk(r, user, "verification_code_rejected", model.RiskLevelHigh, "auth", "修改密码验证失败", map[string]any{"flow": "password_change"})
+		}
 		FailError(w, err)
 		return
 	}
@@ -284,6 +314,7 @@ func SendPasswordChangeEmailCode(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := service.SendPasswordChangeEmailCode(user.ID, r.RemoteAddr); err != nil {
+		service.RecordRequestRisk(r, user, "verification_code_request_rejected", model.RiskLevelMedium, "auth", "修改密码验证码发送请求被拒绝", map[string]any{"flow": "password_change"})
 		FailError(w, err)
 		return
 	}

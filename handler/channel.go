@@ -1,7 +1,7 @@
 package handler
 
 import (
-	"crypto/md5"
+	"crypto/sha256"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -10,70 +10,76 @@ import (
 	"github.com/basketikun/infinite-canvas/service"
 )
 
-// PublicChannelInfo 返回给 App 端的模型渠道配置（含 API Key）。
+// PublicChannelInfo only contains the non-secret model metadata needed by the
+// App. Requests for these channels are always proxied by this service.
 type PublicChannelInfo struct {
-	ConfigHash string `json:"configHash,omitempty"`
-	Protocol               string                       `json:"protocol"`
-	Name                   string                       `json:"name"`
-	BaseURL                string                       `json:"baseUrl"`
-	APIKey                 string                       `json:"apiKey"`
-	Models                 []string                     `json:"models"`
-	Enabled                bool                         `json:"enabled"`
-	PathPrefix             string                       `json:"pathPrefix,omitempty"`
-	ExtraHeaders           map[string]string            `json:"extraHeaders,omitempty"`
-	ExtraBody              map[string]any               `json:"extraBody,omitempty"`
-	ImageFormat            string                       `json:"imageFormat,omitempty"`
-	FieldMapping           *model.ChannelFieldMapping   `json:"fieldMapping,omitempty"`
-	VideoConfig            *model.ChannelVideoConfig    `json:"videoConfig,omitempty"`
-	MediaType              string                       `json:"mediaType,omitempty"`
-	ApiStyle               string                       `json:"apiStyle,omitempty"`
-	EndpointPath           string                       `json:"endpointPath,omitempty"`
-	ResponseFormat         string                       `json:"responseFormat,omitempty"`
-	SupportedResolutions   []string                     `json:"supportedResolutions,omitempty"`
-	SupportedModelVersions []string                     `json:"supportedModelVersions,omitempty"`
-	SupportsWebSearch      bool                         `json:"supportsWebSearch,omitempty"`
+	ConfigHash             string                     `json:"configHash,omitempty"`
+	Protocol               string                     `json:"protocol"`
+	Name                   string                     `json:"name"`
+	BaseURL                string                     `json:"baseUrl,omitempty"`
+	APIKey                 string                     `json:"apiKey,omitempty"`
+	Models                 []string                   `json:"models"`
+	Enabled                bool                       `json:"enabled"`
+	PathPrefix             string                     `json:"pathPrefix,omitempty"`
+	ExtraHeaders           map[string]string          `json:"extraHeaders,omitempty"`
+	ExtraBody              map[string]any             `json:"extraBody,omitempty"`
+	ImageFormat            string                     `json:"imageFormat,omitempty"`
+	FieldMapping           *model.ChannelFieldMapping `json:"fieldMapping,omitempty"`
+	VideoConfig            *model.ChannelVideoConfig  `json:"videoConfig,omitempty"`
+	MediaType              string                     `json:"mediaType,omitempty"`
+	ApiStyle               string                     `json:"apiStyle,omitempty"`
+	EndpointPath           string                     `json:"endpointPath,omitempty"`
+	ResponseFormat         string                     `json:"responseFormat,omitempty"`
+	SupportedResolutions   []string                   `json:"supportedResolutions,omitempty"`
+	SupportedModelVersions []string                   `json:"supportedModelVersions,omitempty"`
+	SupportsWebSearch      bool                       `json:"supportsWebSearch,omitempty"`
 }
 
 // PublicAvailableModels 返回模型列表和默认模型配置。
 type PublicAvailableModels struct {
-	AvailableModels   []string           `json:"availableModels"`
-	ModelCosts        []model.ModelCost  `json:"modelCosts"`
-	DefaultModel      string             `json:"defaultModel"`
-	DefaultImageModel string             `json:"defaultImageModel"`
-	DefaultVideoModel string             `json:"defaultVideoModel"`
-	DefaultTextModel  string             `json:"defaultTextModel"`
+	AvailableModels   []string          `json:"availableModels"`
+	ModelCosts        []model.ModelCost `json:"modelCosts"`
+	DefaultModel      string            `json:"defaultModel"`
+	DefaultImageModel string            `json:"defaultImageModel"`
+	DefaultVideoModel string            `json:"defaultVideoModel"`
+	DefaultTextModel  string            `json:"defaultTextModel"`
 }
 
-// channelToPublic 将内部渠道转为公开格式（含全部字段）。
+// channelToPublic deliberately excludes credentials, upstream origins and
+// custom headers/body values. Those values never need to cross the trust
+// boundary because the Go service performs the upstream request.
 func channelToPublic(ch model.ModelChannel) PublicChannelInfo {
-	chJSON, _ := json.Marshal(ch)
-	hash := fmt.Sprintf("%x", md5.Sum(chJSON))
-	return PublicChannelInfo{
-		ConfigHash: hash,
+	var videoConfig *model.ChannelVideoConfig
+	if ch.VideoConfig != nil {
+		copy := *ch.VideoConfig
+		copy.Path = ""
+		copy.StatusEndpointPath = ""
+		copy.ContentEndpointPath = ""
+		copy.Method = "POST"
+		copy.StatusMethod = "GET"
+		videoConfig = &copy
+	}
+	result := PublicChannelInfo{
 		Protocol:               ch.Protocol,
 		Name:                   ch.Name,
-		BaseURL:                ch.BaseURL,
-		APIKey:                 ch.APIKey,
 		Models:                 ch.Models,
 		Enabled:                ch.Enabled,
-		PathPrefix:             ch.PathPrefix,
-		ExtraHeaders:           ch.ExtraHeaders,
-		ExtraBody:              ch.ExtraBody,
 		ImageFormat:            ch.ImageFormat,
 		FieldMapping:           ch.FieldMapping,
-		VideoConfig:            ch.VideoConfig,
+		VideoConfig:            videoConfig,
 		MediaType:              ch.MediaType,
 		ApiStyle:               ch.ApiStyle,
-		EndpointPath:           ch.EndpointPath,
 		ResponseFormat:         ch.ResponseFormat,
 		SupportedResolutions:   ch.SupportedResolutions,
 		SupportedModelVersions: ch.SupportedModelVersions,
 		SupportsWebSearch:      ch.SupportsWebSearch,
 	}
+	publicJSON, _ := json.Marshal(result)
+	result.ConfigHash = fmt.Sprintf("%x", sha256.Sum256(publicJSON))
+	return result
 }
 
-// GetPublicChannels 获取已登录用户的模型渠道列表（含 API Key）。
-// 注意：不使用 AdminSettings（会隐藏 API Key），直接读取原始配置。
+// GetPublicChannels 获取已登录用户可使用的模型渠道列表。
 func GetPublicChannels(w http.ResponseWriter, r *http.Request) {
 	channels, err := service.GetRawPrivateChannels()
 	if err != nil {

@@ -12,7 +12,7 @@ const quickActions = [
     { href: "/admin/users", label: "管理用户", description: "账户、权限与会员", icon: <UserOutlined /> },
     { href: "/admin/model-classifications", label: "配置模型", description: "模型分类与能力", icon: <AppstoreOutlined /> },
     { href: "/admin/settings", label: "模型渠道", description: "上游渠道与计费", icon: <SettingOutlined /> },
-    { href: "/admin/request-logs", label: "查看请求", description: "检查接口调用记录", icon: <ApiOutlined /> },
+    { href: "/admin/request-logs", label: "使用日志", description: "检查使用记录与错误详情", icon: <ApiOutlined /> },
 ];
 
 export default function AdminDashboardPage() {

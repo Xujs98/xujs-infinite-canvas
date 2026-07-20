@@ -310,12 +310,12 @@ export default function AdminSystemSettingsPage() {
                                     </div>
                                     <div>
                                         <div className="text-sm font-semibold text-gray-800">日志自动清理</div>
-                                        <div className="mt-0.5 text-xs text-gray-400">统一管理请求日志、调用日志和算力点明细的保留策略</div>
+                                        <div className="mt-0.5 text-xs text-gray-400">统一管理使用日志、调用日志和算力点明细的保留策略</div>
                                     </div>
                                 </div>
                                 <div className="grid gap-8 xl:grid-cols-3 xl:divide-x xl:divide-gray-100">
                                     <section className="min-w-0 xl:pr-8">
-                                        <div className="mb-4 text-sm font-medium text-gray-700">请求日志</div>
+                                        <div className="mb-4 text-sm font-medium text-gray-700">使用日志</div>
                                         <Row gutter={[16, 0]}>
                                             <Col span={24}>
                                                 <Form.Item name="requestLogCleanupEnabled" label="自动清理" valuePropName="checked" extra="开启后每小时检查一次，保存设置后立即执行。">

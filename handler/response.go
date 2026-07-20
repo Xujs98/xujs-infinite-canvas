@@ -15,6 +15,10 @@ type response struct {
 	Msg  string `json:"msg"`
 }
 
+type usageAuditErrorRecorder interface {
+	SetUsageAuditError(string)
+}
+
 func OK(w http.ResponseWriter, data any) {
 	writeJSON(w, response{Code: 0, Data: data, Msg: "ok"})
 }
@@ -25,6 +29,9 @@ func Fail(w http.ResponseWriter, msg string) {
 
 func FailError(w http.ResponseWriter, err error) {
 	log.Printf("request failed: %v", err)
+	if recorder, ok := w.(usageAuditErrorRecorder); ok && err != nil {
+		recorder.SetUsageAuditError(err.Error())
+	}
 	if safe, ok := err.(interface{ SafeMessage() string }); ok {
 		Fail(w, safe.SafeMessage())
 		return

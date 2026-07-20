@@ -17,6 +17,8 @@ const (
 	defaultCallLogMaxRows          = 5000
 	defaultCreditLogRetentionDays  = 365
 	defaultCreditLogMaxRows        = 100000
+	defaultRiskEventRetentionDays  = 180
+	defaultRiskEventMaxRows        = 100000
 )
 
 func RunConfiguredLogCleanup() {
@@ -52,6 +54,12 @@ func RunConfiguredLogCleanup() {
 		} else if deleted > 0 {
 			log.Printf("credit log cleanup removed %d expired or excess records", deleted)
 		}
+	}
+	deleted, cleanupErr := repository.PruneRiskEvents(nowTime.AddDate(0, 0, -defaultRiskEventRetentionDays), defaultRiskEventMaxRows)
+	if cleanupErr != nil {
+		log.Printf("risk event cleanup failed: %v", cleanupErr)
+	} else if deleted > 0 {
+		log.Printf("risk event cleanup removed %d expired or excess records", deleted)
 	}
 }
 

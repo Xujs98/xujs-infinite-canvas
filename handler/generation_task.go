@@ -7,6 +7,7 @@ import (
 	"log"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/basketikun/infinite-canvas/model"
 	"github.com/basketikun/infinite-canvas/service"
@@ -64,7 +65,7 @@ func createImageTask(w http.ResponseWriter, r *http.Request, path string) {
 		Fail(w, "未登录或权限不足")
 		return
 	}
-	channel, err := service.SelectModelChannel(modelName)
+	channel, err := selectAIModelChannel(r, modelName)
 	if err != nil {
 		Fail(w, "调用失败，请联系管理员")
 		return
@@ -89,21 +90,37 @@ func createImageTask(w http.ResponseWriter, r *http.Request, path string) {
 		NodeID:     r.URL.Query().Get("nodeId"),
 		Persistent: service.IsRoleTasksEnabled(string(user.Role)),
 	})
+	reqHeaders := map[string]string{"Authorization": "Bearer " + channel.APIKey[:min(len(channel.APIKey), 8)] + "***"}
+	if finalContentType != "" {
+		reqHeaders["Content-Type"] = finalContentType
+	}
+	for key, value := range channel.ExtraHeaders {
+		reqHeaders[key] = value
+	}
+	logID := service.LogRequestDetailed(user.ID, user.Username, modelName, http.MethodPost, path, upstreamURL, reqHeaders, string(finalBody), len(finalBody), extractMediaFromJSON(finalBody), aiRequestLogDetails(r, channel, task.ID))
 
 	chargedCredits := 0
-	if !service.IsMembershipActive(user.MembershipExpiresAt) && !service.IsModelFreeForRole(string(user.Role), modelName) {
+	if service.IsMembershipActive(user.MembershipExpiresAt) {
+		service.LogMembershipFreeUsage(user.ID, modelName, credits, path)
+		service.UpdateRequestLogFreeBilling(logID, "membership_free")
+	} else if service.IsModelFreeForRole(string(user.Role), modelName) {
+		service.LogRoleFreeUsage(user.ID, string(user.Role), modelName, credits, path)
+		service.UpdateRequestLogFreeBilling(logID, "role_free")
+	} else {
 		charge, chargeErr := service.ChargeUserCredits(user.ID, modelName, credits, path)
 		if chargeErr != nil {
 			service.UpdateGenerationTask(task.ID, service.GenerationTaskUpdate{Status: model.GenerationTaskStatusFailed, ErrorMsg: chargeErr.Error()})
+			service.LogRequestResponseDetailed(logID, service.RequestLogResponse{Success: false, ErrorMsg: chargeErr.Error(), ErrorStage: "billing"})
 			FailError(w, chargeErr)
 			return
 		}
 		service.UpdateGenerationTask(task.ID, service.GenerationTaskUpdate{CreditChargeID: charge.ID})
+		service.UpdateRequestLogBilling(logID, charge)
 		chargedCredits = credits
 		ws.DefaultHub.SendToUser(user.ID, map[string]any{"type": "credits-changed"})
 	}
 
-	go runImageGenerationTask(task.ID, user.ID, user.Username, modelName, path, upstreamURL, finalContentType, finalBody, channel.APIKey, channel.ExtraHeaders, chargedCredits)
+	go runImageGenerationTask(task.ID, logID, user.ID, user.Username, modelName, path, upstreamURL, finalContentType, finalBody, channel.APIKey, channel.ExtraHeaders, chargedCredits)
 	OK(w, task)
 }
 
@@ -150,9 +167,11 @@ func prepareAIRequestBody(body []byte, contentType string, modelName string, cha
 	return finalBody, finalContentType
 }
 
-func runImageGenerationTask(taskID, userID, username, modelName, path, upstreamURL, contentType string, body []byte, apiKey string, extraHeaders map[string]string, credits int) {
+func runImageGenerationTask(taskID, logID, userID, username, modelName, path, upstreamURL, contentType string, body []byte, apiKey string, extraHeaders map[string]string, credits int) {
+	startedAt := time.Now()
 	request, err := http.NewRequest(http.MethodPost, upstreamURL, bytes.NewReader(body))
 	if err != nil {
+		service.LogRequestResponseDetailed(logID, service.RequestLogResponse{Success: false, ErrorMsg: err.Error(), ErrorStage: "request_build", ElapsedMs: time.Since(startedAt).Milliseconds()})
 		finishImageTaskFailed(taskID, userID, modelName, path, credits, err.Error())
 		return
 	}
@@ -165,6 +184,7 @@ func runImageGenerationTask(taskID, userID, username, modelName, path, upstreamU
 	}
 	response, err := http.DefaultClient.Do(request)
 	if err != nil {
+		service.LogRequestResponseDetailed(logID, service.RequestLogResponse{Success: false, ErrorMsg: err.Error(), ErrorStage: "network", ElapsedMs: time.Since(startedAt).Milliseconds()})
 		finishImageTaskFailed(taskID, userID, modelName, path, credits, err.Error())
 		go service.LogCall(userID, username, modelName, path, false, err.Error(), credits)
 		return
@@ -176,16 +196,19 @@ func runImageGenerationTask(taskID, userID, username, modelName, path, upstreamU
 		if errorMsg == "" {
 			errorMsg = "图片生成失败"
 		}
+		service.LogRequestResponseDetailed(logID, service.RequestLogResponse{Body: string(respBody), Headers: response.Header, StatusCode: response.StatusCode, Success: false, ErrorMsg: errorMsg, ErrorStage: "upstream", ElapsedMs: time.Since(startedAt).Milliseconds()})
 		finishImageTaskFailed(taskID, userID, modelName, path, credits, errorMsg)
 		go service.LogCall(userID, username, modelName, path, false, string(respBody), credits)
 		return
 	}
 	images, err := extractImageTaskResults(respBody)
 	if err != nil {
+		service.LogRequestResponseDetailed(logID, service.RequestLogResponse{Body: string(respBody), Headers: response.Header, StatusCode: response.StatusCode, Success: false, ErrorMsg: err.Error(), ErrorStage: "response_parse", ElapsedMs: time.Since(startedAt).Milliseconds()})
 		finishImageTaskFailed(taskID, userID, modelName, path, credits, err.Error())
 		go service.LogCall(userID, username, modelName, path, false, err.Error(), credits)
 		return
 	}
+	service.LogRequestResponseDetailed(logID, service.RequestLogResponse{Body: string(respBody), Headers: response.Header, StatusCode: response.StatusCode, Success: true, ElapsedMs: time.Since(startedAt).Milliseconds(), GeneratedCount: len(images)})
 	service.UpdateGenerationTask(taskID, service.GenerationTaskUpdate{Status: model.GenerationTaskStatusSucceeded, Progress: intPtr(100), ResultImages: images})
 	ws.DefaultHub.SendToUser(userID, map[string]any{"type": "generation-task-updated", "taskId": taskID, "status": "completed", "resultImages": images})
 	ws.DefaultHub.SendToUser(userID, map[string]any{"type": "credits-changed"})

@@ -9,16 +9,19 @@ import {
     CloudDownloadOutlined,
     CrownOutlined,
     DashboardOutlined,
+    DownOutlined,
     FieldTimeOutlined,
     FileTextOutlined,
     HomeOutlined,
     KeyOutlined,
+    LineChartOutlined,
     LogoutOutlined,
     MenuUnfoldOutlined,
     NotificationOutlined,
     PictureOutlined,
     RobotOutlined,
     SafetyOutlined,
+    WarningOutlined,
     SettingOutlined,
     ToolOutlined,
     TransactionOutlined,
@@ -44,13 +47,27 @@ type AdminMenuItem = {
     label: string;
 };
 
-const adminMenuGroups: Array<{ label: string; items: AdminMenuItem[] }> = [
+type AdminMenuGroup = {
+    key: string;
+    label: string;
+    icon: ReactNode;
+    items: AdminMenuItem[];
+};
+
+const adminMenuGroups: AdminMenuGroup[] = [
     {
+        key: "overview",
         label: "总览",
-        items: [{ key: "/admin/dashboard", icon: <DashboardOutlined />, label: "运营概览" }],
+        icon: <DashboardOutlined />,
+        items: [
+            { key: "/admin/dashboard", icon: <DashboardOutlined />, label: "运营概览" },
+            { key: "/admin/analytics", icon: <LineChartOutlined />, label: "数据看板" },
+        ],
     },
     {
+        key: "operations",
         label: "业务运营",
+        icon: <TransactionOutlined />,
         items: [
             { key: "/admin/users", icon: <UserOutlined />, label: "用户管理" },
             { key: "/admin/credit-logs", icon: <TransactionOutlined />, label: "算力点流水" },
@@ -60,7 +77,9 @@ const adminMenuGroups: Array<{ label: string; items: AdminMenuItem[] }> = [
         ],
     },
     {
+        key: "content",
         label: "内容与模型",
+        icon: <AppstoreOutlined />,
         items: [
             { key: "/admin/prompts", icon: <FileTextOutlined />, label: "提示词管理" },
             { key: "/admin/prompt-presets", icon: <BarsOutlined />, label: "提示词预设" },
@@ -70,12 +89,15 @@ const adminMenuGroups: Array<{ label: string; items: AdminMenuItem[] }> = [
         ],
     },
     {
+        key: "system",
         label: "系统运维",
+        icon: <ToolOutlined />,
         items: [
             { key: "/admin/roles", icon: <SafetyOutlined />, label: "角色权限" },
             { key: "/admin/agent", icon: <ApiOutlined />, label: "Agent 服务" },
             { key: "/admin/call-logs", icon: <FileTextOutlined />, label: "调用日志" },
-            { key: "/admin/request-logs", icon: <CloudServerOutlined />, label: "请求日志" },
+            { key: "/admin/request-logs", icon: <CloudServerOutlined />, label: "使用日志" },
+            { key: "/admin/risk-events", icon: <WarningOutlined />, label: "风险事件" },
             { key: "/admin/tasks", icon: <FieldTimeOutlined />, label: "任务管理" },
             { key: "/admin/app-releases", icon: <CloudDownloadOutlined />, label: "版本管理" },
             { key: "/admin/settings", icon: <SettingOutlined />, label: "模型设置" },
@@ -88,6 +110,7 @@ const adminMenus = adminMenuGroups.flatMap((group) => group.items);
 
 const adminPageDescriptions: Record<string, string> = {
     "/admin/dashboard": "平台运营数据与服务状态总览",
+    "/admin/analytics": "分析模型调用表现与用户活跃消费",
     "/admin/users": "管理平台用户、角色与账户状态",
     "/admin/credit-logs": "查看用户算力点变动记录",
     "/admin/redeem-codes": "生成和管理平台兑换码",
@@ -101,7 +124,8 @@ const adminPageDescriptions: Record<string, string> = {
     "/admin/roles": "管理角色权限与模型访问范围",
     "/admin/agent": "管理画布 Agent 服务与访问控制",
     "/admin/call-logs": "查看模型调用日志与结果",
-    "/admin/request-logs": "查看服务端 API 请求记录",
+    "/admin/request-logs": "追踪平台使用、模型生成、算力点与错误诊断",
+    "/admin/risk-events": "识别并处置异常登录、重放请求与访问风险",
     "/admin/tasks": "跟踪图片与视频生成任务",
     "/admin/app-releases": "发布和管理桌面客户端安装包",
     "/admin/settings": "配置 AI 模型渠道和费用",
@@ -110,6 +134,10 @@ const adminPageDescriptions: Record<string, string> = {
 
 function getActiveMenu(pathname: string) {
     return adminMenus.find((item) => pathname === item.key || pathname.startsWith(`${item.key}/`)) ?? adminMenus[0];
+}
+
+function getMenuGroupForItem(itemKey: string) {
+    return adminMenuGroups.find((group) => group.items.some((item) => item.key === itemKey)) ?? adminMenuGroups[0];
 }
 
 export default function AdminLayout({ children }: { children: ReactNode }) {
@@ -125,10 +153,12 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
     const [serverOffline, setServerOffline] = useState(false);
     const [serverOfflineLoading, setServerOfflineLoading] = useState(false);
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+    const activeMenu = getActiveMenu(pathname);
+    const activeMenuGroup = getMenuGroupForItem(activeMenu.key);
+    const [openMenuGroups, setOpenMenuGroups] = useState<string[]>([activeMenuGroup.key]);
     const isDesktop = Boolean(screens.lg);
     const siteName = publicSystemSettings?.siteName || DEFAULT_SITE_NAME;
     const siteLogo = publicSystemSettings?.siteLogo || DEFAULT_SITE_LOGO;
-    const activeMenu = getActiveMenu(pathname);
     const displayName = user?.displayName || user?.username || "管理员";
     const shellStyle = { "--admin-accent": "#079a87", "--admin-accent-soft": "#e9faf6" } as CSSProperties;
 
@@ -149,6 +179,14 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
     }, [token, user?.role]);
 
     useEffect(() => setMobileMenuOpen(false), [pathname]);
+
+    useEffect(() => {
+        setOpenMenuGroups((current) => (current.includes(activeMenuGroup.key) ? current : [...current, activeMenuGroup.key]));
+    }, [activeMenuGroup.key]);
+
+    const toggleMenuGroup = (groupKey: string) => {
+        setOpenMenuGroups((current) => (current.includes(groupKey) ? current.filter((key) => key !== groupKey) : [...current, groupKey]));
+    };
 
     const toggleServerOffline = async (offline: boolean) => {
         setServerOfflineLoading(true);
@@ -183,28 +221,47 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
 
     const renderNavigation = (collapsed: boolean) => (
         <nav className="admin-navigation" aria-label="后台主导航">
-            {adminMenuGroups.map((group) => (
-                <div className="admin-nav-group" key={group.label}>
-                    {!collapsed ? <div className="admin-nav-group-label">{group.label}</div> : <div className="admin-nav-divider" />}
-                    {group.items.map((item) => {
-                        const active = activeMenu.key === item.key;
-                        const link = (
-                            <Link className={`admin-nav-item ${active ? "is-active" : ""}`} href={item.key} aria-current={active ? "page" : undefined}>
-                                <span className="admin-nav-icon">{item.icon}</span>
-                                {!collapsed ? <span className="admin-nav-label">{item.label}</span> : null}
-                                {!collapsed && active ? <span className="admin-nav-active-dot" /> : null}
-                            </Link>
-                        );
-                        return collapsed ? (
-                            <Tooltip title={item.label} placement="right" key={item.key}>
-                                {link}
-                            </Tooltip>
+            {adminMenuGroups.map((group) => {
+                const groupOpen = openMenuGroups.includes(group.key);
+                const groupActive = activeMenuGroup.key === group.key;
+                const groupVisible = collapsed || groupOpen;
+                const childrenId = `admin-nav-group-${group.key}`;
+
+                return (
+                    <div className={`admin-nav-group ${groupActive ? "has-active-item" : ""}`} key={group.key}>
+                        {!collapsed ? (
+                            <button type="button" className={`admin-nav-group-trigger ${groupOpen ? "is-open" : ""}`} aria-expanded={groupOpen} aria-controls={childrenId} onClick={() => toggleMenuGroup(group.key)}>
+                                <span className="admin-nav-group-icon">{group.icon}</span>
+                                <span className="admin-nav-group-title">{group.label}</span>
+                                <DownOutlined className="admin-nav-group-chevron" />
+                            </button>
                         ) : (
-                            <span key={item.key}>{link}</span>
-                        );
-                    })}
-                </div>
-            ))}
+                            <div className="admin-nav-divider" />
+                        )}
+                        <div className={`admin-nav-children ${groupVisible ? "is-open" : ""}`} id={childrenId} aria-hidden={!groupVisible}>
+                            <div className="admin-nav-children-inner">
+                                {group.items.map((item) => {
+                                    const active = activeMenu.key === item.key;
+                                    const link = (
+                                        <Link className={`admin-nav-item ${!collapsed ? "admin-nav-subitem" : ""} ${active ? "is-active" : ""}`} href={item.key} aria-current={active ? "page" : undefined} tabIndex={groupVisible ? undefined : -1}>
+                                            <span className="admin-nav-icon">{item.icon}</span>
+                                            {!collapsed ? <span className="admin-nav-label">{item.label}</span> : null}
+                                            {!collapsed && active ? <span className="admin-nav-active-dot" /> : null}
+                                        </Link>
+                                    );
+                                    return collapsed ? (
+                                        <Tooltip title={item.label} placement="right" key={item.key}>
+                                            {link}
+                                        </Tooltip>
+                                    ) : (
+                                        <span key={item.key}>{link}</span>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    </div>
+                );
+            })}
         </nav>
     );
 

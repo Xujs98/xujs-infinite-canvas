@@ -333,7 +333,12 @@ func DeleteUser(id string) error {
 	if err != nil {
 		return err
 	}
-	return db.Delete(&model.User{}, "id = ?", id).Error
+	return db.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Delete(&model.ClientAccessRecord{}, "user_id = ?", id).Error; err != nil {
+			return err
+		}
+		return tx.Delete(&model.User{}, "id = ?", id).Error
+	})
 }
 
 // BatchDeleteUsers 批量删除用户。
@@ -345,7 +350,12 @@ func BatchDeleteUsers(ids []string) error {
 	if err != nil {
 		return err
 	}
-	return db.Delete(&model.User{}, "id IN ?", ids).Error
+	return db.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Delete(&model.ClientAccessRecord{}, "user_id IN ?", ids).Error; err != nil {
+			return err
+		}
+		return tx.Delete(&model.User{}, "id IN ?", ids).Error
+	})
 }
 
 // BatchUpdateUserStatus 批量更新用户状态。

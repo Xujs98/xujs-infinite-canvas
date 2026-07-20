@@ -50,10 +50,12 @@ type UserList struct {
 }
 
 type AdminUserDetail struct {
-	User                 User              `json:"user"`
-	SubscriptionUsed     int               `json:"subscriptionUsed"`
-	TotalConsumedCredits int               `json:"totalConsumedCredits"`
-	ActiveSubscription   *UserSubscription `json:"activeSubscription"`
+	User                 User                    `json:"user"`
+	SubscriptionUsed     int                     `json:"subscriptionUsed"`
+	TotalConsumedCredits int                     `json:"totalConsumedCredits"`
+	ActiveSubscription   *UserSubscription       `json:"activeSubscription"`
+	IPRecords            []AdminUserIPRecord     `json:"ipRecords"`
+	DeviceRecords        []AdminUserDeviceRecord `json:"deviceRecords"`
 }
 
 // AuthUser 用户公开信息。

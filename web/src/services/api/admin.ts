@@ -44,6 +44,30 @@ export type AdminUserDetail = {
     subscriptionUsed: number;
     totalConsumedCredits: number;
     activeSubscription: UserSubscription | null;
+    ipRecords: AdminUserIPRecord[];
+    deviceRecords: AdminUserDeviceRecord[];
+};
+
+export type AdminUserIPRecord = {
+    ipAddress: string;
+    blocked: boolean;
+    clientTypes: string[];
+    deviceCount: number;
+    seenCount: number;
+    firstSeenAt: string;
+    lastSeenAt: string;
+};
+
+export type AdminUserDeviceRecord = {
+    deviceCode: string;
+    blocked: boolean;
+    ipAddresses: string[];
+    appVersion: string;
+    osName: string;
+    osVersion: string;
+    seenCount: number;
+    firstSeenAt: string;
+    lastSeenAt: string;
 };
 
 export type AdminDashboardStats = {
@@ -53,6 +77,70 @@ export type AdminDashboardStats = {
     onlineConnections: number;
     totalUsers: number;
     modelCount: number;
+};
+
+export type AdminAnalyticsRange = "1d" | "7d" | "14d" | "30d";
+
+export type AdminAnalyticsTrendPoint = {
+    at: string;
+    label: string;
+    totalCalls: number;
+    successCalls: number;
+    failedCalls: number;
+    modelCalls: Record<string, number>;
+    activeUsers: number;
+    newUsers: number;
+    consumedCredits: number;
+};
+
+export type AdminModelAnalyticsRank = {
+    model: string;
+    calls: number;
+    success: number;
+    failed: number;
+    successRate: number;
+    share: number;
+};
+
+export type AdminUserAnalyticsRank = {
+    userId: string;
+    username: string;
+    displayName: string;
+    calls: number;
+    successCalls: number;
+    successRate: number;
+    consumedCredits: number;
+    lastActiveAt: string;
+};
+
+export type AdminAnalyticsResult = {
+    range: AdminAnalyticsRange;
+    startAt: string;
+    endAt: string;
+    generatedAt: string;
+    model: {
+        summary: {
+            totalCalls: number;
+            successCalls: number;
+            failedCalls: number;
+            successRate: number;
+            activeModels: number;
+            consumedCredits: number;
+        };
+        trend: AdminAnalyticsTrendPoint[];
+        models: AdminModelAnalyticsRank[];
+    };
+    users: {
+        summary: {
+            totalUsers: number;
+            newUsers: number;
+            activeUsers: number;
+            consumingUsers: number;
+            consumedCredits: number;
+        };
+        trend: AdminAnalyticsTrendPoint[];
+        ranking: AdminUserAnalyticsRank[];
+    };
 };
 
 export type AdminServerOfflineStatus = {
@@ -123,8 +211,16 @@ export async function fetchAdminUserCreditLogs(token: string, id: string, query:
     return apiGet<AdminCreditLogListResponse>(`/api/admin/users/${encodeURIComponent(id)}/credit-logs`, compactApiParams(query), token);
 }
 
+export async function setAdminAccessBan(token: string, kind: "ip" | "device", value: string, blocked: boolean) {
+    return apiPost<boolean>("/api/admin/access-bans", { kind, value, blocked }, token);
+}
+
 export async function fetchAdminDashboardStats(token: string) {
     return apiGet<AdminDashboardStats>("/api/admin/dashboard", undefined, token);
+}
+
+export async function fetchAdminAnalytics(token: string, range: AdminAnalyticsRange) {
+    return apiGet<AdminAnalyticsResult>("/api/admin/analytics", { range }, token);
 }
 
 export async function fetchAdminServerOfflineStatus(token: string) {
@@ -612,12 +708,16 @@ export async function clearAdminCallLogs(token: string) {
     return apiPost<{ deleted: number }>("/api/admin/call-logs/clear", {}, token);
 }
 
-// 请求管理日志
+// 使用日志
 export type AdminRequestLogSummary = {
     id: string;
     userId: string;
     username: string;
+    eventType: string;
+    operation: string;
     model: string;
+    channelName: string;
+    providerId: string;
     method: string;
     path: string;
     url: string;
@@ -626,20 +726,66 @@ export type AdminRequestLogSummary = {
     success: boolean;
     isPolling: boolean;
     source: string;
+    elapsedMs: number;
+    credits: number;
+    walletCredits: number;
+    subscriptionCredits: number;
+    billingMode: string;
+    chargeStatus: string;
+    requestedCount: number;
+    generatedCount: number;
+    taskId: string;
+    errorStage: string;
     createdAt: string;
 };
 export type AdminRequestLog = AdminRequestLogSummary & {
     requestHeaders: string;
     requestBody: string;
     requestMedia: string;
+    requestConfig: string;
+    responseHeaders: string;
     responseBody: string;
     errorMsg: string;
+    referenceImageCount: number;
+    referenceVideoCount: number;
+    referenceAudioCount: number;
+    creditChargeId: string;
+    requestId: string;
+    ipAddress: string;
+    deviceCode: string;
+    clientType: string;
+    appVersion: string;
+    osName: string;
+    osVersion: string;
+    userAgent: string;
+};
+export type AdminRequestLogStats = {
+    total: number;
+    success: number;
+    failed: number;
+    credits: number;
+    averageMs: number;
 };
 export type AdminRequestLogListResponse = {
     items: AdminRequestLogSummary[];
     total: number;
+    stats: AdminRequestLogStats;
 };
-export async function fetchAdminRequestLogs(token: string, query: AdminUserQuery & { source?: string } = {}) {
+export type AdminRequestLogQuery = {
+    keyword?: string;
+    model?: string;
+    channel?: string;
+    source?: string;
+    eventType?: string;
+    operation?: string;
+    status?: string;
+    method?: string;
+    startTime?: string;
+    endTime?: string;
+    page?: number;
+    pageSize?: number;
+};
+export async function fetchAdminRequestLogs(token: string, query: AdminRequestLogQuery = {}) {
     return apiGet<AdminRequestLogListResponse>("/api/admin/request-logs", compactApiParams(query), token);
 }
 export async function fetchAdminRequestLogDetail(token: string, id: string) {
@@ -651,6 +797,59 @@ export async function batchDeleteAdminRequestLogs(token: string, ids: string[]) 
 
 export async function clearAdminRequestLogs(token: string) {
     return apiPost<{ deleted: number }>("/api/admin/request-logs/clear", {}, token);
+}
+
+export type AdminRiskLevel = "low" | "medium" | "high" | "critical";
+export type AdminRiskStatus = "open" | "resolved" | "ignored";
+export type AdminRiskEvent = {
+    id: string;
+    userId: string;
+    username: string;
+    eventType: string;
+    level: AdminRiskLevel;
+    status: AdminRiskStatus;
+    source: string;
+    ipAddress: string;
+    deviceCode: string;
+    clientType: string;
+    appVersion: string;
+    path: string;
+    summary: string;
+    detail: string;
+    occurrenceCount: number;
+    firstSeenAt: string;
+    lastSeenAt: string;
+    resolvedBy: string;
+    resolvedAt?: string | null;
+    createdAt: string;
+    updatedAt: string;
+};
+export type AdminRiskEventListResponse = { items: AdminRiskEvent[]; total: number };
+export type AdminRiskEventStats = { open: number; highRisk: number; today: number };
+export type AdminRiskEventQuery = {
+    keyword?: string;
+    userId?: string;
+    type?: string;
+    level?: string;
+    status?: string;
+    source?: string;
+    page?: number;
+    pageSize?: number;
+};
+export async function fetchAdminRiskEvents(token: string, query: AdminRiskEventQuery = {}) {
+    return apiGet<AdminRiskEventListResponse>("/api/admin/risk-events", compactApiParams(query), token);
+}
+export async function fetchAdminRiskEventStats(token: string) {
+    return apiGet<AdminRiskEventStats>("/api/admin/risk-events/stats", undefined, token);
+}
+export async function updateAdminRiskEventStatus(token: string, id: string, status: AdminRiskStatus) {
+    return apiPost<boolean>(`/api/admin/risk-events/${encodeURIComponent(id)}/status`, { status }, token);
+}
+export async function batchDeleteAdminRiskEvents(token: string, ids: string[]) {
+    return apiPost<boolean>("/api/admin/risk-events/batch-delete", { ids }, token);
+}
+export async function clearAdminRiskEvents(token: string) {
+    return apiPost<{ deleted: number }>("/api/admin/risk-events/clear", {}, token);
 }
 
 // 模型分类管理

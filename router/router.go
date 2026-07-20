@@ -16,9 +16,12 @@ func New() *gin.Engine {
 	_ = router.SetTrustedProxies(nil)
 	api := router.Group("/api")
 	api.Use(middleware.TestOfflineMode)
+	api.Use(middleware.ClientRiskInspection)
+	api.Use(middleware.UsageAudit)
 	api.GET("/health", func(c *gin.Context) {
 		c.String(http.StatusOK, "ok")
 	})
+	api.POST("/client/access-check", gin.WrapF(handler.CheckClientAccess))
 	api.POST("/auth/register", gin.WrapF(handler.Register))
 	api.POST("/auth/register/email-code", gin.WrapF(handler.SendRegistrationEmailCode))
 	api.POST("/auth/login", gin.WrapF(handler.Login))
@@ -39,6 +42,15 @@ func New() *gin.Engine {
 	v1.POST("/images/edits", gin.WrapF(handler.AIImagesEdits))
 	v1.POST("/image-tasks/generations", gin.WrapF(handler.CreateImageGenerationTask))
 	v1.POST("/image-tasks/edits", gin.WrapF(handler.CreateImageEditTask))
+	v1.GET("/image-tasks/status/:id", func(c *gin.Context) {
+		handler.AIImageTaskStatus(c.Writer, c.Request, c.Param("id"))
+	})
+	v1.POST("/image-tasks/status/:id", func(c *gin.Context) {
+		handler.AIImageTaskStatus(c.Writer, c.Request, c.Param("id"))
+	})
+	v1.GET("/image-tasks/content/:id", func(c *gin.Context) {
+		handler.AIImageTaskContent(c.Writer, c.Request, c.Param("id"))
+	})
 	v1.POST("/video-tasks", gin.WrapF(handler.CreateVideoGenerationTask))
 	v1.GET("/generation-tasks/:id", func(c *gin.Context) {
 		handler.GetGenerationTask(c.Writer, c.Request, c.Param("id"))
@@ -103,6 +115,7 @@ func New() *gin.Engine {
 
 	admin := api.Group("/admin", middleware.AdminAuth)
 	admin.GET("/dashboard", gin.WrapF(handler.AdminDashboard))
+	admin.GET("/analytics", gin.WrapF(handler.AdminAnalytics))
 	admin.GET("/server/offline", gin.WrapF(handler.AdminGetServerOffline))
 	admin.POST("/server/offline", gin.WrapF(handler.AdminSetServerOffline))
 	admin.GET("/users", gin.WrapF(handler.AdminUsers))
@@ -112,6 +125,7 @@ func New() *gin.Engine {
 	admin.GET("/users/:id/credit-logs", func(c *gin.Context) {
 		handler.AdminUserCreditLogs(c.Writer, c.Request, c.Param("id"))
 	})
+	admin.POST("/access-bans", gin.WrapF(handler.AdminSetAccessBan))
 	admin.POST("/users", gin.WrapF(handler.AdminSaveUser))
 	admin.POST("/users/:id/credits", func(c *gin.Context) {
 		handler.AdminAdjustUserCredits(c.Writer, c.Request, c.Param("id"))
@@ -191,6 +205,13 @@ func New() *gin.Engine {
 	})
 	admin.POST("/request-logs/batch-delete", gin.WrapF(handler.AdminBatchDeleteRequestLogs))
 	admin.POST("/request-logs/clear", gin.WrapF(handler.AdminClearRequestLogs))
+	admin.GET("/risk-events", gin.WrapF(handler.AdminRiskEvents))
+	admin.GET("/risk-events/stats", gin.WrapF(handler.AdminRiskEventStats))
+	admin.POST("/risk-events/:id/status", func(c *gin.Context) {
+		handler.AdminUpdateRiskEventStatus(c.Writer, c.Request, c.Param("id"))
+	})
+	admin.POST("/risk-events/batch-delete", gin.WrapF(handler.AdminBatchDeleteRiskEvents))
+	admin.POST("/risk-events/clear", gin.WrapF(handler.AdminClearRiskEvents))
 	admin.GET("/tasks", gin.WrapF(handler.AdminGenerationTasks))
 	admin.GET("/app-releases", gin.WrapF(handler.AdminAppReleases))
 	admin.POST("/app-releases", gin.WrapF(handler.AdminCreateAppRelease))

@@ -1,11 +1,12 @@
 "use client";
 
-import { App, Avatar, Button, Descriptions, Empty, Flex, Modal, Pagination, Skeleton, Table, Tabs, Tag, Typography } from "antd";
+import { GlobalOutlined, LaptopOutlined, StopOutlined, UnlockOutlined, WarningOutlined } from "@ant-design/icons";
+import { App, Avatar, Button, Descriptions, Empty, Flex, Modal, Pagination, Skeleton, Space, Table, Tabs, Tag, Typography } from "antd";
 import dayjs from "dayjs";
 import { useCallback, useEffect, useState } from "react";
 
 import { ClickToCopyText } from "@/components/admin/click-to-copy-text";
-import { fetchAdminUserCreditLogs, fetchAdminUserDetail, type AdminCreditLog, type AdminUser, type AdminUserDetail } from "@/services/api/admin";
+import { fetchAdminRiskEvents, fetchAdminUserCreditLogs, fetchAdminUserDetail, setAdminAccessBan, type AdminCreditLog, type AdminRiskEvent, type AdminUser, type AdminUserDeviceRecord, type AdminUserDetail, type AdminUserIPRecord } from "@/services/api/admin";
 import { useUserStore } from "@/stores/use-user-store";
 
 const defaultPageSize = 10;
@@ -24,21 +25,27 @@ const creditTypeLabels: Record<string, string> = {
 };
 const creditTypeColors: Record<string, string> = { admin_adjust: "blue", ai_consume: "red", ai_refund: "green", offline_consume: "volcano", offline_refund: "green", membership_free: "cyan", role_free: "geekblue", invite_reward: "purple", redeem: "gold", check_in: "lime", subscription_purchase: "cyan" };
 const resetCycleLabels: Record<string, string> = { none: "不重置", daily: "每天", weekly: "每周", monthly: "每月", custom: "自定义周期" };
+const riskLevelLabels: Record<string, { label: string; color: string }> = { low: { label: "低", color: "default" }, medium: { label: "中", color: "gold" }, high: { label: "高", color: "orange" }, critical: { label: "严重", color: "red" } };
+const riskStatusLabels: Record<string, { label: string; color: string }> = { open: { label: "待处理", color: "error" }, resolved: { label: "已确认", color: "success" }, ignored: { label: "已忽略", color: "default" } };
 
 function formatTime(value: string) {
     return value ? dayjs(value).format("YYYY-MM-DD HH:mm:ss") : "-";
 }
 
 export function UserDetailModal({ user, open, roleLabels, onClose }: { user: AdminUser | null; open: boolean; roleLabels: Map<string, string>; onClose: () => void }) {
-    const { message } = App.useApp();
+    const { message, modal } = App.useApp();
     const token = useUserStore((state) => state.token);
     const [detail, setDetail] = useState<AdminUserDetail | null>(null);
     const [logs, setLogs] = useState<AdminCreditLog[]>([]);
     const [logsTotal, setLogsTotal] = useState(0);
     const [logsPage, setLogsPage] = useState(1);
     const [logsPageSize, setLogsPageSize] = useState(defaultPageSize);
+    const [riskEvents, setRiskEvents] = useState<AdminRiskEvent[]>([]);
+    const [riskTotal, setRiskTotal] = useState(0);
+    const [riskLoading, setRiskLoading] = useState(false);
     const [loading, setLoading] = useState(false);
     const [logsLoading, setLogsLoading] = useState(false);
+    const [accessUpdating, setAccessUpdating] = useState("");
 
     const loadDetail = useCallback(async () => {
         if (!open || !user) return;
@@ -66,18 +73,62 @@ export function UserDetailModal({ user, open, roleLabels, onClose }: { user: Adm
         }
     }, [logsPage, logsPageSize, message, open, token, user]);
 
+    const loadRiskEvents = useCallback(async () => {
+        if (!open || !user) return;
+        setRiskLoading(true);
+        try {
+            const result = await fetchAdminRiskEvents(token, { userId: user.id, page: 1, pageSize: 50 });
+            setRiskEvents(result.items || []);
+            setRiskTotal(result.total || 0);
+        } catch (error) {
+            message.error(error instanceof Error ? error.message : "读取风险事件失败");
+        } finally {
+            setRiskLoading(false);
+        }
+    }, [message, open, token, user]);
+
     useEffect(() => { void loadDetail(); }, [loadDetail]);
     useEffect(() => { void loadLogs(); }, [loadLogs]);
+    useEffect(() => { void loadRiskEvents(); }, [loadRiskEvents]);
     useEffect(() => {
         if (!open) return;
         setDetail(null);
         setLogs([]);
+        setRiskEvents([]);
+        setRiskTotal(0);
         setLogsPage(1);
         setLogsPageSize(defaultPageSize);
     }, [open, user?.id]);
 
+    const confirmAccessBan = useCallback((kind: "ip" | "device", value: string, blocked: boolean) => {
+        const label = kind === "ip" ? "IP" : "设备码";
+        modal.confirm({
+            title: blocked ? `封禁${label}` : `解除${label}封禁`,
+            content: value,
+            okText: blocked ? "确认封禁" : "确认解除",
+            cancelText: "取消",
+            okButtonProps: { danger: blocked },
+            onOk: async () => {
+                const key = `${kind}:${value}`;
+                setAccessUpdating(key);
+                try {
+                    await setAdminAccessBan(token, kind, value, blocked);
+                    await loadDetail();
+                    message.success(blocked ? `${label}已封禁` : `${label}已解除封禁`);
+                } catch (error) {
+                    message.error(error instanceof Error ? error.message : "操作失败");
+                    throw error;
+                } finally {
+                    setAccessUpdating("");
+                }
+            },
+        });
+    }, [loadDetail, message, modal, token]);
+
     const current = detail?.user || user;
     const subscription = detail?.activeSubscription;
+    const ipRecords = detail?.ipRecords || [];
+    const deviceRecords = detail?.deviceRecords || [];
     const online = Boolean(current?.online);
     const metricItems = [
         { label: "算力点余额", value: current?.credits || 0 },
@@ -154,6 +205,92 @@ export function UserDetailModal({ user, open, roleLabels, onClose }: { user: Adm
                                             </Descriptions>
                                         </div>
                                     ) : null}
+                                </div>
+                            ),
+                        },
+                        {
+                            key: "access",
+                            label: `访问记录 (${ipRecords.length + deviceRecords.length})`,
+                            children: (
+                                <div className="admin-user-access-pane">
+                                    <section className="admin-user-access-section">
+                                        <Flex align="center" justify="space-between" gap={12} wrap="wrap" className="admin-user-access-heading">
+                                            <Space size={8}><GlobalOutlined /><Typography.Text strong>IP 记录</Typography.Text><Tag>{ipRecords.length}</Tag></Space>
+                                        </Flex>
+                                        <Table<AdminUserIPRecord>
+                                            rowKey="ipAddress"
+                                            size="small"
+                                            dataSource={ipRecords}
+                                            pagination={false}
+                                            tableLayout="fixed"
+                                            scroll={{ x: 920 }}
+                                            locale={{ emptyText: <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无 IP 记录" /> }}
+                                            columns={[
+                                                { title: "IP 地址", dataIndex: "ipAddress", width: 170, render: (value: string) => <ClickToCopyText value={value}>{value}</ClickToCopyText> },
+                                                { title: "状态", dataIndex: "blocked", width: 80, render: (value: boolean) => <Tag color={value ? "error" : "success"}>{value ? "已封禁" : "正常"}</Tag> },
+                                                { title: "客户端", dataIndex: "clientTypes", width: 130, render: (values: string[]) => <Space size={4} wrap>{(values || []).map((value) => <Tag key={value} color={value === "app" ? "blue" : "green"}>{value === "app" ? "App" : "Web"}</Tag>)}</Space> },
+                                                { title: "设备", dataIndex: "deviceCount", width: 72, render: (value: number) => `${value || 0} 台` },
+                                                { title: "访问", dataIndex: "seenCount", width: 72, render: (value: number) => `${value || 0} 次` },
+                                                { title: "首次访问", dataIndex: "firstSeenAt", width: 170, render: formatTime },
+                                                { title: "最近访问", dataIndex: "lastSeenAt", width: 170, render: formatTime },
+                                                { title: "操作", key: "actions", width: 96, fixed: "right", render: (_, item) => <Button danger={!item.blocked} type="text" size="small" loading={accessUpdating === `ip:${item.ipAddress}`} icon={item.blocked ? <UnlockOutlined /> : <StopOutlined />} onClick={() => confirmAccessBan("ip", item.ipAddress, !item.blocked)}>{item.blocked ? "解除" : "封禁"}</Button> },
+                                            ]}
+                                        />
+                                    </section>
+
+                                    <section className="admin-user-access-section">
+                                        <Flex align="center" justify="space-between" gap={12} wrap="wrap" className="admin-user-access-heading">
+                                            <Space size={8}><LaptopOutlined /><Typography.Text strong>设备码记录</Typography.Text><Tag>{deviceRecords.length}</Tag></Space>
+                                        </Flex>
+                                        <Table<AdminUserDeviceRecord>
+                                            rowKey="deviceCode"
+                                            size="small"
+                                            dataSource={deviceRecords}
+                                            pagination={false}
+                                            tableLayout="fixed"
+                                            scroll={{ x: 1060 }}
+                                            locale={{ emptyText: <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无设备码记录" /> }}
+                                            columns={[
+                                                { title: "设备码", dataIndex: "deviceCode", width: 245, render: (value: string) => <ClickToCopyText value={value}>{value}</ClickToCopyText> },
+                                                { title: "状态", dataIndex: "blocked", width: 80, render: (value: boolean) => <Tag color={value ? "error" : "success"}>{value ? "已封禁" : "正常"}</Tag> },
+                                                { title: "系统", key: "system", width: 150, ellipsis: true, render: (_, item) => <Typography.Text ellipsis={{ tooltip: `${item.osName || "-"} ${item.osVersion || ""}` }}>{[item.osName, item.osVersion].filter(Boolean).join(" ") || "-"}</Typography.Text> },
+                                                { title: "App 版本", dataIndex: "appVersion", width: 100, render: (value: string) => value || "-" },
+                                                { title: "IP", dataIndex: "ipAddresses", width: 180, render: (values: string[]) => <Typography.Text ellipsis={{ tooltip: (values || []).join(", ") }}>{(values || []).join(", ") || "-"}</Typography.Text> },
+                                                { title: "访问", dataIndex: "seenCount", width: 72, render: (value: number) => `${value || 0} 次` },
+                                                { title: "首次访问", dataIndex: "firstSeenAt", width: 170, render: formatTime },
+                                                { title: "最近访问", dataIndex: "lastSeenAt", width: 170, render: formatTime },
+                                                { title: "操作", key: "actions", width: 96, fixed: "right", render: (_, item) => <Button danger={!item.blocked} type="text" size="small" loading={accessUpdating === `device:${item.deviceCode}`} icon={item.blocked ? <UnlockOutlined /> : <StopOutlined />} onClick={() => confirmAccessBan("device", item.deviceCode, !item.blocked)}>{item.blocked ? "解除" : "封禁"}</Button> },
+                                            ]}
+                                        />
+                                    </section>
+                                </div>
+                            ),
+                        },
+                        {
+                            key: "risk",
+                            label: `风险事件 (${riskTotal})`,
+                            children: (
+                                <div className="admin-user-risk-pane">
+                                    <Table<AdminRiskEvent>
+                                        rowKey="id"
+                                        size="small"
+                                        loading={riskLoading}
+                                        dataSource={riskEvents}
+                                        pagination={false}
+                                        tableLayout="fixed"
+                                        scroll={{ x: 920, y: 360 }}
+                                        locale={{ emptyText: <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无风险事件" /> }}
+                                        columns={[
+                                            { title: "等级", dataIndex: "level", width: 76, render: (value: string) => <Tag color={riskLevelLabels[value]?.color}>{riskLevelLabels[value]?.label || value}</Tag> },
+                                            { title: "事件", key: "event", width: 220, render: (_, item) => <Space size={6}><WarningOutlined /><Typography.Text ellipsis={{ tooltip: item.summary }}>{item.summary || item.eventType}</Typography.Text></Space> },
+                                            { title: "来源", dataIndex: "source", width: 100, render: (value: string, item) => item.clientType === "app" ? "App" : value || "服务端" },
+                                            { title: "IP", dataIndex: "ipAddress", width: 145, render: (value: string) => value ? <ClickToCopyText value={value}>{value}</ClickToCopyText> : "-" },
+                                            { title: "次数", dataIndex: "occurrenceCount", width: 65, render: (value: number) => value || 1 },
+                                            { title: "状态", dataIndex: "status", width: 88, render: (value: string) => <Tag color={riskStatusLabels[value]?.color}>{riskStatusLabels[value]?.label || value}</Tag> },
+                                            { title: "最近发生", dataIndex: "lastSeenAt", width: 170, render: formatTime },
+                                        ]}
+                                    />
+                                    {riskTotal > riskEvents.length ? <Typography.Text type="secondary" style={{ display: "block", marginTop: 10 }}>仅展示最近 {riskEvents.length} 条，请在“风险事件”页面查看全部记录。</Typography.Text> : null}
                                 </div>
                             ),
                         },

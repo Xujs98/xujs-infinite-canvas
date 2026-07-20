@@ -401,7 +401,11 @@ func GetAdminUserDetail(userID string) (model.AdminUserDetail, error) {
 	if err != nil {
 		return model.AdminUserDetail{}, err
 	}
-	return model.AdminUserDetail{User: user, SubscriptionUsed: subscriptionUsed, TotalConsumedCredits: walletConsumed + subscriptionConsumed, ActiveSubscription: activeSubscription}, nil
+	ipRecords, deviceRecords, err := GetUserAccessRecords(userID)
+	if err != nil {
+		return model.AdminUserDetail{}, err
+	}
+	return model.AdminUserDetail{User: user, SubscriptionUsed: subscriptionUsed, TotalConsumedCredits: walletConsumed + subscriptionConsumed, ActiveSubscription: activeSubscription, IPRecords: ipRecords, DeviceRecords: deviceRecords}, nil
 }
 
 func SaveUser(user model.User, password string) (model.User, error) {
