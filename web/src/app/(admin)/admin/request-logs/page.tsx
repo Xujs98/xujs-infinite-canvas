@@ -84,6 +84,16 @@ function formatDuration(milliseconds: number): string {
     return `${minutes} 分 ${seconds} 秒`;
 }
 
+function formatAverageDuration(milliseconds: number): string {
+    if (!milliseconds) return "-";
+    if (milliseconds < 1000) return `${milliseconds.toFixed(2)} ms`;
+    if (milliseconds < 60_000) return `${(milliseconds / 1000).toFixed(2)} s`;
+    const totalSeconds = Number((milliseconds / 1000).toFixed(2));
+    const minutes = Math.floor(totalSeconds / 60);
+    const seconds = totalSeconds - minutes * 60;
+    return `${minutes} 分 ${seconds.toFixed(2)} 秒`;
+}
+
 function formatBytes(bytes: number): string {
     if (!bytes) return "0 B";
     if (bytes < 1024) return `${bytes} B`;
@@ -536,7 +546,7 @@ export default function AdminRequestLogsPage() {
                 <Metric icon={<CloudServerOutlined />} label="使用记录" value={stats.total.toLocaleString("zh-CN")} note="当前筛选范围" tone="toneTeal" />
                 <Metric icon={<ThunderboltOutlined />} label="消耗算力点" value={stats.credits.toLocaleString("zh-CN")} note="实际扣除总量" tone="toneAmber" />
                 <Metric icon={<ExclamationCircleOutlined />} label="失败记录" value={stats.failed.toLocaleString("zh-CN")} note={stats.total ? `失败率 ${((stats.failed / stats.total) * 100).toFixed(1)}%` : "失败率 0%"} tone="toneRed" />
-                <Metric icon={<ClockCircleOutlined />} label="平均耗时" value={formatDuration(stats.averageMs)} note={`${stats.success.toLocaleString("zh-CN")} 次成功`} tone="toneBlue" />
+                <Metric icon={<ClockCircleOutlined />} label="平均耗时" value={formatAverageDuration(stats.averageMs)} note={`${stats.success.toLocaleString("zh-CN")} 次成功`} tone="toneBlue" />
             </div>
 
             <Card className={styles.tablePanel} variant="borderless">
