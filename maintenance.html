@@ -1,0 +1,505 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#101411">
+  <meta name="robots" content="noindex, nofollow">
+  <title>服务器迁移维护中 | 矩龙画布</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #101411;
+      --surface: rgba(23, 29, 25, 0.74);
+      --line: rgba(218, 229, 220, 0.14);
+      --text: #f4f7f4;
+      --muted: #aab5ad;
+      --green: #55d68b;
+      --amber: #f1b85b;
+      --coral: #ee7865;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      min-height: 100%;
+      margin: 0;
+    }
+
+    body {
+      overflow-x: hidden;
+      background: var(--bg);
+      color: var(--text);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
+        "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+      letter-spacing: 0;
+    }
+
+    #canvas-network {
+      position: fixed;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      opacity: 0.92;
+      pointer-events: none;
+    }
+
+    .page {
+      position: relative;
+      z-index: 1;
+      display: grid;
+      grid-template-rows: auto 1fr auto;
+      min-height: 100vh;
+      min-height: 100svh;
+      padding: max(24px, env(safe-area-inset-top)) max(24px, env(safe-area-inset-right))
+        max(20px, env(safe-area-inset-bottom)) max(24px, env(safe-area-inset-left));
+    }
+
+    .header,
+    .footer,
+    .main {
+      width: min(1160px, 100%);
+      margin-inline: auto;
+    }
+
+    .header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 20px;
+      min-height: 56px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-size: 17px;
+      font-weight: 700;
+    }
+
+    .brand-mark {
+      position: relative;
+      width: 30px;
+      height: 30px;
+    }
+
+    .brand-mark::before,
+    .brand-mark::after,
+    .brand-mark span {
+      position: absolute;
+      width: 9px;
+      height: 9px;
+      border-radius: 50%;
+      background: var(--green);
+      box-shadow: 0 0 20px rgba(85, 214, 139, 0.55);
+      content: "";
+    }
+
+    .brand-mark::before {
+      top: 2px;
+      left: 2px;
+    }
+
+    .brand-mark::after {
+      right: 2px;
+      bottom: 2px;
+      background: var(--amber);
+      box-shadow: 0 0 20px rgba(241, 184, 91, 0.5);
+    }
+
+    .brand-mark span {
+      top: 10px;
+      left: 11px;
+      background: var(--text);
+      box-shadow: none;
+    }
+
+    .brand-mark i {
+      position: absolute;
+      inset: 6px;
+      border: 1px solid rgba(244, 247, 244, 0.44);
+      transform: rotate(45deg);
+    }
+
+    .timezone {
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .main {
+      display: grid;
+      grid-template-columns: minmax(0, 1.2fr) minmax(290px, 0.8fr);
+      align-items: center;
+      gap: clamp(48px, 8vw, 120px);
+      padding-block: clamp(48px, 9vh, 108px);
+    }
+
+    .status-line {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 24px;
+      color: var(--amber);
+      font-size: 14px;
+      font-weight: 700;
+    }
+
+    .status-dot {
+      width: 9px;
+      height: 9px;
+      border-radius: 50%;
+      background: currentColor;
+      box-shadow: 0 0 0 6px rgba(241, 184, 91, 0.11);
+      animation: pulse 1.8s ease-in-out infinite;
+    }
+
+    h1 {
+      max-width: 760px;
+      margin: 0;
+      font-size: clamp(44px, 7vw, 88px);
+      line-height: 1.04;
+      font-weight: 760;
+      letter-spacing: 0;
+    }
+
+    .lead {
+      max-width: 680px;
+      margin: 28px 0 0;
+      color: var(--muted);
+      font-size: clamp(16px, 1.7vw, 20px);
+      line-height: 1.8;
+    }
+
+    .window {
+      margin-top: 30px;
+      color: var(--text);
+      font-size: 15px;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .panel {
+      padding: 30px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--surface);
+      backdrop-filter: blur(14px);
+      box-shadow: 0 24px 80px rgba(0, 0, 0, 0.26);
+    }
+
+    .panel-label {
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .countdown {
+      min-height: 54px;
+      margin-top: 8px;
+      font-size: clamp(32px, 5vw, 52px);
+      font-weight: 720;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .progress-track {
+      height: 4px;
+      margin-top: 28px;
+      overflow: hidden;
+      background: rgba(244, 247, 244, 0.1);
+    }
+
+    .progress-bar {
+      width: 0;
+      height: 100%;
+      background: var(--green);
+      transition: width 0.6s ease;
+    }
+
+    .steps {
+      display: grid;
+      gap: 14px;
+      margin: 26px 0 0;
+      padding: 0;
+      list-style: none;
+    }
+
+    .steps li {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 18px;
+      padding-top: 14px;
+      border-top: 1px solid var(--line);
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .steps strong {
+      color: var(--text);
+      font-weight: 600;
+    }
+
+    .refresh {
+      width: 100%;
+      min-height: 44px;
+      margin-top: 28px;
+      border: 1px solid rgba(85, 214, 139, 0.48);
+      border-radius: 6px;
+      background: rgba(85, 214, 139, 0.09);
+      color: var(--text);
+      font: inherit;
+      font-weight: 650;
+      cursor: pointer;
+      transition: background 160ms ease, border-color 160ms ease;
+    }
+
+    .refresh:hover,
+    .refresh:focus-visible {
+      border-color: var(--green);
+      background: rgba(85, 214, 139, 0.16);
+      outline: none;
+    }
+
+    .footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 20px;
+      padding-top: 18px;
+      border-top: 1px solid var(--line);
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    @keyframes pulse {
+      50% {
+        opacity: 0.5;
+        transform: scale(0.82);
+      }
+    }
+
+    @media (max-width: 820px) {
+      .page {
+        padding-inline: 20px;
+      }
+
+      .main {
+        grid-template-columns: 1fr;
+        align-content: center;
+        gap: 38px;
+        padding-block: 44px;
+      }
+
+      h1 {
+        font-size: 46px;
+      }
+
+      .panel {
+        padding: 24px;
+      }
+
+      .footer {
+        align-items: flex-start;
+        flex-direction: column;
+        gap: 8px;
+      }
+    }
+
+    @media (max-width: 430px) {
+      .timezone {
+        display: none;
+      }
+
+      h1 {
+        font-size: 40px;
+      }
+
+      .lead {
+        font-size: 15px;
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *,
+      *::before,
+      *::after {
+        scroll-behavior: auto !important;
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+      }
+    }
+  </style>
+</head>
+<body>
+  <canvas id="canvas-network" aria-hidden="true"></canvas>
+  <div class="page">
+    <header class="header">
+      <div class="brand">
+        <span class="brand-mark" aria-hidden="true"><i></i><span></span></span>
+        <span>矩龙画布</span>
+      </div>
+      <div class="timezone">北京时间 UTC+8</div>
+    </header>
+
+    <main class="main">
+      <section aria-labelledby="page-title">
+        <div class="status-line">
+          <span class="status-dot" aria-hidden="true"></span>
+          <span id="status-text">服务器迁移进行中</span>
+        </div>
+        <h1 id="page-title">服务器迁移维护中</h1>
+        <p class="lead">
+          我们正在迁移服务数据并执行完整性校验。维护期间网站、App 登录、模型调用和素材访问暂时不可用，请勿重复提交生成任务。
+        </p>
+        <p class="window">维护窗口：2026年7月21日 17:00 - 20:00</p>
+      </section>
+
+      <aside class="panel" aria-label="维护进度">
+        <div class="panel-label" id="countdown-label">距离预计恢复</div>
+        <div class="countdown" id="countdown" aria-live="polite">--:--:--</div>
+        <div class="progress-track" aria-hidden="true">
+          <div class="progress-bar" id="progress-bar"></div>
+        </div>
+        <ul class="steps">
+          <li><span>迁移阶段</span><strong id="phase">数据传输与校验</strong></li>
+          <li><span>预计恢复</span><strong>今天 20:00</strong></li>
+          <li><span>当前状态</span><strong id="service-state">服务暂停</strong></li>
+        </ul>
+        <button class="refresh" type="button" onclick="window.location.reload()">刷新状态</button>
+      </aside>
+    </main>
+
+    <footer class="footer">
+      <span>迁移完成后重新打开客户端即可恢复使用</span>
+      <span>矩龙画布 · 2026</span>
+    </footer>
+  </div>
+
+  <script>
+    (() => {
+      const start = new Date("2026-07-21T17:00:00+08:00").getTime();
+      const end = new Date("2026-07-21T20:00:00+08:00").getTime();
+      const countdown = document.getElementById("countdown");
+      const countdownLabel = document.getElementById("countdown-label");
+      const statusText = document.getElementById("status-text");
+      const serviceState = document.getElementById("service-state");
+      const phase = document.getElementById("phase");
+      const progressBar = document.getElementById("progress-bar");
+
+      const pad = (value) => String(value).padStart(2, "0");
+
+      function updateTime() {
+        const now = Date.now();
+        let target = end;
+
+        if (now < start) {
+          target = start;
+          countdownLabel.textContent = "距离维护开始";
+          statusText.textContent = "迁移维护即将开始";
+          serviceState.textContent = "服务正常";
+          phase.textContent = "等待维护窗口";
+          progressBar.style.width = "0%";
+        } else if (now >= end) {
+          countdownLabel.textContent = "预计维护窗口已结束";
+          countdown.textContent = "恢复确认中";
+          statusText.textContent = "正在确认服务状态";
+          serviceState.textContent = "等待恢复";
+          phase.textContent = "最终检查";
+          progressBar.style.width = "100%";
+          return;
+        } else {
+          const percent = Math.max(2, Math.min(98, ((now - start) / (end - start)) * 100));
+          progressBar.style.width = `${percent}%`;
+        }
+
+        const remaining = Math.max(0, target - now);
+        const hours = Math.floor(remaining / 3600000);
+        const minutes = Math.floor((remaining % 3600000) / 60000);
+        const seconds = Math.floor((remaining % 60000) / 1000);
+        countdown.textContent = `${pad(hours)}:${pad(minutes)}:${pad(seconds)}`;
+      }
+
+      updateTime();
+      window.setInterval(updateTime, 1000);
+
+      const canvas = document.getElementById("canvas-network");
+      const context = canvas.getContext("2d");
+      const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      let width = 0;
+      let height = 0;
+      let points = [];
+      let frame = 0;
+
+      function resize() {
+        const ratio = Math.min(window.devicePixelRatio || 1, 2);
+        width = window.innerWidth;
+        height = window.innerHeight;
+        canvas.width = Math.floor(width * ratio);
+        canvas.height = Math.floor(height * ratio);
+        canvas.style.width = `${width}px`;
+        canvas.style.height = `${height}px`;
+        context.setTransform(ratio, 0, 0, ratio, 0, 0);
+
+        const count = Math.max(24, Math.min(72, Math.floor((width * height) / 24000)));
+        points = Array.from({ length: count }, (_, index) => ({
+          x: Math.random() * width,
+          y: Math.random() * height,
+          vx: (Math.random() - 0.5) * 0.16,
+          vy: (Math.random() - 0.5) * 0.16,
+          radius: index % 9 === 0 ? 2.6 : 1.5,
+          accent: index % 11 === 0,
+        }));
+        draw();
+      }
+
+      function draw() {
+        context.clearRect(0, 0, width, height);
+
+        for (let i = 0; i < points.length; i += 1) {
+          const point = points[i];
+          if (!reducedMotion) {
+            point.x += point.vx;
+            point.y += point.vy;
+            if (point.x < -20) point.x = width + 20;
+            if (point.x > width + 20) point.x = -20;
+            if (point.y < -20) point.y = height + 20;
+            if (point.y > height + 20) point.y = -20;
+          }
+
+          for (let j = i + 1; j < points.length; j += 1) {
+            const other = points[j];
+            const dx = point.x - other.x;
+            const dy = point.y - other.y;
+            const distance = Math.sqrt(dx * dx + dy * dy);
+            if (distance < 150) {
+              context.beginPath();
+              context.moveTo(point.x, point.y);
+              context.lineTo(other.x, other.y);
+              context.strokeStyle = `rgba(151, 177, 159, ${(1 - distance / 150) * 0.16})`;
+              context.lineWidth = 1;
+              context.stroke();
+            }
+          }
+
+          context.beginPath();
+          context.arc(point.x, point.y, point.radius, 0, Math.PI * 2);
+          context.fillStyle = point.accent ? "rgba(241, 184, 91, 0.72)" : "rgba(85, 214, 139, 0.58)";
+          context.fill();
+        }
+
+        if (!reducedMotion) frame = window.requestAnimationFrame(draw);
+      }
+
+      window.addEventListener("resize", () => {
+        if (frame) window.cancelAnimationFrame(frame);
+        resize();
+      });
+      resize();
+    })();
+  </script>
+</body>
+</html>
