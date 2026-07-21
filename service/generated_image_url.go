@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/url"
 	"regexp"
@@ -23,7 +24,7 @@ type GeneratedImageTemporaryURL struct {
 	ExpiresAt time.Time `json:"expiresAt"`
 }
 
-func ResolveGeneratedImageTemporaryURL(ctx context.Context, providerID, sourceURL string) (GeneratedImageTemporaryURL, error) {
+func ResolveGeneratedImageTemporaryURL(ctx context.Context, providerID, sourceURL, requestHost string) (GeneratedImageTemporaryURL, error) {
 	channels, err := GetRawPrivateChannels()
 	if err != nil {
 		return GeneratedImageTemporaryURL{}, err
@@ -37,7 +38,7 @@ func ResolveGeneratedImageTemporaryURL(ctx context.Context, providerID, sourceUR
 		return GeneratedImageTemporaryURL{}, err
 	}
 	expiresIn := settings.MinIOStorage.PresignedURLExpirySeconds
-	requestURL, err := buildGeneratedImagePresignURL(channel, sourceURL, expiresIn)
+	requestURL, err := buildGeneratedImagePresignURL(channel, sourceURL, requestHost, expiresIn)
 	if err != nil {
 		return GeneratedImageTemporaryURL{}, safeMessageError{message: err.Error()}
 	}
@@ -114,14 +115,14 @@ func selectGeneratedImageChannel(channels []model.ModelChannel, providerID, sour
 	return model.ModelChannel{}, fmt.Errorf("无法识别图片来源渠道")
 }
 
-func buildGeneratedImagePresignURL(channel model.ModelChannel, sourceURL string, expiresIn int) (string, error) {
+func buildGeneratedImagePresignURL(channel model.ModelChannel, sourceURL, requestHost string, expiresIn int) (string, error) {
 	if expiresIn < 60 || expiresIn > 86400 {
 		return "", fmt.Errorf("临时图片地址有效期配置无效")
 	}
-	if !generatedImageSourceMatchesChannel(channel, sourceURL) {
-		return "", fmt.Errorf("图片地址与来源渠道不匹配")
+	parsed, err := canonicalGeneratedImageSourceURL(channel, sourceURL, requestHost)
+	if err != nil {
+		return "", err
 	}
-	parsed, _ := url.Parse(strings.TrimSpace(sourceURL))
 	parsed.RawQuery = ""
 	parsed.Fragment = ""
 	parsed.Path = strings.TrimRight(parsed.Path, "/") + "/presign"
@@ -129,6 +130,54 @@ func buildGeneratedImagePresignURL(channel model.ModelChannel, sourceURL string,
 	query.Set("expires_in", strconv.Itoa(expiresIn))
 	parsed.RawQuery = query.Encode()
 	return parsed.String(), nil
+}
+
+func canonicalGeneratedImageSourceURL(channel model.ModelChannel, sourceURL, requestHost string) (*url.URL, error) {
+	source, err := url.Parse(strings.TrimSpace(sourceURL))
+	if err != nil || !generatedImageTaskPathPattern.MatchString(strings.TrimRight(source.Path, "/")) {
+		return nil, fmt.Errorf("图片地址与来源渠道不匹配")
+	}
+	base, err := url.Parse(normalizeModelChannelBaseURL(channel.BaseURL))
+	if err != nil || base.Host == "" || (base.Scheme != "http" && base.Scheme != "https") {
+		return nil, fmt.Errorf("图片来源渠道地址无效")
+	}
+
+	directChannelURL := source.Host != "" && strings.EqualFold(source.Scheme, base.Scheme) && strings.EqualFold(source.Host, base.Host)
+	currentCanvasURL := source.Host == "" || generatedImageHostMatchesRequest(source.Host, requestHost)
+	if !directChannelURL && !currentCanvasURL {
+		return nil, fmt.Errorf("图片地址与来源渠道不匹配")
+	}
+	if !directChannelURL {
+		source.Scheme = base.Scheme
+		source.Host = base.Host
+		source.User = base.User
+	}
+	return source, nil
+}
+
+func generatedImageHostMatchesRequest(sourceHost, requestHost string) bool {
+	sourceName := generatedImageHostname(sourceHost)
+	requestName := generatedImageHostname(requestHost)
+	if sourceName == "" || requestName == "" {
+		return false
+	}
+	if strings.EqualFold(sourceName, requestName) {
+		return true
+	}
+	return isLoopbackHostname(sourceName) && isLoopbackHostname(requestName)
+}
+
+func generatedImageHostname(rawHost string) string {
+	rawHost = strings.TrimSpace(strings.Split(rawHost, ",")[0])
+	return strings.TrimSuffix(strings.ToLower((&url.URL{Host: rawHost}).Hostname()), ".")
+}
+
+func isLoopbackHostname(hostname string) bool {
+	if strings.EqualFold(hostname, "localhost") {
+		return true
+	}
+	ip := net.ParseIP(hostname)
+	return ip != nil && ip.IsLoopback()
 }
 
 func generatedImageSourceMatchesChannel(channel model.ModelChannel, sourceURL string) bool {

@@ -23,7 +23,12 @@ func GeneratedImageTemporaryURL(w http.ResponseWriter, r *http.Request) {
 		Fail(w, "图片地址不能为空")
 		return
 	}
-	result, err := service.ResolveGeneratedImageTemporaryURL(r.Context(), strings.TrimSpace(input.ProviderID), strings.TrimSpace(input.SourceURL))
+	result, err := service.ResolveGeneratedImageTemporaryURL(
+		r.Context(),
+		strings.TrimSpace(input.ProviderID),
+		strings.TrimSpace(input.SourceURL),
+		strings.TrimSpace(r.Host),
+	)
 	if err != nil {
 		FailError(w, err)
 		return
