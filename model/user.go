@@ -18,29 +18,30 @@ const (
 
 // User 系统用户。
 type User struct {
-	ID                  string     `json:"id" gorm:"primaryKey"`
-	Username            string     `json:"username" gorm:"uniqueIndex"`
-	Password            string     `json:"password,omitempty"`
-	Email               string     `json:"email"`
-	DisplayName         string     `json:"displayName"`
-	AvatarURL           string     `json:"avatarUrl"`
-	Role                UserRole   `json:"role"`
-	Credits             int        `json:"credits"`
-	AffCode             string     `json:"affCode" gorm:"uniqueIndex"`
-	AffCount            int        `json:"affCount"`
-	InviterID           string     `json:"inviterId"`
-	GithubID            string     `json:"githubId"`
-	LinuxDoID           string     `json:"linuxDoId" gorm:"index"`
-	WechatID            string     `json:"wechatId"`
-	Status              UserStatus `json:"status"`
-	MembershipExpiresAt string     `json:"membershipExpiresAt"`
-	LastLoginAt         string     `json:"lastLoginAt"`
-	Extra               string     `json:"extra" gorm:"type:text"`
-	CreatedAt           string     `json:"createdAt"`
-	UpdatedAt           string     `json:"updatedAt"`
-	Online              bool       `json:"online" gorm:"-"`
-	OnlineApp           bool       `json:"onlineApp" gorm:"-"`
-	OnlineWeb           bool       `json:"onlineWeb" gorm:"-"`
+	ID                  string           `json:"id" gorm:"primaryKey"`
+	Username            string           `json:"username" gorm:"uniqueIndex"`
+	Password            string           `json:"password,omitempty"`
+	Email               string           `json:"email"`
+	DisplayName         string           `json:"displayName"`
+	AvatarURL           string           `json:"avatarUrl"`
+	Role                UserRole         `json:"role"`
+	Credits             int              `json:"credits"`
+	AffCode             string           `json:"affCode" gorm:"uniqueIndex"`
+	AffCount            int              `json:"affCount"`
+	InviterID           string           `json:"inviterId"`
+	GithubID            string           `json:"githubId"`
+	LinuxDoID           string           `json:"linuxDoId" gorm:"index"`
+	WechatID            string           `json:"wechatId"`
+	Status              UserStatus       `json:"status"`
+	CustomChannelPolicy PermissionPolicy `json:"customChannelPolicy" gorm:"type:varchar(16);default:inherit"`
+	MembershipExpiresAt string           `json:"membershipExpiresAt"`
+	LastLoginAt         string           `json:"lastLoginAt"`
+	Extra               string           `json:"extra" gorm:"type:text"`
+	CreatedAt           string           `json:"createdAt"`
+	UpdatedAt           string           `json:"updatedAt"`
+	Online              bool             `json:"online" gorm:"-"`
+	OnlineApp           bool             `json:"onlineApp" gorm:"-"`
+	OnlineWeb           bool             `json:"onlineWeb" gorm:"-"`
 }
 
 // UserList 用户分页结果。
@@ -75,6 +76,7 @@ type AuthUser struct {
 	InviterID                       string   `json:"inviterId"`
 	MembershipExpiresAt             string   `json:"membershipExpiresAt"`
 	EnableTasks                     bool     `json:"enableTasks"`
+	AllowCustomChannel              bool     `json:"allowCustomChannel"`
 	LastLoginAt                     string   `json:"lastLoginAt"`
 	CreatedAt                       string   `json:"createdAt"`
 	UpdatedAt                       string   `json:"updatedAt"`

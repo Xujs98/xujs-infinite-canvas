@@ -386,6 +386,7 @@ func GetAdminUserDetail(userID string) (model.AdminUserDetail, error) {
 		return model.AdminUserDetail{}, safeMessageError{message: "用户不存在"}
 	}
 	user.Password = ""
+	normalizeUserDefaults(&user)
 	if status, exists := ws.DefaultHub.OnlineSnapshot()[user.ID]; exists {
 		user.Online = status.Online
 		user.OnlineApp = status.App
@@ -410,6 +411,7 @@ func GetAdminUserDetail(userID string) (model.AdminUserDetail, error) {
 
 func SaveUser(user model.User, password string) (model.User, error) {
 	user.Username = strings.TrimSpace(user.Username)
+	user.CustomChannelPolicy = normalizePermissionPolicy(user.CustomChannelPolicy)
 	if strings.ContainsAny(user.Username, " \t\r\n") {
 		return user, safeMessageError{message: "用户名不能包含空格"}
 	}
@@ -851,7 +853,7 @@ func BatchUpdateUserStatus(ids []string, status model.UserStatus) error {
 }
 
 func GuestUser() model.AuthUser {
-	return model.AuthUser{ID: "", Username: "guest", Role: model.UserRoleGuest}
+	return model.AuthUser{ID: "", Username: "guest", Role: model.UserRoleGuest, AllowCustomChannel: IsUserCustomChannelAllowed(model.User{})}
 }
 
 func newSession(user model.User) (model.AuthSession, error) {
@@ -892,6 +894,7 @@ func now() string {
 func publicUser(user model.User) model.AuthUser {
 	result := model.PublicUser(user)
 	result.EnableTasks = IsRoleTasksEnabled(string(user.Role))
+	result.AllowCustomChannel = IsUserCustomChannelAllowed(user)
 	if subscription, ok, _ := repository.GetActiveUserSubscription(user.ID); ok {
 		result.HasActiveSubscription = true
 		result.SubscriptionCredits = subscription.QuotaRemaining
@@ -915,6 +918,7 @@ func normalizeUserDefaults(user *model.User) {
 	if user.AffCode == "" {
 		user.AffCode = newAffCode()
 	}
+	user.CustomChannelPolicy = normalizePermissionPolicy(user.CustomChannelPolicy)
 }
 
 type linuxDoTokenResponse struct {

@@ -19,31 +19,47 @@ func EnsureBuiltinRoles() {
 	for _, r := range builtinRoles {
 		if _, ok, _ := repository.GetRoleByName(r.name); !ok {
 			repository.SaveRole(model.Role{
-				ID:            newID("role"),
-				Name:          r.name,
-				Label:         r.label,
-				Description:   r.desc,
-				AllowedModels: []string{},
-				FreeModels:    []string{},
-				IsBuiltin:     true,
-				CreatedAt:     now(),
-				UpdatedAt:     now(),
+				ID:                  newID("role"),
+				Name:                r.name,
+				Label:               r.label,
+				Description:         r.desc,
+				AllowedModels:       []string{},
+				FreeModels:          []string{},
+				CustomChannelPolicy: model.PermissionPolicyInherit,
+				IsBuiltin:           true,
+				CreatedAt:           now(),
+				UpdatedAt:           now(),
 			})
 		}
 	}
 }
 
 func ListRoles(keyword string, page, pageSize int) (model.RoleList, error) {
-	return repository.ListRoles(keyword, page, pageSize)
+	result, err := repository.ListRoles(keyword, page, pageSize)
+	if err != nil {
+		return model.RoleList{}, err
+	}
+	for i := range result.Items {
+		normalizeRolePermissions(&result.Items[i])
+	}
+	return result, nil
 }
 
 func GetAllRoles() ([]model.Role, error) {
-	return repository.GetAllRoles()
+	roles, err := repository.GetAllRoles()
+	if err != nil {
+		return nil, err
+	}
+	for i := range roles {
+		normalizeRolePermissions(&roles[i])
+	}
+	return roles, nil
 }
 
 func CreateRole(role model.Role) (model.Role, error) {
 	role.ID = newID("role")
 	role.IsBuiltin = false
+	normalizeRolePermissions(&role)
 	normalizeRoleOfflineLimit(&role)
 	role.CreatedAt = now()
 	role.UpdatedAt = now()
@@ -66,6 +82,7 @@ func UpdateRole(id string, role model.Role) (model.Role, error) {
 	current.AllowOffline = role.AllowOffline
 	current.OfflineCreditLimit = role.OfflineCreditLimit
 	current.EnableTasks = role.EnableTasks
+	current.CustomChannelPolicy = normalizePermissionPolicy(role.CustomChannelPolicy)
 	normalizeRoleOfflineLimit(&current)
 	current.UpdatedAt = now()
 	return repository.SaveRole(current)
@@ -155,4 +172,8 @@ func normalizeRoleOfflineLimit(role *model.Role) {
 	if !role.AllowOffline || role.OfflineCreditLimit < 0 {
 		role.OfflineCreditLimit = 0
 	}
+}
+
+func normalizeRolePermissions(role *model.Role) {
+	role.CustomChannelPolicy = normalizePermissionPolicy(role.CustomChannelPolicy)
 }

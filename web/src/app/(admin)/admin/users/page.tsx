@@ -1,12 +1,29 @@
 "use client";
 
-import { CrownOutlined, DeleteOutlined, DesktopOutlined, EditOutlined, MobileOutlined, PlusOutlined, ReloadOutlined, SearchOutlined } from "@ant-design/icons";
+import {
+    ApiOutlined,
+    CalendarOutlined,
+    CrownOutlined,
+    DeleteOutlined,
+    DesktopOutlined,
+    EditOutlined,
+    IdcardOutlined,
+    LockOutlined,
+    MailOutlined,
+    MobileOutlined,
+    PlusOutlined,
+    ReloadOutlined,
+    SafetyCertificateOutlined,
+    SearchOutlined,
+    ThunderboltOutlined,
+    UserOutlined,
+} from "@ant-design/icons";
 import { ProTable, type ProColumns } from "@ant-design/pro-components";
-import { Avatar, Button, Card, Col, DatePicker, Divider, Flex, Form, Input, InputNumber, Modal, Row, Select, Space, Tag, Tooltip, Typography } from "antd";
+import { Avatar, Button, Card, Col, DatePicker, Flex, Form, Input, InputNumber, Modal, Row, Select, Space, Tag, Tooltip, Typography } from "antd";
 import dayjs, { type Dayjs } from "dayjs";
 import { useEffect, useMemo, useState } from "react";
 
-import type { AdminUser } from "@/services/api/admin";
+import { fetchAdminSystemSettings, type AdminUser } from "@/services/api/admin";
 import { useQuery } from "@tanstack/react-query";
 import { useAdminUsers } from "./use-admin-users";
 import { fetchAllRoles, type AdminRole } from "@/services/api/role";
@@ -23,6 +40,22 @@ const statusOptions = [
     { label: "禁用", value: "ban" },
 ];
 
+const customChannelPolicyOptions = [
+    { label: "跟随角色", value: "inherit" },
+    { label: "允许", value: "enabled" },
+    { label: "禁止", value: "disabled" },
+];
+
+type CustomChannelPolicy = "inherit" | "enabled" | "disabled";
+
+function resolveCustomChannelAccess(systemAllowed: boolean, rolePolicy: CustomChannelPolicy, userPolicy: CustomChannelPolicy) {
+    if (userPolicy === "enabled") return { allowed: true, source: "用户设置" };
+    if (userPolicy === "disabled") return { allowed: false, source: "用户设置" };
+    if (rolePolicy === "enabled") return { allowed: true, source: "角色权限" };
+    if (rolePolicy === "disabled") return { allowed: false, source: "角色权限" };
+    return { allowed: systemAllowed, source: "系统设置" };
+}
+
 export default function AdminUsersPage() {
     const token = useUserStore((state) => state.token);
     const { data: rolesData } = useQuery({
@@ -30,7 +63,13 @@ export default function AdminUsersPage() {
         queryFn: () => fetchAllRoles(),
         staleTime: 60000,
     });
-    const roles = rolesData || [];
+    const { data: systemSettings } = useQuery({
+        queryKey: ["admin", "system-settings", "custom-channel"],
+        queryFn: () => fetchAdminSystemSettings(token),
+        enabled: Boolean(token),
+        staleTime: 60000,
+    });
+    const roles = (rolesData || []) as AdminRole[];
     const roleOptions = roles.map((r: AdminRole) => ({ label: r.label, value: r.name }));
     const roleLabelMap = useMemo(() => {
         const map = new Map<string, string>();
@@ -80,11 +119,18 @@ export default function AdminUsersPage() {
                 status: "active",
                 ...editingUser,
                 role: editingUser.role || "user",
+                customChannelPolicy: editingUser.customChannelPolicy || "inherit",
                 password: "",
                 membershipExpiresAt: editingUser.membershipExpiresAt ? dayjs(editingUser.membershipExpiresAt) : undefined,
             });
         }
     }, [editingUser, form]);
+
+    const selectedRoleName = Form.useWatch("role", form);
+    const selectedUserPolicy = (Form.useWatch("customChannelPolicy", form) || "inherit") as CustomChannelPolicy;
+    const selectedRole = roles.find((item) => item.name === selectedRoleName);
+    const rolePolicy = (selectedRole?.customChannelPolicy || "inherit") as CustomChannelPolicy;
+    const customChannelAccess = resolveCustomChannelAccess(Boolean(systemSettings?.allowCustomChannel), rolePolicy, selectedUserPolicy);
 
     const saveUser = async () => {
         const value = await form.validateFields();
@@ -295,7 +341,7 @@ export default function AdminUsersPage() {
                         <Button key="batch-delete" danger icon={<DeleteOutlined />} disabled={!selectedIds.length} onClick={() => setBatchDeleteOpen(true)}>
                             批量删除{selectedIds.length ? ` ${selectedIds.length}` : ""}
                         </Button>,
-                        <Button key="add" type="primary" icon={<PlusOutlined />} onClick={() => setEditingUser({ role: "user", status: "active" })}>
+                        <Button key="add" type="primary" icon={<PlusOutlined />} onClick={() => setEditingUser({ role: "user", status: "active", customChannelPolicy: "inherit" })}>
                             新增
                         </Button>,
                     ]}
@@ -314,63 +360,144 @@ export default function AdminUsersPage() {
             <UserSubscriptionsModal user={subscriptionUser} open={Boolean(subscriptionUser)} onClose={() => setSubscriptionUser(null)} onChanged={() => void refreshUsers()} />
             <UserDetailModal user={detailUser} open={Boolean(detailUser)} roleLabels={roleLabelMap} onClose={() => setDetailUser(null)} />
 
-            <Modal title={editingUser?.id ? "编辑用户" : "新增用户"} open={Boolean(editingUser)} width="min(720px, calc(100vw - 32px))" onCancel={() => setEditingUser(null)} onOk={() => void saveUser()} okText="保存" cancelText="取消" destroyOnHidden>
-                <Form form={form} layout="vertical" requiredMark={false}>
-                    <Typography.Text strong>基础信息</Typography.Text>
-                    <Row gutter={[14, 4]}>
-                        <Col xs={24} md={12}>
-                            <Form.Item name="username" label="用户名" rules={[{ required: true, message: "请输入用户名" }]}>
-                                <Input />
-                            </Form.Item>
-                        </Col>
-                        <Col xs={24} md={12}>
-                            <Form.Item name="password" label={editingUser?.id ? "新密码" : "密码"} rules={editingUser?.id ? [] : [{ required: true, message: "请输入密码" }]}>
-                                <Input.Password autoComplete="new-password" />
-                            </Form.Item>
-                        </Col>
-                        <Col xs={24} md={12}>
-                            <Form.Item name="displayName" label="昵称">
-                                <Input />
-                            </Form.Item>
-                        </Col>
-                        <Col xs={24} md={12}>
-                            <Form.Item name="email" label="邮箱">
-                                <Input />
-                            </Form.Item>
-                        </Col>
-                        <Col xs={24} md={12}>
-                            <Form.Item name="role" label="角色" rules={[{ required: true, message: "请选择角色" }]}>
-                                <Select options={roleOptions} />
-                            </Form.Item>
-                        </Col>
-                        <Col xs={24} md={12}>
-                            <Form.Item name="status" label="状态" rules={[{ required: true, message: "请选择状态" }]}>
-                                <Select options={statusOptions} />
-                            </Form.Item>
-                        </Col>
-                        <Col xs={24} md={12}>
-                            <Form.Item name="membershipExpiresAt" label="会员到期时间">
-                                <DatePicker showTime format="YYYY-MM-DD HH:mm:ss" style={{ width: "100%" }} placeholder="不设置则非会员" allowClear />
-                            </Form.Item>
-                        </Col>
-                    </Row>
+            <Modal
+                title={
+                    <Flex align="center" gap={12}>
+                        <Avatar size={38} icon={<UserOutlined />} style={{ background: "#0f766e" }} />
+                        <div>
+                            <Typography.Text strong style={{ display: "block", fontSize: 16 }}>
+                                {editingUser?.id ? "编辑用户" : "新增用户"}
+                            </Typography.Text>
+                            <Typography.Text type="secondary" style={{ display: "block", fontSize: 12, fontWeight: 400 }}>
+                                {editingUser?.id ? editingUser.displayName || editingUser.username : "创建账号并分配访问权限"}
+                            </Typography.Text>
+                        </div>
+                    </Flex>
+                }
+                open={Boolean(editingUser)}
+                width="min(840px, calc(100vw - 32px))"
+                onCancel={() => setEditingUser(null)}
+                onOk={() => void saveUser()}
+                okText="保存"
+                cancelText="取消"
+                destroyOnHidden
+            >
+                <Form form={form} layout="vertical" requiredMark={false} className="pt-1">
+                    <section>
+                        <Flex align="center" gap={9} className="mb-4">
+                            <span className="flex size-8 items-center justify-center rounded-md bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300">
+                                <IdcardOutlined />
+                            </span>
+                            <div>
+                                <Typography.Text strong style={{ display: "block" }}>
+                                    账号信息
+                                </Typography.Text>
+                                <Typography.Text type="secondary" style={{ display: "block", fontSize: 12 }}>
+                                    登录凭证与基础资料
+                                </Typography.Text>
+                            </div>
+                        </Flex>
+                        <Row gutter={[16, 2]}>
+                            <Col xs={24} md={12}>
+                                <Form.Item name="username" label="用户名" rules={[{ required: true, message: "请输入用户名" }]}>
+                                    <Input prefix={<UserOutlined />} placeholder="用于登录的账号" />
+                                </Form.Item>
+                            </Col>
+                            <Col xs={24} md={12}>
+                                <Form.Item name="password" label={editingUser?.id ? "新密码" : "密码"} rules={editingUser?.id ? [] : [{ required: true, message: "请输入密码" }]}>
+                                    <Input.Password prefix={<LockOutlined />} autoComplete="new-password" placeholder={editingUser?.id ? "留空则不修改" : "设置登录密码"} />
+                                </Form.Item>
+                            </Col>
+                            <Col xs={24} md={12}>
+                                <Form.Item name="displayName" label="昵称">
+                                    <Input prefix={<IdcardOutlined />} placeholder="用户显示名称" />
+                                </Form.Item>
+                            </Col>
+                            <Col xs={24} md={12}>
+                                <Form.Item name="email" label="邮箱">
+                                    <Input prefix={<MailOutlined />} placeholder="name@example.com" />
+                                </Form.Item>
+                            </Col>
+                        </Row>
+                    </section>
+
+                    <section className="mt-2 border-t border-stone-200 pt-5 dark:border-stone-800">
+                        <Flex align="center" gap={9} className="mb-4">
+                            <span className="flex size-8 items-center justify-center rounded-md bg-blue-50 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300">
+                                <SafetyCertificateOutlined />
+                            </span>
+                            <div>
+                                <Typography.Text strong style={{ display: "block" }}>
+                                    权限与状态
+                                </Typography.Text>
+                                <Typography.Text type="secondary" style={{ display: "block", fontSize: 12 }}>
+                                    用户设置优先于角色和系统设置
+                                </Typography.Text>
+                            </div>
+                        </Flex>
+                        <Row gutter={[16, 2]}>
+                            <Col xs={24} md={8}>
+                                <Form.Item name="role" label="角色" rules={[{ required: true, message: "请选择角色" }]}>
+                                    <Select options={roleOptions} />
+                                </Form.Item>
+                            </Col>
+                            <Col xs={24} md={8}>
+                                <Form.Item name="status" label="状态" rules={[{ required: true, message: "请选择状态" }]}>
+                                    <Select options={statusOptions} />
+                                </Form.Item>
+                            </Col>
+                            <Col xs={24} md={8}>
+                                <Form.Item name="customChannelPolicy" label="自定义渠道">
+                                    <Select options={customChannelPolicyOptions} suffixIcon={<ApiOutlined />} />
+                                </Form.Item>
+                            </Col>
+                            <Col xs={24}>
+                                <div className="mb-5 flex min-h-11 items-center justify-between gap-3 rounded-md border border-stone-200 bg-stone-50 px-3 py-2 dark:border-stone-800 dark:bg-stone-900/40">
+                                    <Flex align="center" gap={9}>
+                                        <ApiOutlined className={customChannelAccess.allowed ? "text-emerald-600" : "text-stone-400"} />
+                                        <Typography.Text>自定义渠道最终权限</Typography.Text>
+                                    </Flex>
+                                    <Space size={6}>
+                                        <Tag color={customChannelAccess.allowed ? "green" : "red"}>{customChannelAccess.allowed ? "允许" : "禁止"}</Tag>
+                                        <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+                                            来源：{customChannelAccess.source}
+                                        </Typography.Text>
+                                    </Space>
+                                </div>
+                            </Col>
+                            <Col xs={24} md={12}>
+                                <Form.Item name="membershipExpiresAt" label="会员到期时间">
+                                    <DatePicker prefix={<CalendarOutlined />} showTime format="YYYY-MM-DD HH:mm:ss" style={{ width: "100%" }} placeholder="不设置则非会员" allowClear />
+                                </Form.Item>
+                            </Col>
+                        </Row>
+                    </section>
                     {editingUser?.id ? (
-                        <>
-                            <Divider style={{ margin: "4px 0 16px" }} />
-                            <Typography.Text strong>算力点调整</Typography.Text>
-                            <Row gutter={[14, 4]}>
-                                <Col xs={24} md={12}>
-                                    <Form.Item label="算力点">
-                                        <Space.Compact style={{ width: "100%" }}>
-                                            <Form.Item name="credits" noStyle>
-                                                <InputNumber min={0} precision={0} style={{ width: "100%" }} />
-                                            </Form.Item>
-                                            <Button onClick={() => void saveCredits()}>调整</Button>
-                                        </Space.Compact>
+                        <section className="mt-1 border-t border-stone-200 pt-5 dark:border-stone-800">
+                            <Flex align="center" gap={9} className="mb-4">
+                                <span className="flex size-8 items-center justify-center rounded-md bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300">
+                                    <ThunderboltOutlined />
+                                </span>
+                                <div>
+                                    <Typography.Text strong style={{ display: "block" }}>
+                                        算力点
+                                    </Typography.Text>
+                                    <Typography.Text type="secondary" style={{ display: "block", fontSize: 12 }}>
+                                        直接设置用户当前可用余额
+                                    </Typography.Text>
+                                </div>
+                            </Flex>
+                            <Form.Item label="当前算力点" style={{ maxWidth: 390, marginBottom: 4 }}>
+                                <Space.Compact style={{ width: "100%" }}>
+                                    <Form.Item name="credits" noStyle>
+                                        <InputNumber min={0} precision={0} prefix={<ThunderboltOutlined />} style={{ width: "100%" }} />
                                     </Form.Item>
-                                </Col>
-                            </Row>
-                        </>
+                                    <Button type="primary" ghost onClick={() => void saveCredits()}>
+                                        单独调整
+                                    </Button>
+                                </Space.Compact>
+                            </Form.Item>
+                        </section>
                     ) : null}
                 </Form>
             </Modal>

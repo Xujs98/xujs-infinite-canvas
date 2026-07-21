@@ -53,6 +53,8 @@ export function ClientRootInit({ children }: { children: ReactNode }) {
     const openConfigDialog = useConfigStore((state) => state.openConfigDialog);
     const loadRoles = useConfigStore((state) => state.loadRoles);
     const token = useUserStore((state) => state.token);
+    const user = useUserStore((state) => state.user);
+    const userStoreReady = useUserStore((state) => state.isReady);
     const isLoginPage = pathname === "/login" || pathname === "/admin/login";
 
     // 监听分类变化，自动适配视频秒数
@@ -127,6 +129,7 @@ export function ClientRootInit({ children }: { children: ReactNode }) {
                     applyRolesToCurrentUser(payload.data);
                     window.dispatchEvent(new CustomEvent("roles-changed", { detail: payload.data }));
                     void loadPublicSettings();
+                    void hydrateUser();
                     return;
                 }
                 if (payload.type === "roles-changed") {
@@ -136,6 +139,18 @@ export function ClientRootInit({ children }: { children: ReactNode }) {
                         window.dispatchEvent(new CustomEvent("roles-changed", { detail: roles }));
                     })();
                     void loadPublicSettings();
+                    void hydrateUser();
+                    return;
+                }
+                if (payload.type === "system-settings-changed") {
+                    void loadPublicSettings();
+                    void loadPublicSystemSettings();
+                    void hydrateUser();
+                    return;
+                }
+                if (payload.type === "user-permissions-changed") {
+                    void hydrateUser();
+                    return;
                 }
                 if (payload.type === "online-status-changed") {
                     window.dispatchEvent(new CustomEvent("online-status-changed"));
@@ -152,14 +167,13 @@ export function ClientRootInit({ children }: { children: ReactNode }) {
             if (reconnectTimer) window.clearTimeout(reconnectTimer);
             socket?.close();
         };
-    }, [hydrateUser, loadModelClassifications, loadPublicSettings, token]);
+    }, [hydrateUser, loadModelClassifications, loadPublicSettings, loadPublicSystemSettings, loadRoles, token]);
 
     useEffect(() => {
         if (!isLoginPage) void hydrateUser();
     }, [hydrateUser, isLoginPage]);
 
     // 用户登录态变化时重新加载角色权限
-    const user = useUserStore((s) => s.user);
     useEffect(() => {
         if (!user || user.role === "guest") {
             useConfigStore.setState({ roleAllowedModels: [] });
@@ -173,6 +187,7 @@ export function ClientRootInit({ children }: { children: ReactNode }) {
 
     useEffect(() => {
         if (handledConfigParams.current) return;
+        if (!userStoreReady) return;
         const searchParams = new URLSearchParams(window.location.search);
         const baseUrl = searchParams.get("baseUrl") || searchParams.get("baseurl");
         const apiKey = searchParams.get("apiKey") || searchParams.get("apikey");
@@ -184,7 +199,8 @@ export function ClientRootInit({ children }: { children: ReactNode }) {
         searchParams.delete("apiKey");
         searchParams.delete("apikey");
         window.history.replaceState(null, "", `${window.location.pathname}${searchParams.size ? `?${searchParams}` : ""}${window.location.hash}`);
-        if (!publicSettings.modelChannel.allowCustomChannel) {
+        const allowCustomChannel = user?.allowCustomChannel ?? publicSettings.modelChannel.allowCustomChannel;
+        if (!allowCustomChannel) {
             openConfigDialog(false);
             message.error("后台未允许用户自定义渠道，请联系管理员进行配置");
             return;
@@ -193,7 +209,7 @@ export function ClientRootInit({ children }: { children: ReactNode }) {
         if (baseUrl) updateConfig("baseUrl", baseUrl);
         if (apiKey) updateConfig("apiKey", apiKey);
         openConfigDialog(false);
-    }, [message, openConfigDialog, publicSettings, updateConfig]);
+    }, [message, openConfigDialog, publicSettings, updateConfig, user?.allowCustomChannel, userStoreReady]);
 
     return <>{children}</>;
 }

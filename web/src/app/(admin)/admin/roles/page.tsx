@@ -1,6 +1,6 @@
 "use client";
 
-import { DeleteOutlined, EditOutlined, GiftOutlined, LockOutlined, PlusOutlined, SafetyOutlined, SearchOutlined, UserOutlined } from "@ant-design/icons";
+import { ApiOutlined, DeleteOutlined, EditOutlined, GiftOutlined, LockOutlined, PlusOutlined, SafetyOutlined, SearchOutlined, UserOutlined } from "@ant-design/icons";
 import { App, Button, Card, Col, Flex, Form, Input, InputNumber, Modal, Row, Select, Space, Switch, Table, Tag, Tooltip, Typography } from "antd";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
@@ -14,6 +14,18 @@ const builtinRoleColors: Record<string, string> = {
     user: "#1890ff",
     member: "#722ed1",
 };
+
+const customChannelPolicyOptions = [
+    { label: "跟随系统", value: "inherit" },
+    { label: "允许", value: "enabled" },
+    { label: "禁止", value: "disabled" },
+];
+
+const customChannelPolicyMeta = {
+    inherit: { label: "跟随系统", color: "default" },
+    enabled: { label: "允许", color: "green" },
+    disabled: { label: "禁止", color: "red" },
+} as const;
 
 export default function AdminRolesPage() {
     const { message } = App.useApp();
@@ -82,6 +94,7 @@ export default function AdminRolesPage() {
                     allowOffline: Boolean(values.allowOffline),
                     offlineCreditLimit: Boolean(values.allowOffline) ? Math.max(0, Math.floor(Number(values.offlineCreditLimit) || 0)) : 0,
                     enableTasks: Boolean(values.enableTasks),
+                    customChannelPolicy: values.customChannelPolicy || "inherit",
                 });
                 message.success("更新成功");
             } else {
@@ -94,6 +107,7 @@ export default function AdminRolesPage() {
                     allowOffline: Boolean(values.allowOffline),
                     offlineCreditLimit: Boolean(values.allowOffline) ? Math.max(0, Math.floor(Number(values.offlineCreditLimit) || 0)) : 0,
                     enableTasks: Boolean(values.enableTasks),
+                    customChannelPolicy: values.customChannelPolicy || "inherit",
                 });
                 message.success("创建成功");
             }
@@ -132,7 +146,7 @@ export default function AdminRolesPage() {
     const openCreate = () => {
         setEditingItem(null);
         form.resetFields();
-        form.setFieldsValue({ allowedModels: [], freeModels: [], allowOffline: false, offlineCreditLimit: 0, enableTasks: false });
+        form.setFieldsValue({ allowedModels: [], freeModels: [], allowOffline: false, offlineCreditLimit: 0, enableTasks: false, customChannelPolicy: "inherit" });
         setModalOpen(true);
     };
 
@@ -147,6 +161,7 @@ export default function AdminRolesPage() {
             allowOffline: Boolean(item.allowOffline),
             offlineCreditLimit: item.offlineCreditLimit ?? 0,
             enableTasks: Boolean(item.enableTasks),
+            customChannelPolicy: item.customChannelPolicy || "inherit",
         });
         setModalOpen(true);
     };
@@ -258,6 +273,15 @@ export default function AdminRolesPage() {
                         {models.length > 4 && <Tag color="cyan">+{models.length - 4}</Tag>}
                     </Space>
                 );
+            },
+        },
+        {
+            title: "自定义渠道",
+            dataIndex: "customChannelPolicy",
+            width: 130,
+            render: (_: unknown, item: AdminRole) => {
+                const meta = customChannelPolicyMeta[item.customChannelPolicy || "inherit"];
+                return <Tag color={meta.color}>{meta.label}</Tag>;
             },
         },
         {
@@ -375,7 +399,7 @@ export default function AdminRolesPage() {
                         dataSource={items}
                         columns={columns}
                         tableLayout="fixed"
-                        scroll={{ x: 1362 }}
+                        scroll={{ x: 1492 }}
                         rowSelection={{
                             selectedRowKeys: selectedIds,
                             onChange: (keys) => setSelectedIds(keys as string[]),
@@ -485,6 +509,9 @@ export default function AdminRolesPage() {
                     ) : null}
                     <Form.Item name="enableTasks" label="任务功能" valuePropName="checked" tooltip="开启后，该角色在 Web 端创建的图片和视频任务会持久化到服务端，刷新页面或服务重启后仍可按任务记录恢复。">
                         <Switch checkedChildren="开启" unCheckedChildren="关闭" />
+                    </Form.Item>
+                    <Form.Item name="customChannelPolicy" label="自定义渠道" tooltip="跟随系统时使用“系统设置 > 注册与积分”中的全局开关；允许或禁止会覆盖系统设置。">
+                        <Select prefix={<ApiOutlined />} options={customChannelPolicyOptions} />
                     </Form.Item>
                 </Form>
             </Modal>

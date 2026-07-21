@@ -25,6 +25,7 @@ export type AdminUser = {
     inviterId: string;
     linuxDoId: string;
     status: "active" | "ban";
+    customChannelPolicy: "inherit" | "enabled" | "disabled";
     membershipExpiresAt: string;
     lastLoginAt: string;
     createdAt: string;

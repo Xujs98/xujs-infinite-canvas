@@ -38,14 +38,15 @@ type bindAffCodeRequest struct {
 }
 
 type saveUserRequest struct {
-	ID                  string           `json:"id"`
-	Username            string           `json:"username"`
-	Password            string           `json:"password"`
-	Email               string           `json:"email"`
-	DisplayName         string           `json:"displayName"`
-	Role                model.UserRole   `json:"role"`
-	Status              model.UserStatus `json:"status"`
-	MembershipExpiresAt string           `json:"membershipExpiresAt"`
+	ID                  string                 `json:"id"`
+	Username            string                 `json:"username"`
+	Password            string                 `json:"password"`
+	Email               string                 `json:"email"`
+	DisplayName         string                 `json:"displayName"`
+	Role                model.UserRole         `json:"role"`
+	Status              model.UserStatus       `json:"status"`
+	MembershipExpiresAt string                 `json:"membershipExpiresAt"`
+	CustomChannelPolicy model.PermissionPolicy `json:"customChannelPolicy"`
 }
 
 type adjustUserCreditsRequest struct {
@@ -236,12 +237,14 @@ func AdminSaveUser(w http.ResponseWriter, r *http.Request) {
 		Role:                request.Role,
 		Status:              request.Status,
 		MembershipExpiresAt: request.MembershipExpiresAt,
+		CustomChannelPolicy: request.CustomChannelPolicy,
 	}, request.Password)
 	if err != nil {
 		FailError(w, err)
 		return
 	}
 	OK(w, user)
+	ws.DefaultHub.SendToUser(user.ID, map[string]any{"type": "user-permissions-changed"})
 }
 
 func AdminAdjustUserCredits(w http.ResponseWriter, r *http.Request, id string) {

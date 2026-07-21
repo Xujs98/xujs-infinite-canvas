@@ -7,6 +7,7 @@ import { persist } from "zustand/middleware";
 import { apiGet } from "@/services/api/request";
 import type { AdminRole } from "@/services/api/role";
 import type { AdminPublicSettings } from "@/services/api/admin";
+import { useUserStore } from "@/stores/use-user-store";
 
 export type ModelCostItem = { model: string; credits: number; alias: string };
 
@@ -129,9 +130,10 @@ type ConfigStore = {
     loadRoles: () => Promise<AdminRole[]>;
 };
 
-function resolveEffectiveConfig(config: AiConfig, modelChannel: AdminPublicSettings["modelChannel"] | null, roleAllowedModels: string[] = []) {
+function resolveEffectiveConfig(config: AiConfig, modelChannel: AdminPublicSettings["modelChannel"] | null, roleAllowedModels: string[] = [], allowCustomChannel?: boolean) {
     const hasModelRestriction = roleAllowedModels.length > 0;
-    const channelMode = modelChannel?.allowCustomChannel ? config.channelMode : "remote";
+    const customChannelAllowed = allowCustomChannel ?? modelChannel?.allowCustomChannel ?? true;
+    const channelMode = customChannelAllowed ? config.channelMode : "remote";
     if (channelMode === "local" || !modelChannel) {
         // local 模式下也做模型分类和角色过滤
         const models = config.models || [];
@@ -497,7 +499,8 @@ export function useEffectiveConfig() {
     const config = useConfigStore((state) => state.config);
     const modelChannel = useConfigStore((state) => state.publicSettings?.modelChannel || null);
     const roleAllowedModels = useConfigStore((state) => state.roleAllowedModels);
-    return useMemo(() => resolveEffectiveConfig(config, modelChannel, roleAllowedModels), [config, modelChannel, roleAllowedModels]);
+    const userAllowCustomChannel = useUserStore((state) => state.user?.allowCustomChannel);
+    return useMemo(() => resolveEffectiveConfig(config, modelChannel, roleAllowedModels, userAllowCustomChannel), [config, modelChannel, roleAllowedModels, userAllowCustomChannel]);
 }
 
 export function buildApiUrl(baseUrl: string, path: string) {

@@ -10,6 +10,7 @@ export type AdminRole = {
     allowOffline: boolean;
     offlineCreditLimit: number;
     enableTasks: boolean;
+    customChannelPolicy: "inherit" | "enabled" | "disabled";
     isBuiltin: boolean;
     createdAt: string;
     updatedAt: string;

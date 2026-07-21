@@ -20,6 +20,7 @@ export type AuthUser = {
     inviterId: string;
     membershipExpiresAt: string;
     enableTasks: boolean;
+    allowCustomChannel: boolean;
     lastLoginAt: string;
     createdAt: string;
     updatedAt: string;
