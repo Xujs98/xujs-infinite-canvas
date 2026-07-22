@@ -401,7 +401,7 @@ func proxyAIRequest(w http.ResponseWriter, r *http.Request, path string) {
 	logID := service.LogRequestDetailed(user.ID, user.Username, modelName, http.MethodPost, path, upstreamURL, reqHeaders, string(finalBody), len(finalBody), extractMediaFromJSON(finalBody), aiRequestLogDetails(r, channel, ""))
 
 	log.Printf("AI proxy upstream: url=%s method=POST content_type=%s body_size=%d", upstreamURL, contentType, len(finalBody))
-	request, err := http.NewRequest(http.MethodPost, upstreamURL, bytes.NewReader(finalBody))
+	request, err := http.NewRequestWithContext(r.Context(), http.MethodPost, upstreamURL, bytes.NewReader(finalBody))
 	if err != nil {
 		log.Printf("AI proxy build request failed: url=%s err=%v", upstreamURL, err)
 		service.LogRequestResponse(logID, "", 0, false, err.Error())
@@ -412,6 +412,9 @@ func proxyAIRequest(w http.ResponseWriter, r *http.Request, path string) {
 	request.Header.Set("Authorization", "Bearer "+channel.APIKey)
 	if contentType != "" {
 		request.Header.Set("Content-Type", contentType)
+	}
+	if accept := strings.TrimSpace(r.Header.Get("Accept")); accept != "" {
+		request.Header.Set("Accept", accept)
 	}
 	// 应用渠道 ExtraHeaders
 	for k, v := range channel.ExtraHeaders {
@@ -592,6 +595,132 @@ type canvasGenerationTaskContext struct {
 	CreditChargeID string
 }
 
+const (
+	aiStreamHeartbeatInterval = 15 * time.Second
+	aiStreamLogLimit          = 2 * 1024 * 1024
+)
+
+type aiStreamRead struct {
+	data []byte
+	err  error
+}
+
+func shouldProxyAIStream(path string, request *http.Request, response *http.Response) bool {
+	if !strings.Contains(strings.ToLower(path), "chat/completions") {
+		return false
+	}
+	return strings.Contains(strings.ToLower(request.Header.Get("Accept")), "text/event-stream") ||
+		strings.Contains(strings.ToLower(response.Header.Get("Content-Type")), "text/event-stream")
+}
+
+func appendAIStreamLog(captured *bytes.Buffer, chunk []byte) bool {
+	remaining := aiStreamLogLimit - captured.Len()
+	if remaining <= 0 {
+		return true
+	}
+	if len(chunk) > remaining {
+		_, _ = captured.Write(chunk[:remaining])
+		return true
+	}
+	_, _ = captured.Write(chunk)
+	return false
+}
+
+func proxyAIStreamResponse(w http.ResponseWriter, response *http.Response) ([]byte, bool, error) {
+	for key, values := range response.Header {
+		if strings.EqualFold(key, "Content-Length") {
+			continue
+		}
+		for _, value := range values {
+			w.Header().Add(key, value)
+		}
+	}
+	w.Header().Set("Cache-Control", "no-cache, no-transform")
+	w.Header().Set("X-Accel-Buffering", "no")
+	w.WriteHeader(response.StatusCode)
+	flusher, _ := w.(http.Flusher)
+	if flusher != nil {
+		flusher.Flush()
+	}
+
+	reads := make(chan aiStreamRead, 1)
+	ctx := response.Request.Context()
+	go func() {
+		buffer := make([]byte, 32*1024)
+		for {
+			n, err := response.Body.Read(buffer)
+			item := aiStreamRead{err: err}
+			if n > 0 {
+				item.data = append([]byte(nil), buffer[:n]...)
+			}
+			select {
+			case reads <- item:
+			case <-ctx.Done():
+				return
+			}
+			if err != nil {
+				return
+			}
+		}
+	}()
+
+	ticker := time.NewTicker(aiStreamHeartbeatInterval)
+	defer ticker.Stop()
+	var captured bytes.Buffer
+	truncated := false
+	for {
+		select {
+		case <-ctx.Done():
+			return captured.Bytes(), truncated, ctx.Err()
+		case <-ticker.C:
+			if _, err := io.WriteString(w, ": keep-alive\n\n"); err != nil {
+				return captured.Bytes(), truncated, err
+			}
+			if flusher != nil {
+				flusher.Flush()
+			}
+		case item := <-reads:
+			if len(item.data) > 0 {
+				if appendAIStreamLog(&captured, item.data) {
+					truncated = true
+				}
+				if _, err := w.Write(item.data); err != nil {
+					return captured.Bytes(), truncated, err
+				}
+				if flusher != nil {
+					flusher.Flush()
+				}
+			}
+			if item.err == io.EOF {
+				return captured.Bytes(), truncated, nil
+			}
+			if item.err != nil {
+				return captured.Bytes(), truncated, item.err
+			}
+		}
+	}
+}
+
+func aiStreamResponseIndicatesFailure(body []byte) (bool, string) {
+	if failed, message := aiResponseIndicatesFailure(body); failed {
+		return true, message
+	}
+	for _, line := range bytes.Split(body, []byte("\n")) {
+		line = bytes.TrimSpace(line)
+		if !bytes.HasPrefix(line, []byte("data:")) {
+			continue
+		}
+		payload := bytes.TrimSpace(bytes.TrimPrefix(line, []byte("data:")))
+		if bytes.Equal(payload, []byte("[DONE]")) {
+			continue
+		}
+		if failed, message := aiResponseIndicatesFailure(payload); failed {
+			return true, message
+		}
+	}
+	return false, ""
+}
+
 func copyAIResponse(w http.ResponseWriter, request *http.Request, onFailure func(), userID, username, modelName, path string, credits int, extraArgs ...any) {
 	var isPolling bool
 	var videoConfig *model.ChannelVideoConfig
@@ -681,6 +810,35 @@ func copyAIResponse(w http.ResponseWriter, request *http.Request, onFailure func
 			go service.LogCall(userID, username, modelName, path, false, string(body), credits)
 		}
 		Fail(w, "调用失败，请联系管理员")
+		return
+	}
+
+	if shouldProxyAIStream(path, request, response) {
+		respBody, truncated, streamErr := proxyAIStreamResponse(w, response)
+		respText := string(respBody)
+		if truncated {
+			respText += "\n...[stream log truncated]"
+		}
+		responseSucceeded := streamErr == nil
+		responseError := ""
+		if streamErr != nil {
+			responseError = streamErr.Error()
+		} else if failed, message := aiStreamResponseIndicatesFailure(respBody); failed {
+			responseSucceeded = false
+			responseError = message
+		}
+		if !responseSucceeded && onFailure != nil {
+			onFailure()
+		}
+		if baseURL != "" {
+			LogChannelResponse(baseURL, respText, response.StatusCode, responseError)
+		}
+		if logID != "" {
+			service.LogRequestResponseDetailed(logID, service.RequestLogResponse{Body: respText, Headers: response.Header, StatusCode: response.StatusCode, Success: responseSucceeded, ErrorMsg: responseError, ErrorStage: "stream", ElapsedMs: time.Since(startedAt).Milliseconds(), GeneratedCount: -1})
+		}
+		if !isPolling {
+			go service.LogCall(userID, username, modelName, path, responseSucceeded, responseError, credits)
+		}
 		return
 	}
 
