@@ -25,6 +25,7 @@ export type AppRelease = {
     version: string;
     title: string;
     notes: string;
+    forceUpdate: boolean;
     status: AppReleaseStatus;
     publishedAt: string | null;
     createdAt: string;
@@ -47,11 +48,11 @@ export async function fetchAdminAppReleases(token: string, query: { keyword?: st
     return apiGet<AppReleaseList>("/api/admin/app-releases", compactApiParams(query), token);
 }
 
-export async function createAdminAppRelease(token: string, data: Pick<AppRelease, "version" | "title" | "notes">) {
+export async function createAdminAppRelease(token: string, data: Pick<AppRelease, "version" | "title" | "notes" | "forceUpdate">) {
     return apiPost<AppRelease>("/api/admin/app-releases", data, token);
 }
 
-export async function updateAdminAppRelease(token: string, id: string, data: Pick<AppRelease, "version" | "title" | "notes" | "status">) {
+export async function updateAdminAppRelease(token: string, id: string, data: Pick<AppRelease, "version" | "title" | "notes" | "forceUpdate" | "status">) {
     return apiPut<AppRelease>(`/api/admin/app-releases/${encodeURIComponent(id)}`, data, token);
 }
 
@@ -95,4 +96,8 @@ export async function deleteAdminAppReleaseArtifact(token: string, id: string) {
 
 export async function fetchLatestAppRelease() {
     return apiGet<AppRelease>("/api/app-releases/latest");
+}
+
+export async function fetchRecentAppReleases(query: { page?: number; pageSize?: number } = {}) {
+    return apiGet<AppReleaseList>("/api/app-releases", compactApiParams(query));
 }

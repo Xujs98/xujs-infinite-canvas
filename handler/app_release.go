@@ -12,10 +12,11 @@ import (
 )
 
 type appReleaseRequest struct {
-	Version string                 `json:"version"`
-	Title   string                 `json:"title"`
-	Notes   string                 `json:"notes"`
-	Status  model.AppReleaseStatus `json:"status"`
+	Version     string                 `json:"version"`
+	Title       string                 `json:"title"`
+	Notes       string                 `json:"notes"`
+	ForceUpdate bool                   `json:"forceUpdate"`
+	Status      model.AppReleaseStatus `json:"status"`
 }
 
 func AdminAppReleases(w http.ResponseWriter, r *http.Request) {
@@ -33,7 +34,9 @@ func AdminCreateAppRelease(w http.ResponseWriter, r *http.Request) {
 		Fail(w, "请求格式错误")
 		return
 	}
-	result, err := service.CreateAppRelease(model.AppRelease{Version: request.Version, Title: request.Title, Notes: request.Notes})
+	result, err := service.CreateAppRelease(model.AppRelease{
+		Version: request.Version, Title: request.Title, Notes: request.Notes, ForceUpdate: request.ForceUpdate,
+	})
 	if err != nil {
 		FailError(w, err)
 		return
@@ -47,7 +50,10 @@ func AdminUpdateAppRelease(w http.ResponseWriter, r *http.Request, id string) {
 		Fail(w, "请求格式错误")
 		return
 	}
-	result, err := service.UpdateAppRelease(id, model.AppRelease{Version: request.Version, Title: request.Title, Notes: request.Notes, Status: request.Status})
+	result, err := service.UpdateAppRelease(id, model.AppRelease{
+		Version: request.Version, Title: request.Title, Notes: request.Notes,
+		ForceUpdate: request.ForceUpdate, Status: request.Status,
+	})
 	if err != nil {
 		FailError(w, err)
 		return
@@ -103,6 +109,19 @@ func AdminDeleteAppReleaseArtifact(w http.ResponseWriter, r *http.Request, id st
 
 func PublicLatestAppRelease(w http.ResponseWriter, r *http.Request) {
 	result, err := service.LatestPublishedAppRelease()
+	if err != nil {
+		FailError(w, err)
+		return
+	}
+	OK(w, result)
+}
+
+func PublicRecentAppReleases(w http.ResponseWriter, r *http.Request) {
+	query := parseQuery(r)
+	if query.PageSize < 1 {
+		query.PageSize = 10
+	}
+	result, err := service.PublishedAppReleases(query)
 	if err != nil {
 		FailError(w, err)
 		return

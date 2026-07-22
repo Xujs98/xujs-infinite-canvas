@@ -64,6 +64,27 @@ func GetLatestPublishedAppRelease() (model.AppRelease, error) {
 	return item, err
 }
 
+func ListPublishedAppReleases(q model.Query) (model.AppReleaseList, error) {
+	db, err := DB()
+	if err != nil {
+		return model.AppReleaseList{}, err
+	}
+	q.Normalize()
+	tx := db.Model(&model.AppRelease{}).Where("status = ?", model.AppReleaseStatusPublished)
+	var total int64
+	if err := tx.Count(&total).Error; err != nil {
+		return model.AppReleaseList{}, err
+	}
+	var items []model.AppRelease
+	err = tx.Preload("Artifacts").
+		Where("status = ?", model.AppReleaseStatusPublished).
+		Order("published_at DESC, created_at DESC").
+		Offset(q.Offset()).
+		Limit(q.PageSize).
+		Find(&items).Error
+	return model.AppReleaseList{Items: items, Total: total}, err
+}
+
 func CreateAppRelease(item model.AppRelease) (model.AppRelease, error) {
 	db, err := DB()
 	if err != nil {

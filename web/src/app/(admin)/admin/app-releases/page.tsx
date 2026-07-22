@@ -2,7 +2,7 @@
 
 import { AppleFilled, CloudUploadOutlined, DeleteOutlined, EditOutlined, PlusOutlined, ReloadOutlined, SearchOutlined, WindowsFilled } from "@ant-design/icons";
 import { ProTable, type ProColumns } from "@ant-design/pro-components";
-import { App, Button, Card, Col, Empty, Form, Input, Modal, Popconfirm, Progress, Row, Select, Space, Tag, Tooltip, Typography, Upload } from "antd";
+import { App, Button, Card, Col, Empty, Form, Input, Modal, Popconfirm, Progress, Row, Select, Space, Switch, Tag, Tooltip, Typography, Upload } from "antd";
 import type { UploadProps } from "antd";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
@@ -77,7 +77,7 @@ export default function AdminAppReleasesPage() {
     const openCreate = () => {
         setEditing(null);
         form.resetFields();
-        form.setFieldsValue({ version: "", title: "", notes: "", status: "draft" });
+        form.setFieldsValue({ version: "", title: "", notes: "", forceUpdate: false, status: "draft" });
         setFormOpen(true);
     };
 
@@ -157,7 +157,11 @@ export default function AdminAppReleasesPage() {
             width: 260,
             render: (_: unknown, item: AppRelease) => (
                 <div>
-                    <Space size={8}><Typography.Text strong>v{item.version}</Typography.Text><Tag color={item.status === "published" ? "green" : "default"}>{item.status === "published" ? "已发布" : "草稿"}</Tag></Space>
+                    <Space size={[8, 4]} wrap>
+                        <Typography.Text strong>v{item.version}</Typography.Text>
+                        <Tag color={item.status === "published" ? "green" : "default"}>{item.status === "published" ? "已发布" : "草稿"}</Tag>
+                        {item.forceUpdate ? <Tag color="red">强制更新</Tag> : null}
+                    </Space>
                     <Typography.Text type="secondary" ellipsis={{ tooltip: item.title }} style={{ display: "block", maxWidth: 230, fontSize: 12 }}>{item.title}</Typography.Text>
                 </div>
             ),
@@ -169,8 +173,8 @@ export default function AdminAppReleasesPage() {
                 <Space size={[4, 4]} wrap>{item.artifacts.map((artifact) => <Tag key={artifact.id}>{artifact.platform === "windows" ? "Windows" : "macOS"} · {artifact.arch}</Tag>)}</Space>
             ) : <Typography.Text type="secondary">尚未上传</Typography.Text>,
         },
-        { title: "更新说明", dataIndex: "notes", ellipsis: true, render: (value: string) => value || <Typography.Text type="secondary">-</Typography.Text> },
-        { title: "发布时间", dataIndex: "publishedAt", width: 180, render: (value: string | null) => value ? new Date(value).toLocaleString("zh-CN") : "-" },
+        { title: "更新说明", dataIndex: "notes", ellipsis: true, render: (_: unknown, item: AppRelease) => item.notes || <Typography.Text type="secondary">-</Typography.Text> },
+        { title: "发布时间", dataIndex: "publishedAt", width: 180, render: (_: unknown, item: AppRelease) => item.publishedAt ? new Date(item.publishedAt).toLocaleString("zh-CN") : "-" },
         {
             title: "操作",
             width: 140,
@@ -254,6 +258,19 @@ export default function AdminAppReleasesPage() {
                         <Col xs={24} sm={14}><Form.Item name="title" label="版本标题"><Input placeholder="矩龙画布 0.2.0" /></Form.Item></Col>
                     </Row>
                     {editing ? <Form.Item name="status" label="发布状态" rules={[{ required: true }]}><Select options={[{ value: "draft", label: "草稿" }, { value: "published", label: "已发布" }]} /></Form.Item> : null}
+                    <Form.Item label="更新策略">
+                        <div className="flex items-center justify-between gap-4 rounded-md border border-slate-200 px-4 py-3 dark:border-slate-700">
+                            <div>
+                                <Typography.Text strong>强制更新</Typography.Text>
+                                <Typography.Text type="secondary" style={{ display: "block", marginTop: 2, fontSize: 12 }}>
+                                    开启并发布后，旧版客户端必须完成更新才能继续使用。
+                                </Typography.Text>
+                            </div>
+                            <Form.Item name="forceUpdate" valuePropName="checked" noStyle>
+                                <Switch checkedChildren="开启" unCheckedChildren="关闭" />
+                            </Form.Item>
+                        </div>
+                    </Form.Item>
                     <Form.Item name="notes" label="更新说明"><Input.TextArea rows={7} maxLength={5000} showCount placeholder="逐行填写本次新增、优化和修复内容" /></Form.Item>
                     {editing?.status === "draft" ? <Typography.Text type="secondary">发布前请先在“安装包”中至少上传一个平台文件。</Typography.Text> : null}
                 </Form>

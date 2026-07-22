@@ -43,6 +43,21 @@ func LatestPublishedAppRelease() (model.AppRelease, error) {
 	return item, err
 }
 
+func PublishedAppReleases(query model.Query) (model.AppReleaseList, error) {
+	query.Normalize()
+	if query.PageSize > 100 {
+		query.PageSize = 100
+	}
+	result, err := repository.ListPublishedAppReleases(query)
+	if err != nil {
+		return result, err
+	}
+	for index := range result.Items {
+		decorateAppRelease(&result.Items[index])
+	}
+	return result, nil
+}
+
 func CreateAppRelease(input model.AppRelease) (model.AppRelease, error) {
 	version, err := normalizeAppReleaseVersion(input.Version)
 	if err != nil {
@@ -55,13 +70,14 @@ func CreateAppRelease(input model.AppRelease) (model.AppRelease, error) {
 	}
 	nowTime := time.Now()
 	item := model.AppRelease{
-		ID:        newID("release"),
-		Version:   version,
-		Title:     strings.TrimSpace(input.Title),
-		Notes:     strings.TrimSpace(input.Notes),
-		Status:    model.AppReleaseStatusDraft,
-		CreatedAt: nowTime,
-		UpdatedAt: nowTime,
+		ID:          newID("release"),
+		Version:     version,
+		Title:       strings.TrimSpace(input.Title),
+		Notes:       strings.TrimSpace(input.Notes),
+		ForceUpdate: input.ForceUpdate,
+		Status:      model.AppReleaseStatusDraft,
+		CreatedAt:   nowTime,
+		UpdatedAt:   nowTime,
 	}
 	if item.Title == "" {
 		item.Title = "矩龙画布 " + item.Version
@@ -99,6 +115,7 @@ func UpdateAppRelease(id string, input model.AppRelease) (model.AppRelease, erro
 	item.Version = version
 	item.Title = strings.TrimSpace(input.Title)
 	item.Notes = strings.TrimSpace(input.Notes)
+	item.ForceUpdate = input.ForceUpdate
 	item.Status = status
 	item.UpdatedAt = time.Now()
 	if item.Title == "" {

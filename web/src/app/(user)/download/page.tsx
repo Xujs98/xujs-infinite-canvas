@@ -5,7 +5,7 @@ import { ArrowDown, Check, CircuitBoard, Download, Image as ImageIcon, Monitor, 
 import type { CSSProperties } from "react";
 import { useEffect, useMemo, useState } from "react";
 
-import { type AppRelease, type AppReleaseArch, type AppReleaseArtifact, type AppReleasePlatform, fetchLatestAppRelease } from "@/services/api/app-releases";
+import { type AppRelease, type AppReleaseArch, type AppReleaseArtifact, type AppReleasePlatform, fetchLatestAppRelease, fetchRecentAppReleases } from "@/services/api/app-releases";
 import { cn } from "@/lib/utils";
 
 import styles from "./download.module.css";
@@ -37,6 +37,7 @@ function selectArtifact(release: AppRelease | null, platform: AppReleasePlatform
 
 export default function ClientDownloadPage() {
     const [release, setRelease] = useState<AppRelease | null>(null);
+    const [releaseHistory, setReleaseHistory] = useState<AppRelease[]>([]);
     const [loading, setLoading] = useState(true);
     const [platform, setPlatform] = useState<AppReleasePlatform>("windows");
     const [arch, setArch] = useState<AppReleaseArch>("x64");
@@ -55,6 +56,9 @@ export default function ClientDownloadPage() {
             .then(setRelease)
             .catch(() => setRelease(null))
             .finally(() => setLoading(false));
+        fetchRecentAppReleases({ page: 1, pageSize: 100 })
+            .then((result) => setReleaseHistory(result.items || []))
+            .catch(() => setReleaseHistory([]));
     }, []);
 
     const artifact = useMemo(() => selectArtifact(release, platform, arch), [arch, platform, release]);
@@ -156,6 +160,34 @@ export default function ClientDownloadPage() {
                         <div className="mt-7 space-y-3">
                             {notes.length ? notes.map((note, index) => <div key={`${index}-${note}`} className="flex gap-3 text-sm leading-6 text-stone-700 dark:text-stone-300"><span className="mt-2 size-1.5 shrink-0 rounded-full bg-emerald-600" /><span>{note}</span></div>) : <p className="text-sm text-stone-500">暂无更新说明</p>}
                         </div>
+                    </div>
+                </div>
+            </section>
+
+            <section className="border-t border-stone-200 bg-white dark:border-stone-800 dark:bg-stone-950">
+                <div className="mx-auto max-w-6xl px-6 py-14 md:py-16">
+                    <p className="text-sm font-medium text-emerald-700 dark:text-emerald-400">发布记录</p>
+                    <h2 className="mt-2 text-2xl font-semibold">更新历史</h2>
+                    <p className="mt-2 text-sm text-stone-500">查看矩龙画布桌面客户端已经发布的版本和更新内容。</p>
+                    <div className="mt-7 divide-y divide-stone-200 overflow-hidden rounded-md border border-stone-200 dark:divide-stone-800 dark:border-stone-800">
+                        {releaseHistory.length ? releaseHistory.map((item) => {
+                            const itemNotes = item.notes.split(/\r?\n/).map((note) => note.replace(/^[-*]\s*/, "").trim()).filter(Boolean);
+                            return (
+                                <article key={item.id} className="grid gap-3 px-5 py-5 md:grid-cols-[150px_1fr] md:px-6">
+                                    <div>
+                                        <div className="flex flex-wrap items-center gap-2">
+                                            <strong className="text-base">v{item.version}</strong>
+                                            {item.forceUpdate ? <span className="rounded bg-red-50 px-2 py-0.5 text-xs font-medium text-red-700 dark:bg-red-500/10 dark:text-red-300">强制更新</span> : null}
+                                        </div>
+                                        <time className="mt-1 block text-xs text-stone-500">{item.publishedAt ? new Date(item.publishedAt).toLocaleDateString("zh-CN") : ""}</time>
+                                    </div>
+                                    <div>
+                                        <h3 className="text-sm font-medium">{item.title}</h3>
+                                        {itemNotes.length ? <ul className="mt-2 space-y-1 text-sm leading-6 text-stone-600 dark:text-stone-400">{itemNotes.map((note, index) => <li key={`${index}-${note}`}>- {note}</li>)}</ul> : <p className="mt-2 text-sm text-stone-500">暂无更新说明</p>}
+                                    </div>
+                                </article>
+                            );
+                        }) : <p className="px-6 py-10 text-center text-sm text-stone-500">暂无更新历史</p>}
                     </div>
                 </div>
             </section>

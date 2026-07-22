@@ -14,6 +14,7 @@ type AppRelease struct {
 	Version     string               `json:"version" gorm:"uniqueIndex"`
 	Title       string               `json:"title"`
 	Notes       string               `json:"notes" gorm:"type:text"`
+	ForceUpdate bool                 `json:"forceUpdate" gorm:"not null;default:false"`
 	Status      AppReleaseStatus     `json:"status" gorm:"index"`
 	PublishedAt *time.Time           `json:"publishedAt" gorm:"index"`
 	CreatedAt   time.Time            `json:"createdAt"`

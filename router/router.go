@@ -101,6 +101,7 @@ func New() *gin.Engine {
 	api.GET("/assets", middleware.OptionalAuth, gin.WrapF(handler.Assets))
 	api.GET("/system-settings", gin.WrapF(handler.GetPublicSystemSettings))
 	api.GET("/app-releases/latest", gin.WrapF(handler.PublicLatestAppRelease))
+	api.GET("/app-releases", gin.WrapF(handler.PublicRecentAppReleases))
 	api.GET("/app-releases/artifacts/:id/download", func(c *gin.Context) {
 		handler.DownloadAppReleaseArtifact(c.Writer, c.Request, c.Param("id"))
 	})
