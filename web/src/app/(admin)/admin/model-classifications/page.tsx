@@ -238,6 +238,8 @@ export default function AdminModelClassificationsPage() {
                     "imageQualities",
                     "imageAspectRatios",
                     "imageMaxCount",
+                    "imageBatchConcurrency",
+                    "imageSupportCustomSize",
                     "imageAsyncTaskEnabled",
                     "imageAsyncTaskIdField",
                     "imageAsyncStatusEndpointPath",
@@ -379,9 +381,9 @@ export default function AdminModelClassificationsPage() {
     useEffect(() => {
         if (!modalOpen) return;
         const clearFields: Record<string, string[]> = {
-            video: ["imageQualities", "imageAspectRatios", "imageMaxCount", "imageSupportCustomSize", "audioVoices", "audioFormats", "audioSpeedMin", "audioSpeedMax"],
+            video: ["imageQualities", "imageAspectRatios", "imageMaxCount", "imageBatchConcurrency", "imageSupportCustomSize", "audioVoices", "audioFormats", "audioSpeedMin", "audioSpeedMax"],
             image: ["videoResolutions", "videoRatios", "videoDurations", "videoMaxDuration", "videoBillingMode", "videoSupportGenerateAudio", "videoSupportWatermark", "audioVoices", "audioFormats", "audioSpeedMin", "audioSpeedMax"],
-            audio: ["videoResolutions", "videoRatios", "videoDurations", "videoMaxDuration", "videoBillingMode", "videoSupportGenerateAudio", "videoSupportWatermark", "imageQualities", "imageAspectRatios", "imageMaxCount", "imageSupportCustomSize"],
+            audio: ["videoResolutions", "videoRatios", "videoDurations", "videoMaxDuration", "videoBillingMode", "videoSupportGenerateAudio", "videoSupportWatermark", "imageQualities", "imageAspectRatios", "imageMaxCount", "imageBatchConcurrency", "imageSupportCustomSize"],
             text: [
                 "videoResolutions",
                 "videoRatios",
@@ -393,6 +395,7 @@ export default function AdminModelClassificationsPage() {
                 "imageQualities",
                 "imageAspectRatios",
                 "imageMaxCount",
+                "imageBatchConcurrency",
                 "imageSupportCustomSize",
                 "audioVoices",
                 "audioFormats",
@@ -414,6 +417,7 @@ export default function AdminModelClassificationsPage() {
                 "imageQualities",
                 "imageAspectRatios",
                 "imageMaxCount",
+                "imageBatchConcurrency",
                 "imageSupportCustomSize",
                 "audioVoices",
                 "audioFormats",
