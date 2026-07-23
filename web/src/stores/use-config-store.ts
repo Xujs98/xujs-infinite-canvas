@@ -241,6 +241,7 @@ export type ModelClassificationDetail = {
         aspectRatios: string[];
         maxCount: number;
         supportCustomSize: boolean;
+        batchConcurrency?: number;
     } | null;
     audioConfig: {
         voices: string[];

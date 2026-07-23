@@ -175,6 +175,7 @@ type ImageModelConfig struct {
 	AspectRatios      []string              `json:"aspectRatios"`
 	MaxCount          int                   `json:"maxCount"`
 	SupportCustomSize bool                  `json:"supportCustomSize"`
+	BatchConcurrency  int                   `json:"batchConcurrency,omitempty"`
 	AsyncTask         *ImageAsyncTaskConfig `json:"asyncTask,omitempty"`
 }
 

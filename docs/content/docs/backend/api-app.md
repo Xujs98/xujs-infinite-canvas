@@ -391,6 +391,23 @@ GET /model-classifications/all
 
 **鉴权**: 无需鉴权
 
+图片模型的 `imageConfig` 包含批量生成与异步轮询参数：
+
+```json
+{
+  "qualities": ["auto", "2K"],
+  "aspectRatios": ["1:1", "16:9"],
+  "maxCount": 10,
+  "supportCustomSize": true,
+  "batchConcurrency": 3,
+  "asyncTask": {
+    "enabled": true
+  }
+}
+```
+
+`batchConcurrency` 允许 `1-20`，默认按 `3` 处理。App 使用该值限制同一渠道和模型等待上游接受的请求数；异步任务被接受并进入状态轮询后不再占用提交槽位。不同渠道或模型使用独立队列。
+
 ---
 
 ## 13. 图片代理

@@ -877,6 +877,7 @@ export type ImageModelConfig = {
     aspectRatios: string[];
     maxCount: number;
     supportCustomSize: boolean;
+    batchConcurrency?: number;
     asyncTask?: ImageAsyncTaskConfig | null;
 };
 

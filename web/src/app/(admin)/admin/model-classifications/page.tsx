@@ -167,6 +167,7 @@ export default function AdminModelClassificationsPage() {
                       imageAspectRatios: item.imageConfig?.aspectRatios || [],
                       imageMaxCount: item.imageConfig?.maxCount,
                       imageSupportCustomSize: item.imageConfig?.supportCustomSize,
+                      imageBatchConcurrency: item.imageConfig?.batchConcurrency ?? 3,
                       imageAsyncTaskEnabled: item.imageConfig?.asyncTask?.enabled ?? false,
                       imageAsyncTaskIdField: item.imageConfig?.asyncTask?.taskIdField ?? "task_id",
                       imageAsyncStatusEndpointPath: item.imageConfig?.asyncTask?.statusEndpointPath ?? "/v1/images/generations/{taskId}",
@@ -309,6 +310,7 @@ export default function AdminModelClassificationsPage() {
                     aspectRatios: toArr(values.imageAspectRatios).length ? toArr(values.imageAspectRatios) : ["1:1"],
                     maxCount: values.imageMaxCount || 1,
                     supportCustomSize: values.imageSupportCustomSize ?? true,
+                    batchConcurrency: Math.min(20, Math.max(1, Number(values.imageBatchConcurrency) || 3)),
                     asyncTask: values.imageAsyncTaskEnabled
                         ? {
                               enabled: true,
@@ -785,12 +787,22 @@ export default function AdminModelClassificationsPage() {
                                 <Select mode="tags" placeholder="选择或输入比例" options={allAspectRatioOptions.map((v) => ({ label: v, value: v }))} />
                             </Form.Item>
                             <Row gutter={16}>
-                                <Col span={12}>
+                                <Col span={8}>
                                     <Form.Item name="imageMaxCount" label="最大生成数量">
                                         <InputNumber min={1} max={100} placeholder="1" style={{ width: "100%" }} />
                                     </Form.Item>
                                 </Col>
-                                <Col span={12}>
+                                <Col span={8}>
+                                    <Form.Item
+                                        name="imageBatchConcurrency"
+                                        label="批量提交并发数"
+                                        initialValue={3}
+                                        help="同一渠道和模型等待上游受理的最大请求数"
+                                    >
+                                        <InputNumber min={1} max={20} precision={0} style={{ width: "100%" }} />
+                                    </Form.Item>
+                                </Col>
+                                <Col span={8}>
                                     <Form.Item name="imageSupportCustomSize" label="支持自定义尺寸" valuePropName="checked">
                                         <Switch />
                                     </Form.Item>
