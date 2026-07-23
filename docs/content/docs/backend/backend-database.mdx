@@ -17,6 +17,8 @@ description: 当前后端主要数据表与字段说明
 - `mysql`
 - `postgresql`
 
+SQLite 启动时会自动补充 `journal_mode=WAL` 和 15 秒 `busy_timeout`，并将连接池限制为单连接。这样请求日志、调用日志与算力点事务会在同一进程内顺序写入，避免批量模型调用因 SQLite 单写限制产生 `SQLITE_BUSY`。`DATABASE_DSN` 已显式配置 `busy_timeout` 或 `journal_mode` 时保留配置值，不会覆盖。
+
 当前启动时执行 `AutoMigrate`，自动维护以下表：
 
 - `users`

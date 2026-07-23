@@ -36,6 +36,8 @@ var (
 	dbErr  error
 )
 
+const sqliteBusyTimeoutMS = 15000
+
 // DB 初始化并返回全局数据库连接。
 func DB() (*gorm.DB, error) {
 	dbOnce.Do(func() {
@@ -44,8 +46,11 @@ func DB() (*gorm.DB, error) {
 			driver = "sqlite"
 		}
 		dsn := config.Cfg.DatabaseDSN
-		if driver == "sqlite" && dsn != ":memory:" {
-			_ = os.MkdirAll(filepath.Dir(dsn), 0755)
+		if driver == "sqlite" {
+			if databasePath := sqliteDatabasePath(dsn); databasePath != "" {
+				_ = os.MkdirAll(filepath.Dir(databasePath), 0755)
+			}
+			dsn = sqliteDSNWithConcurrencyDefaults(dsn)
 		}
 		if isPostgresDriver(driver) {
 			dbErr = ensurePostgresDatabase(dsn)
@@ -62,6 +67,12 @@ func DB() (*gorm.DB, error) {
 		db, dbErr = gorm.Open(dialector(driver, dsn), &gorm.Config{})
 		if dbErr != nil {
 			return
+		}
+		if driver == "sqlite" {
+			dbErr = configureSQLitePool(db)
+			if dbErr != nil {
+				return
+			}
 		}
 		dbErr = db.AutoMigrate(
 			&model.User{},
@@ -100,6 +111,52 @@ func DB() (*gorm.DB, error) {
 		dbErr = ensureRoleOfflineCreditLimitColumn(db)
 	})
 	return db, dbErr
+}
+
+func sqliteDatabasePath(dsn string) string {
+	path := strings.TrimSpace(strings.SplitN(dsn, "?", 2)[0])
+	if path == "" || path == ":memory:" || strings.HasPrefix(path, "file:") {
+		return ""
+	}
+	return path
+}
+
+func sqliteDSNWithConcurrencyDefaults(dsn string) string {
+	dsn = strings.TrimSpace(dsn)
+	if dsn == "" {
+		return dsn
+	}
+	lower := strings.ToLower(dsn)
+	params := make([]string, 0, 2)
+	if !strings.Contains(lower, "busy_timeout") {
+		params = append(params, "_pragma=busy_timeout(15000)")
+	}
+	if dsn != ":memory:" && !strings.Contains(lower, "mode=memory") && !strings.Contains(lower, "journal_mode") {
+		params = append(params, "_pragma=journal_mode(WAL)")
+	}
+	if len(params) == 0 {
+		return dsn
+	}
+	separator := "?"
+	if strings.Contains(dsn, "?") {
+		separator = "&"
+	}
+	if strings.HasSuffix(dsn, "?") || strings.HasSuffix(dsn, "&") {
+		separator = ""
+	}
+	return dsn + separator + strings.Join(params, "&")
+}
+
+func configureSQLitePool(database *gorm.DB) error {
+	sqlDB, err := database.DB()
+	if err != nil {
+		return err
+	}
+	// SQLite has a single writer. Keeping one pooled connection prevents
+	// request/call-log writes from racing credit charge transactions.
+	sqlDB.SetMaxOpenConns(1)
+	sqlDB.SetMaxIdleConns(1)
+	return nil
 }
 
 func ensureRoleFreeModelsColumn(db *gorm.DB) error {
